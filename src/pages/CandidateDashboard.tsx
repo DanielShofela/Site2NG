@@ -60,6 +60,31 @@ export default function CandidateDashboard() {
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [cvBlobUrl, setCvBlobUrl] = useState<string | null>(null);
   
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  const [selectedApp, setSelectedApp] = useState<any>(null);
+  const [selectedJob, setSelectedJob] = useState<any>(null);
+  const [isLoadingJob, setIsLoadingJob] = useState(false);
+
+  const handleViewDetails = async (app: any) => {
+    setSelectedApp(app);
+    setIsDetailsOpen(true);
+    setIsLoadingJob(true);
+    try {
+      const { doc, getDoc } = await import('firebase/firestore');
+      const jobDoc = await getDoc(doc(db, 'jobs', app.jobId));
+      if (jobDoc.exists()) {
+        setSelectedJob({ id: jobDoc.id, ...jobDoc.data() });
+      } else {
+        setSelectedJob(null);
+      }
+    } catch (e) {
+      console.error('Error fetching job details:', e);
+      setSelectedJob(null);
+    } finally {
+      setIsLoadingJob(false);
+    }
+  };
+  
   const score = user ? calculateCompletionScore(user) : 0;
   const suggestions = user ? getProfileSuggestions(user) : [];
 
@@ -395,7 +420,13 @@ export default function CandidateDashboard() {
                              app.status === 'viewed' ? 'Consultée' :
                              app.status === 'shortlisted' ? 'Sélectionné' : 'Refusé'}
                           </Badge>
-                          <Button variant="ghost" className="h-10 rounded-xl font-bold bg-slate-50 hover:bg-slate-100">Détails</Button>
+                          <Button 
+                            variant="ghost" 
+                            className="h-10 rounded-xl font-bold bg-slate-50 hover:bg-slate-100"
+                            onClick={() => handleViewDetails(app)}
+                          >
+                            Détails
+                          </Button>
                         </div>
                       </CardContent>
                     </Card>
@@ -437,6 +468,96 @@ export default function CandidateDashboard() {
               </div>
             )}
           </div>
+        </DialogContent>
+      </Dialog>
+      {/* Application Details Dialog */}
+      <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
+        <DialogContent className="sm:max-w-[550px] rounded-[32px] p-0 overflow-hidden border-none shadow-2xl">
+          {selectedApp && (
+            <div className="bg-white">
+              <div className="bg-slate-900 p-8 text-white">
+                <DialogHeader>
+                  <DialogTitle className="text-2xl font-extrabold tracking-tight">Détails de la candidature</DialogTitle>
+                  <DialogDescription className="text-slate-400 mt-1">
+                    Candidature envoyée le {formatDistanceToNow(selectedApp.appliedAt?.seconds ? new Date(selectedApp.appliedAt.seconds * 1000) : new Date(selectedApp.appliedAt), { addSuffix: true, locale: fr })}
+                  </DialogDescription>
+                </DialogHeader>
+              </div>
+
+              <div className="p-8 space-y-6">
+                <div className="flex items-center gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                  <div className="h-12 w-12 bg-slate-900 rounded-xl flex items-center justify-center font-black text-white text-lg">
+                    {selectedApp.companyName?.[0] || 'J'}
+                  </div>
+                  <div>
+                    <h4 className="font-extrabold text-slate-900">{selectedApp.jobTitle}</h4>
+                    <p className="text-slate-500 text-sm font-medium">{selectedApp.companyName}</p>
+                  </div>
+                  <Badge className={`ml-auto
+                    ${selectedApp.status === 'pending' ? 'bg-yellow-100 text-yellow-700' : ''}
+                    ${selectedApp.status === 'viewed' ? 'bg-blue-100 text-blue-700' : ''}
+                    ${selectedApp.status === 'shortlisted' ? 'bg-green-100 text-green-700' : ''}
+                    ${selectedApp.status === 'rejected' ? 'bg-red-100 text-red-700' : ''}
+                    px-3 py-1 border-none font-bold rounded-lg
+                  `}>
+                    {selectedApp.status === 'pending' ? 'En attente' : 
+                     selectedApp.status === 'viewed' ? 'Consultée' :
+                     selectedApp.status === 'shortlisted' ? 'Sélectionné' : 'Refusé'}
+                  </Badge>
+                </div>
+
+                {isLoadingJob ? (
+                  <div className="flex justify-center py-12">
+                    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-600"></div>
+                  </div>
+                ) : selectedJob ? (
+                  <div className="space-y-6 animate-in fade-in duration-500">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">Localisation</p>
+                        <p className="text-sm font-bold text-slate-700 flex items-center gap-1">
+                          <MapPin className="h-3 w-3 text-orange-600" /> {selectedJob.location}
+                        </p>
+                      </div>
+                      <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">Type de contrat</p>
+                        <p className="text-sm font-bold text-slate-700">{selectedJob.type}</p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <h4 className="text-sm font-bold text-slate-900 border-l-4 border-orange-600 pl-3">Description du poste</h4>
+                      <p className="text-sm text-slate-600 leading-relaxed max-h-[200px] overflow-y-auto pr-2 custom-scrollbar">
+                        {selectedJob.description}
+                      </p>
+                    </div>
+
+                    {selectedJob.salary && (
+                      <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-100">
+                        <p className="text-[10px] text-emerald-600 font-bold uppercase tracking-widest mb-1">Salaire proposé</p>
+                        <p className="text-sm font-bold text-emerald-700">{selectedJob.salary}</p>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <AlertCircle className="h-10 w-10 text-slate-200 mx-auto mb-2" />
+                    <p className="text-slate-400 text-sm font-medium">Les détails complets de l'offre ne sont plus disponibles.</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="p-8 pt-0">
+                <Button 
+                  variant="outline" 
+                  className="w-full h-12 rounded-xl font-bold border-slate-200"
+                  onClick={() => setIsDetailsOpen(false)}
+                >
+                  Fermer
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>
