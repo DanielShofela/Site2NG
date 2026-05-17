@@ -133,35 +133,35 @@ export default function CandidateDashboard() {
   return (
     <div className="min-h-screen bg-slate-50/50 pb-20">
       {/* Profile Header Banner */}
-      <div className="bg-slate-900 h-48 relative">
+      <div className="bg-slate-900 h-48 sm:h-64 relative">
         <div className="container mx-auto px-4 h-full flex items-end">
           <div className="translate-y-12 flex flex-col md:flex-row items-center md:items-end gap-6 w-full">
-            <Avatar className="h-32 w-32 border-4 border-white shadow-xl">
+            <Avatar className="h-24 w-24 sm:h-32 sm:w-32 border-4 border-white shadow-xl flex-shrink-0">
               <AvatarImage src={user.photoUrl || ''} />
-              <AvatarFallback className="text-4xl bg-orange-100 text-orange-600">
+              <AvatarFallback className="text-3xl sm:text-4xl bg-orange-100 text-orange-600">
                 {user.displayName?.[0]}
               </AvatarFallback>
             </Avatar>
             <div className="flex-1 text-center md:text-left pb-2">
-              <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight md:text-white md:drop-shadow-sm">
+              <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight md:text-white md:drop-shadow-sm">
                 {user.firstName} {user.lastName}
               </h1>
               <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 mt-2">
                 <Badge className="bg-orange-600 text-white border-none px-3 py-1">
                   {user.jobTitle || 'Candidat'}
                 </Badge>
-                <div className="flex items-center text-slate-500 md:text-slate-300 text-sm gap-1">
+                <div className="flex items-center text-slate-500 md:text-slate-300 text-xs sm:text-sm gap-1">
                   <MapPin className="h-4 w-4" /> {user.city}, {user.commune}
                 </div>
               </div>
             </div>
-            <div className="flex items-center gap-3 pb-2">
-              <Link to="/onboarding">
-                <Button className="bg-white text-slate-900 border-none hover:bg-slate-100 font-bold rounded-xl shadow-lg">
+            <div className="flex flex-col sm:flex-row items-center gap-3 pb-2 w-full sm:w-auto">
+              <Link to="/onboarding" className="w-full sm:w-auto">
+                <Button className="w-full bg-white text-slate-900 border-none hover:bg-slate-100 font-bold rounded-xl shadow-lg">
                   <Settings className="mr-2 h-4 w-4" /> Modifier Profil
                 </Button>
               </Link>
-              <Button onClick={handleExportCV} variant="outline" className="bg-white/10 text-white border-white/20 hover:bg-white/20 rounded-xl font-bold backdrop-blur-md">
+              <Button onClick={handleExportCV} variant="outline" className="w-full sm:w-auto bg-white/10 sm:bg-white/10 text-slate-800 sm:text-white border-slate-200 sm:border-white/20 hover:bg-slate-100 sm:hover:bg-white/20 rounded-xl font-bold backdrop-blur-md">
                 <Download className="mr-2 h-4 w-4" /> Export PDF
               </Button>
             </div>

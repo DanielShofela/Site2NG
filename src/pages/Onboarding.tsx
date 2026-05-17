@@ -116,20 +116,20 @@ export default function Onboarding() {
     <div className="min-h-screen bg-slate-50 pt-10 pb-20 px-4">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
-        <div className="mb-8 flex justify-between items-end">
+        <div className="mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
           <div>
-            <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
               Complétez votre profil professionnel
             </h1>
-            <p className="text-slate-500 mt-2">
+            <p className="text-slate-500 mt-2 text-sm sm:text-base">
               Laissez les recruteurs découvrir votre plein potentiel.
             </p>
           </div>
-          <div className="text-right">
+          <div className="text-left sm:text-right w-full sm:w-auto">
             <span className="text-sm font-bold text-orange-600">
               Etape {currentStep + 1} sur {STEPS.length}
             </span>
-            <div className="w-48 h-2 bg-slate-200 rounded-full mt-2 overflow-hidden">
+            <div className="w-full sm:w-48 h-2 bg-slate-200 rounded-full mt-2 overflow-hidden">
               <motion.div 
                 className="h-full bg-orange-600"
                 initial={{ width: 0 }}
@@ -259,7 +259,7 @@ export default function Onboarding() {
 function PersonalInfoStep({ data, onChange }: { data: Partial<UserProfile>, onChange: (d: any) => void }) {
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label htmlFor="firstName">Prénom *</Label>
           <Input 
@@ -282,7 +282,7 @@ function PersonalInfoStep({ data, onChange }: { data: Partial<UserProfile>, onCh
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label htmlFor="gender">Sexe</Label>
           <Select value={data.gender} onValueChange={v => onChange({ gender: v })}>
@@ -297,18 +297,29 @@ function PersonalInfoStep({ data, onChange }: { data: Partial<UserProfile>, onCh
           </Select>
         </div>
         <div className="space-y-2">
-          <Label htmlFor="birthDate">Date de naissance</Label>
+          <Label htmlFor="birthDate">Date de naissance (JJ/MM/AAAA)</Label>
           <Input 
             id="birthDate" 
-            type="date"
+            type="text"
             value={data.birthDate || ''} 
-            onChange={e => onChange({ birthDate: e.target.value })}
+            onChange={e => {
+              // Basic auto-formatting for DD/MM/YYYY
+              let val = e.target.value.replace(/\D/g, '');
+              if (val.length > 8) val = val.slice(0, 8);
+              if (val.length > 4) {
+                val = val.slice(0, 2) + '/' + val.slice(2, 4) + '/' + val.slice(4);
+              } else if (val.length > 2) {
+                val = val.slice(0, 2) + '/' + val.slice(2);
+              }
+              onChange({ birthDate: val });
+            }}
+            placeholder="Ex: 15/05/1990"
             className="h-12 border-slate-200"
           />
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label htmlFor="phone">Téléphone principal *</Label>
           <Input 
@@ -331,7 +342,7 @@ function PersonalInfoStep({ data, onChange }: { data: Partial<UserProfile>, onCh
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label htmlFor="city">Ville</Label>
           <Input 
@@ -400,7 +411,7 @@ function ProfessionalStep({ data, onChange }: { data: Partial<UserProfile>, onCh
         </Select>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label htmlFor="yearsExp">Années d'expérience</Label>
           <Input 
@@ -841,7 +852,7 @@ function DocumentsStep({ data, onChange }: { data: Partial<UserProfile>, onChang
       <div className="space-y-6">
         <Label className="text-lg font-bold">Réseaux Professionnels</Label>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label className="flex items-center gap-2">
               <Globe className="h-4 w-4 text-slate-400" /> LinkedIn
