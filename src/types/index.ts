@@ -4,7 +4,7 @@
  */
 
 export type UserRole = 'candidate' | 'recruiter' | 'admin';
-export type ApprovalStatus = 'pending' | 'approved' | 'rejected';
+export type ApprovalStatus = 'draft' | 'submitted' | 'verifying' | 'approved' | 'rejected' | 'pending';
 export type JobStatus = 'active' | 'closed';
 export type ApplicationStatus = 'pending' | 'viewed' | 'shortlisted' | 'rejected';
 
@@ -97,11 +97,58 @@ export interface UserProfile {
   profileComplete?: boolean;
   profileViews?: number;
 
-  // Recruiter fields
+  // Recruiter fields - Extended
   companyName?: string;
+  tradeName?: string;
   companyEmail?: string;
-  registrationNumber?: string;
+  registrationNumber?: string; // RCCM
+  taxNumber?: string;
+  taxAccount?: string;
+  legalForm?: string;
+  creationDate?: string;
   companyDescription?: string;
+  companyShortDescription?: string;
+  sectorActivity?: string;
+  subSector?: string;
+  
+  website?: string;
+  whatsappBusiness?: string;
+  
+  manager?: {
+    firstName: string;
+    lastName: string;
+    role: string;
+    email: string;
+    phone: string;
+    photoUrl?: string;
+  };
+
+  companySize?: string;
+  companyType?: string; // TPE, PME, Grande Entreprise, Multinationale
+
+  recruitmentNeeds?: {
+    currentlyRecruiting: boolean;
+    profileTypes: string[];
+    frequency: string;
+    zones: string[];
+  };
+
+  branding?: {
+    bannerUrl?: string;
+    mission?: string;
+    vision?: string;
+    values?: string[];
+    perks?: string[];
+    gallery?: string[];
+  };
+
+  legalDocuments?: {
+    rccmUrl?: string;
+    taxStatusUrl?: string;
+    otherUrls?: string[];
+    brochureUrl?: string;
+    presentationUrl?: string;
+  };
   
   createdAt: any;
 }

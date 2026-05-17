@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Search, MapPin, Briefcase, Clock, Filter, ChevronRight, CheckCircle2 } from 'lucide-react';
+import { Search, MapPin, Briefcase, Clock, Filter, ChevronRight, CheckCircle2, ExternalLink } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Job, Application } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
@@ -158,7 +159,14 @@ export default function Jobs() {
                               {job.title}
                             </CardTitle>
                             <div className="flex items-center text-sm font-medium text-slate-500">
-                              <span className="text-slate-900">{job.companyName}</span>
+                              <Link 
+                                to={`/company/${job.recruiterId}`} 
+                                className="text-slate-900 hover:text-orange-600 transition-colors flex items-center gap-1 group/company"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                {job.companyName}
+                                <ExternalLink className="h-3 w-3 opacity-0 group-hover/company:opacity-100 transition-opacity" />
+                              </Link>
                               <span className="mx-2 opacity-30">•</span>
                               <MapPin className="h-3.5 w-3.5 mr-1 text-orange-600" /> {job.location}
                             </div>
@@ -211,7 +219,13 @@ export default function Jobs() {
                         <DialogHeader>
                           <DialogTitle className="text-3xl font-extrabold tracking-tight">{selectedJob.title}</DialogTitle>
                           <DialogDescription className="flex items-center gap-2 mt-3 text-slate-300 font-medium">
-                            <span className="text-white bg-white/10 px-3 py-1 rounded-lg">{selectedJob.companyName}</span>
+                            <Link 
+                              to={`/company/${selectedJob.recruiterId}`}
+                              className="text-white bg-white/10 px-3 py-1 rounded-lg hover:bg-white/20 transition-all flex items-center gap-2"
+                            >
+                              {selectedJob.companyName}
+                              <ExternalLink className="h-3 w-3" />
+                            </Link>
                             <span className="opacity-50">•</span>
                             <span className="flex items-center gap-1.5"><MapPin className="h-4 w-4 text-orange-500" /> {selectedJob.location}</span>
                           </DialogDescription>

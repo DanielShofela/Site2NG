@@ -285,7 +285,7 @@ function PersonalInfoStep({ data, onChange }: { data: Partial<UserProfile>, onCh
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label htmlFor="gender">Sexe</Label>
-          <Select value={data.gender} onValueChange={v => onChange({ gender: v })}>
+          <Select value={data.gender || ""} onValueChange={v => onChange({ gender: v })}>
             <SelectTrigger className="h-12 border-slate-200">
               <SelectValue placeholder="Sélectionner" />
             </SelectTrigger>
@@ -395,7 +395,7 @@ function ProfessionalStep({ data, onChange }: { data: Partial<UserProfile>, onCh
 
       <div className="space-y-2">
         <Label htmlFor="sector">Secteur d'activité</Label>
-        <Select value={data.sector} onValueChange={v => onChange({ sector: v })}>
+        <Select value={data.sector || ""} onValueChange={v => onChange({ sector: v })}>
           <SelectTrigger className="h-12 border-slate-200">
             <SelectValue placeholder="Sélectionner un secteur" />
           </SelectTrigger>
@@ -765,7 +765,7 @@ function SkillsStep({ data, onChange }: { data: Partial<UserProfile>, onChange: 
                </div>
                <div className="flex-1 space-y-2">
                  <Label className="text-xs">Niveau</Label>
-                 <Select value={lang.level} onValueChange={v => updateLanguage(index, { level: v })}>
+                 <Select value={lang.level || ""} onValueChange={v => updateLanguage(index, { level: v })}>
                   <SelectTrigger className="bg-white">
                     <SelectValue />
                   </SelectTrigger>

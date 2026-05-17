@@ -29,6 +29,7 @@ interface AuthContextType {
   loginWithGoogle: (role?: UserRole) => Promise<void>;
   signupWithEmail: (email: string, password: string, userData: Partial<UserProfile>) => Promise<void>;
   loginWithEmail: (email: string, password: string) => Promise<void>;
+  sendPasswordReset: (email: string) => Promise<void>;
   updateProfile: (data: Partial<UserProfile>) => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -141,6 +142,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const sendPasswordReset = async (email: string) => {
+    const { sendPasswordResetEmail } = await import('firebase/auth');
+    auth.languageCode = 'fr';
+    await sendPasswordResetEmail(auth, email);
+  };
+
   const logout = async () => {
     setLoading(true);
     try {
@@ -168,7 +175,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, loginWithGoogle, updateProfile, logout }}>
+    <AuthContext.Provider value={{ user, loading, loginWithGoogle, signupWithEmail, loginWithEmail, sendPasswordReset, updateProfile, logout }}>
       {children}
     </AuthContext.Provider>
   );

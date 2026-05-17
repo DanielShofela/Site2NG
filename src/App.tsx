@@ -15,6 +15,9 @@ import Onboarding from './pages/Onboarding';
 import AdminDashboard from './pages/AdminDashboard';
 import About from './pages/About';
 import PendingApproval from './pages/PendingApproval';
+import ForgotPassword from './pages/ForgotPassword';
+import RecruiterOnboarding from './pages/RecruiterOnboarding';
+import CompanyProfile from './pages/CompanyProfile';
 import Navbar from './components/layout/Navbar';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 
@@ -36,6 +39,11 @@ function ProtectedRoute({ children, role }: { children: React.ReactNode, role: s
     return <Navigate to="/onboarding" />;
   }
 
+  // If recruiter but profile not complete, redirect to recruiter onboarding
+  if (user.role === 'recruiter' && !user.profileComplete && window.location.pathname !== '/recruiter-onboarding') {
+    return <Navigate to="/recruiter-onboarding" />;
+  }
+
   return <>{children}</>;
 }
 
@@ -54,9 +62,12 @@ export default function App() {
               <Route path="/recruiter" element={<ProtectedRoute role="recruiter"><RecruiterDashboard /></ProtectedRoute>} />
               <Route path="/candidate" element={<ProtectedRoute role="candidate"><CandidateDashboard /></ProtectedRoute>} />
               <Route path="/onboarding" element={<ProtectedRoute role="candidate"><Onboarding /></ProtectedRoute>} />
+              <Route path="/recruiter-onboarding" element={<ProtectedRoute role="recruiter"><RecruiterOnboarding /></ProtectedRoute>} />
               <Route path="/admin" element={<ProtectedRoute role="admin"><AdminDashboard /></ProtectedRoute>} />
               <Route path="/about" element={<About />} />
               <Route path="/pending-approval" element={<PendingApproval />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/company/:id" element={<CompanyProfile />} />
             </Routes>
           </main>
         </div>
