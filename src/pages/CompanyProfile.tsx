@@ -104,7 +104,7 @@ export default function CompanyProfile() {
   return (
     <div className="min-h-screen bg-slate-50 pb-20">
       {/* Header / Banner */}
-      <div className="h-[300px] md:h-[400px] w-full relative overflow-hidden bg-slate-900">
+      <div className="h-[200px] md:h-[300px] lg:h-[400px] w-full relative overflow-hidden bg-slate-900">
         {profile.branding?.bannerUrl ? (
           <img 
             src={profile.branding.bannerUrl} 
@@ -117,46 +117,46 @@ export default function CompanyProfile() {
         
         <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 to-transparent" />
         
-        <div className="container relative h-full flex flex-col justify-end pb-12 px-4">
-          <div className="flex flex-col md:flex-row items-end gap-6">
-            <div className="h-32 w-32 md:h-44 md:w-44 bg-white rounded-[40px] p-2 shadow-2xl shrink-0 translate-y-6">
-              <div className="h-full w-full rounded-[34px] overflow-hidden bg-slate-50 flex items-center justify-center border border-slate-100">
+        <div className="container relative h-full flex flex-col justify-end pb-8 md:pb-12 px-4">
+          <div className="flex flex-col md:flex-row items-center md:items-end gap-6 text-center md:text-left">
+            <div className="h-24 w-24 sm:h-32 md:h-44 md:w-44 bg-white rounded-[24px] md:rounded-[40px] p-2 shadow-2xl shrink-0 translate-y-6 md:translate-y-8">
+              <div className="h-full w-full rounded-[18px] md:rounded-[34px] overflow-hidden bg-slate-50 flex items-center justify-center border border-slate-100">
                 {profile.photoUrl ? (
-                  <img src={profile.photoUrl} alt={profile.companyName} className="h-full w-full object-contain p-4" />
+                  <img src={profile.photoUrl} alt={profile.companyName} className="h-full w-full object-contain p-2 md:p-4" />
                 ) : (
-                  <Building2 className="h-16 w-16 text-slate-300" />
+                  <Building2 className="h-10 w-10 md:h-16 md:w-16 text-slate-300" />
                 )}
               </div>
             </div>
-            <div className="flex-1 mb-8 md:mb-2">
-              <div className="flex items-center gap-3">
-                <h1 className="text-3xl md:text-5xl font-black text-white tracking-tight">
+            <div className="flex-1 mb-2 md:mb-4">
+              <div className="flex flex-wrap items-center justify-center md:justify-start gap-3">
+                <h1 className="text-2xl md:text-5xl font-black text-white tracking-tight">
                   {profile.companyName}
                 </h1>
                 {profile.status === 'approved' && (
-                  <Badge className="bg-blue-500 text-white border-none rounded-full px-3 py-1 flex items-center gap-1">
+                  <Badge className="bg-blue-500 text-white border-none rounded-full px-3 py-1 flex items-center gap-1 text-[10px]">
                     <ShieldCheck className="h-3.5 w-3.5" />
                     Vérifiée
                   </Badge>
                 )}
               </div>
-              <p className="text-slate-300 text-lg font-medium mt-2 max-w-2xl line-clamp-2">
+              <p className="text-slate-300 text-sm md:text-lg font-medium mt-2 max-w-2xl line-clamp-2 md:line-clamp-none">
                 {profile.companyShortDescription || profile.companyDescription?.slice(0, 150) + '...'}
               </p>
-              <div className="flex flex-wrap items-center gap-4 mt-4 text-slate-400 text-sm font-bold">
-                <span className="flex items-center gap-1.5"><MapPin className="h-4 w-4" /> {profile.city}, {profile.commune || "CI"}</span>
-                <span className="flex items-center gap-1.5"><Users className="h-4 w-4" /> {profile.companySize || "N/A"}</span>
-                <span className="flex items-center gap-1.5"><Briefcase className="h-4 w-4" /> {profile.sectorActivity || "N/A"}</span>
+              <div className="flex flex-wrap justify-center md:justify-start items-center gap-3 md:gap-4 mt-4 text-slate-400 text-xs md:text-sm font-bold">
+                <span className="flex items-center gap-1.5"><MapPin className="h-4 w-4 text-orange-500" /> {profile.city}, {profile.commune || "CI"}</span>
+                <span className="flex items-center gap-1.5"><Users className="h-4 w-4 text-orange-500" /> {profile.companySize || "N/A"}</span>
+                <span className="flex items-center gap-1.5"><Briefcase className="h-4 w-4 text-orange-500" /> {profile.sectorActivity || "N/A"}</span>
               </div>
             </div>
-            <div className="flex flex-col gap-3 mb-2 w-full md:w-auto">
+            <div className="flex flex-col sm:flex-row md:flex-col gap-3 mb-2 w-full md:w-auto">
               {profile.recruitmentNeeds?.currentlyRecruiting && (
                 <Badge className="bg-orange-600 text-white border-none font-bold py-2 px-6 rounded-full text-center justify-center">
-                  Recrute actuellement
+                  Recrute
                 </Badge>
               )}
               {profile.website && (
-                <Button variant="outline" className="bg-white/10 border-white/20 text-white hover:bg-white/20 rounded-2xl h-12 font-bold backdrop-blur-sm" asChild>
+                <Button variant="outline" className="bg-white/10 border-white/20 text-white hover:bg-white/20 rounded-2xl h-11 md:h-12 font-bold backdrop-blur-sm" asChild>
                   <a href={profile.website} target="_blank" rel="noopener noreferrer">
                     <Globe className="mr-2 h-4 w-4" /> Site Web
                   </a>
@@ -167,7 +167,7 @@ export default function CompanyProfile() {
         </div>
       </div>
 
-      <div className="container px-4 mt-20 grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-12">
+      <div className="container px-4 mt-16 md:mt-24 grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-8 md:gap-12">
         {/* Main Content */}
         <div className="space-y-12">
           {/* Stats Bar */}

@@ -161,35 +161,35 @@ export default function CandidateDashboard() {
       <div className="bg-slate-900 h-40 sm:h-56 relative" />
 
       {/* Profile Info Section - Overlapping with Banner */}
-      <div className="container mx-auto px-4 relative -mt-20 sm:-mt-24 z-10">
+      <div className="container mx-auto px-4 relative -mt-16 sm:-mt-24 z-10">
         <div className="flex flex-col md:flex-row items-center md:items-end gap-6 w-full">
-          <Avatar className="h-28 w-28 sm:h-40 sm:w-40 border-4 border-white shadow-2xl flex-shrink-0 bg-white">
+          <Avatar className="h-24 w-24 sm:h-32 md:h-40 sm:w-32 md:w-40 border-4 border-white shadow-2xl flex-shrink-0 bg-white">
             <AvatarImage src={user.photoUrl || ''} />
-            <AvatarFallback className="text-4xl sm:text-5xl bg-orange-100 text-orange-600">
+            <AvatarFallback className="text-3xl sm:text-4xl md:text-5xl bg-orange-100 text-orange-600">
               {user.displayName?.[0]}
             </AvatarFallback>
           </Avatar>
-          <div className="flex-1 text-center md:text-left pb-2">
-            <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight md:text-white md:drop-shadow-lg">
+          <div className="flex-1 text-center md:text-left">
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-slate-900 tracking-tight md:text-white md:drop-shadow-lg leading-tight">
               {user.firstName} {user.lastName}
             </h1>
-            <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 mt-2">
-              <Badge className="bg-orange-600 text-white border-none px-4 py-1 text-sm font-bold shadow-lg shadow-orange-600/20">
+            <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 md:gap-3 mt-2">
+              <Badge className="bg-orange-600 text-white border-none px-3 md:px-4 py-1 text-xs md:text-sm font-bold shadow-lg shadow-orange-600/20">
                 {user.jobTitle || 'Candidat'}
               </Badge>
-              <div className="flex items-center text-slate-500 md:text-slate-100 text-sm font-medium gap-1 bg-black/10 md:bg-white/10 px-3 py-1 rounded-full backdrop-blur-sm">
-                <MapPin className="h-4 w-4" /> {user.city || 'Ville non spécifiée'}, {user.commune || ''}
+              <div className="flex items-center text-slate-500 md:text-slate-100 text-[10px] md:text-sm font-bold gap-1 bg-black/5 md:bg-white/10 px-3 py-1 rounded-full backdrop-blur-sm">
+                <MapPin className="h-3 w-3 md:h-4 md:w-4 text-orange-500 md:text-white" /> {user.city || 'CP'}, {user.commune || 'CI'}
               </div>
             </div>
           </div>
-          <div className="flex flex-col sm:flex-row items-center gap-3 pb-2 w-full sm:w-auto">
+          <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
             <Link to="/onboarding" className="w-full sm:w-auto">
-              <Button className="w-full bg-slate-900 text-white md:bg-white md:text-slate-900 border-none hover:bg-slate-800 md:hover:bg-slate-100 font-bold rounded-xl shadow-xl transition-all hover:scale-105">
-                <Settings className="mr-2 h-4 w-4" /> Modifier Profil
+              <Button className="w-full h-11 md:h-12 bg-slate-900 text-white md:bg-white md:text-slate-900 border-none hover:bg-slate-800 md:hover:bg-slate-100 font-bold rounded-xl md:rounded-2xl shadow-xl transition-all">
+                <Settings className="mr-2 h-4 w-4" /> Profil
               </Button>
             </Link>
-            <Button onClick={handleExportCV} variant="outline" className="w-full sm:w-auto bg-white text-slate-700 border-slate-200 hover:bg-slate-50 rounded-xl font-bold shadow-lg transition-all hover:scale-105">
-              <Download className="mr-2 h-4 w-4" /> Export PDF
+            <Button onClick={handleExportCV} variant="outline" className="w-full h-11 md:h-12 sm:w-auto bg-white text-slate-700 border-slate-200 hover:bg-slate-50 rounded-xl md:rounded-2xl font-bold shadow-lg transition-all">
+              <Download className="mr-2 h-4 w-4" /> CV PDF
             </Button>
           </div>
         </div>
@@ -268,12 +268,12 @@ export default function CandidateDashboard() {
         {/* Right Column: Experience, Education, Skills */}
         <div className="lg:col-span-8 space-y-6">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <div className="flex items-center justify-between mb-6 bg-white p-2 rounded-2xl shadow-sm border border-slate-100">
-              <TabsList className="bg-transparent border-none gap-2">
-                <TabsTrigger value="profile" className="rounded-xl font-bold py-2 px-6 data-[state=active]:bg-slate-900 data-[state=active]:text-white">Aperçu Profil</TabsTrigger>
-                <TabsTrigger value="applications" className="rounded-xl font-bold py-2 px-6 data-[state=active]:bg-slate-900 data-[state=active]:text-white">
+            <div className="flex items-center justify-between mb-6 bg-white p-2 rounded-2xl shadow-sm border border-slate-100 overflow-x-auto scrollbar-hide">
+              <TabsList className="bg-transparent border-none gap-1 md:gap-2 min-w-max">
+                <TabsTrigger value="profile" className="rounded-xl font-bold py-2 px-4 md:px-6 data-[state=active]:bg-slate-900 data-[state=active]:text-white transition-all whitespace-nowrap">Aperçu Profil</TabsTrigger>
+                <TabsTrigger value="applications" className="rounded-xl font-bold py-2 px-4 md:px-6 data-[state=active]:bg-slate-900 data-[state=active]:text-white transition-all whitespace-nowrap">
                   Candidatures 
-                  {applications.length > 0 && <Badge className="ml-2 bg-orange-600 text-white border-none">{applications.length}</Badge>}
+                  {applications.length > 0 && <Badge className="ml-2 bg-orange-600 text-white border-none px-1.5 py-0 h-5 min-w-[20px]">{applications.length}</Badge>}
                 </TabsTrigger>
               </TabsList>
             </div>

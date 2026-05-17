@@ -267,11 +267,11 @@ export default function RecruiterDashboard() {
         <div className="absolute top-0 right-0 w-96 h-96 bg-orange-600/10 rounded-full blur-[100px] -translate-y-1/2 translate-x-1/3"></div>
         <div className="absolute bottom-0 left-0 w-64 h-64 bg-blue-600/10 rounded-full blur-[80px] translate-y-1/2 -translate-x-1/4"></div>
         
-        <div className="container relative z-10">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
-            <div className="flex flex-col md:flex-row items-center md:items-end gap-6">
-              <div className="h-24 w-24 md:h-32 md:w-32 bg-white rounded-[32px] p-2 shadow-2xl relative">
-                <div className="h-full w-full rounded-[24px] overflow-hidden bg-slate-50 flex items-center justify-center">
+        <div className="container px-4 relative z-10">
+          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-8">
+            <div className="flex flex-col md:flex-row items-center md:items-end gap-6 w-full lg:w-auto">
+              <div className="h-24 w-24 md:h-32 md:w-32 bg-white rounded-[24px] md:rounded-[32px] p-2 shadow-2xl relative shrink-0">
+                <div className="h-full w-full rounded-[18px] md:rounded-[24px] overflow-hidden bg-slate-50 flex items-center justify-center">
                   {user.photoUrl ? (
                     <img src={user.photoUrl} alt={user.companyName} className="h-full w-full object-contain p-2" />
                   ) : (
@@ -284,30 +284,30 @@ export default function RecruiterDashboard() {
                   </div>
                 )}
               </div>
-              <div className="text-center md:text-left pb-2">
-                <h1 className="text-3xl md:text-5xl font-black tracking-tight">{user.companyName || user.displayName}</h1>
-                <div className="flex flex-wrap justify-center md:justify-start items-center gap-4 mt-2 text-slate-400 font-bold">
-                  <span className="flex items-center gap-1.5"><MapPin className="h-4 w-4" /> {user.city || 'N/A'}, {user.commune || 'CI'}</span>
-                  <span className="flex items-center gap-1.5"><Briefcase className="h-4 w-4" /> {user.sectorActivity || 'Secteur non défini'}</span>
-                  <Badge className={`${user.status === 'approved' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-orange-500/20 text-orange-400'} border-none font-black px-3`}>
-                    {user.status === 'approved' ? 'ENTREPRISE VÉRIFIÉE' : 'EN ATTENTE DE VÉRIFICATION'}
+              <div className="text-center md:text-left flex-1">
+                <h1 className="text-2xl md:text-4xl lg:text-5xl font-black tracking-tight leading-tight">{user.companyName || user.displayName}</h1>
+                <div className="flex flex-wrap justify-center md:justify-start items-center gap-3 md:gap-4 mt-3 text-slate-400 font-bold text-sm md:text-base">
+                  <span className="flex items-center gap-1.5 shrink-0"><MapPin className="h-4 w-4 text-orange-500" /> {user.city || 'N/A'}, {user.commune || 'CI'}</span>
+                  <span className="flex items-center gap-1.5 shrink-0"><Briefcase className="h-4 w-4 text-orange-500" /> {user.sectorActivity || 'Secteur non défini'}</span>
+                  <Badge className={`${user.status === 'approved' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-orange-500/20 text-orange-400'} border-none font-black px-3 text-[10px] tracking-wider`}>
+                    {user.status === 'approved' ? 'VÉRIFIÉE' : 'EN VÉRIFICATION'}
                   </Badge>
                 </div>
               </div>
             </div>
             
-            <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+            <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
               <Button 
                 variant="outline" 
-                className="bg-white/5 border-white/10 text-white hover:bg-white/10 h-12 rounded-2xl font-bold backdrop-blur-sm"
+                className="bg-white/5 border-white/10 text-white hover:bg-white/10 h-11 md:h-12 rounded-xl md:rounded-2xl font-bold backdrop-blur-sm flex-1 md:flex-none"
                 onClick={() => navigate('/recruiter-onboarding')}
               >
-                <Settings className="mr-2 h-4 w-4" /> Paramètres Compte
+                <Settings className="mr-2 h-4 w-4" /> Paramètres
               </Button>
               <Dialog onOpenChange={(open) => { if (!open) setJobCreated(false); }}>
                 <DialogTrigger asChild nativeButton={true}>
-                  <Button className="h-12 px-8 rounded-2xl bg-orange-600 hover:bg-orange-700 text-white font-black shadow-xl shadow-orange-600/20 border-none">
-                    <Plus className="mr-2 h-5 w-5" /> Publier une offre
+                  <Button className="h-11 md:h-12 px-6 md:px-8 rounded-xl md:rounded-2xl bg-orange-600 hover:bg-orange-700 text-white font-black shadow-xl shadow-orange-600/20 border-none flex-1 md:flex-none">
+                    <Plus className="mr-2 h-5 w-5" /> Publier
                   </Button>
                 </DialogTrigger>
                 <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto rounded-[40px] border-none shadow-2xl">
@@ -395,17 +395,19 @@ export default function RecruiterDashboard() {
 
       <div className="container px-4">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="mb-10 bg-white/50 backdrop-blur-sm self-start inline-flex p-1.5 rounded-2xl border border-slate-100 shadow-sm">
-            <TabsTrigger value="jobs" className="rounded-xl px-8 font-black data-[state=active]:bg-slate-900 data-[state=active]:text-white">
-              <LayoutDashboard className="mr-2 h-4 w-4" /> Tableau de Bord
-            </TabsTrigger>
-            <TabsTrigger value="applications" className="rounded-xl px-8 font-black data-[state=active]:bg-slate-900 data-[state=active]:text-white">
-              <Users className="mr-2 h-4 w-4" /> Candidatures
-            </TabsTrigger>
-            <TabsTrigger value="profile" className="rounded-xl px-8 font-black data-[state=active]:bg-slate-900 data-[state=active]:text-white">
-              <Building2 className="mr-2 h-4 w-4" /> Profil Entreprise
-            </TabsTrigger>
-          </TabsList>
+          <div className="overflow-x-auto pb-4 -mx-4 px-4 scrollbar-hide">
+            <TabsList className="bg-white/50 backdrop-blur-sm inline-flex p-1.5 rounded-2xl border border-slate-100 shadow-sm w-auto min-w-max">
+              <TabsTrigger value="jobs" className="rounded-xl px-4 md:px-8 font-black data-[state=active]:bg-slate-900 data-[state=active]:text-white whitespace-nowrap">
+                <LayoutDashboard className="mr-2 h-4 w-4" /> Dashboard
+              </TabsTrigger>
+              <TabsTrigger value="applications" className="rounded-xl px-4 md:px-8 font-black data-[state=active]:bg-slate-900 data-[state=active]:text-white whitespace-nowrap">
+                <Users className="mr-2 h-4 w-4" /> Candidatures
+              </TabsTrigger>
+              <TabsTrigger value="profile" className="rounded-xl px-4 md:px-8 font-black data-[state=active]:bg-slate-900 data-[state=active]:text-white whitespace-nowrap">
+                <Building2 className="mr-2 h-4 w-4" /> Profil
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
         <TabsContent value="jobs">
           <div className="grid gap-6">
@@ -551,25 +553,25 @@ export default function RecruiterDashboard() {
               {/* Profile Details */}
               <div className="space-y-8">
                  <Card className="border-none shadow-xl shadow-slate-200/50 rounded-[40px] bg-white overflow-hidden">
-                    <CardHeader className="bg-slate-900 text-white p-10 flex flex-row justify-between items-center">
+                    <CardHeader className="bg-slate-900 text-white p-6 md:p-10 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
                        <div>
                          <Badge className="bg-orange-600 text-white border-none font-bold mb-3">VUE PUBLIQUE ACTIVÉE</Badge>
-                         <CardTitle className="text-3xl font-black">Identité de l'Entreprise</CardTitle>
+                         <CardTitle className="text-2xl md:text-3xl font-black">Identité Entreprise</CardTitle>
                        </div>
                        <Button 
                          variant="outline" 
-                         className="bg-white/10 border-white/20 text-white hover:bg-white/20 rounded-2xl h-12 font-bold backdrop-blur-sm"
+                         className="bg-white/10 border-white/20 text-white hover:bg-white/20 rounded-2xl h-11 md:h-12 font-bold backdrop-blur-sm w-full sm:w-auto"
                          onClick={() => navigate('/recruiter-onboarding')}
                        >
-                         <Settings className="mr-2 h-4 w-4" /> Modifier le profil
+                         <Settings className="mr-2 h-4 w-4" /> Modifier
                        </Button>
                     </CardHeader>
-                    <CardContent className="p-10 space-y-10">
+                    <CardContent className="p-6 md:p-10 space-y-8 md:space-y-10">
                        <section className="space-y-4">
                           <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                            <FileText className="h-4 w-4 text-orange-500" /> Présentation Générale
+                            <FileText className="h-4 w-4 text-orange-500" /> Présentation
                           </h3>
-                          <div className="bg-slate-50 p-8 rounded-[32px] border border-slate-100">
+                          <div className="bg-slate-50 p-6 md:p-8 rounded-[24px] md:rounded-[32px] border border-slate-100">
                              <p className="text-slate-600 font-medium leading-relaxed whitespace-pre-wrap italic">
                                 "{user.companyDescription || 'Aucune description fournie.'}"
                              </p>
@@ -605,7 +607,7 @@ export default function RecruiterDashboard() {
                             <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
                               <Heart className="h-4 w-4 text-orange-500" /> Valeurs de l'entreprise
                             </h3>
-                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
                                {user.branding.values.map(val => (
                                  <div key={val} className="p-5 bg-white border border-slate-100 rounded-2xl shadow-sm text-center">
                                     <p className="font-black text-slate-900">{val}</p>
