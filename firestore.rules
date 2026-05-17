@@ -1,21 +1,55 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Utility functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+    
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+    
+    function isRole(role) {
+      return isSignedIn() && getUserData().role == role;
+    }
+    
+    function isAdmin() {
+      return isRole('admin');
+    }
+
     match /users/{userId} {
-      allow read: if true;
-      allow write: if request.auth != null && request.auth.uid == userId;
+      allow read: if isSignedIn();
+      allow create: if isOwner(userId) && 
+                      (request.resource.data.role in ['candidate', 'recruiter']) &&
+                      (request.resource.data.role == 'recruiter' ? request.resource.data.status == 'pending' : request.resource.data.status == 'approved');
+      allow update: if isOwner(userId) && 
+                      !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'status', 'uid', 'email']) ||
+                      isAdmin();
+      allow delete: if isAdmin();
     }
 
     match /jobs/{jobId} {
       allow read: if true;
-      allow create: if request.auth != null;
-      allow update, delete: if request.auth != null; // Simplification for demo
+      allow create: if isRole('recruiter') || isAdmin();
+      allow update, delete: if (isRole('recruiter') && resource.data.recruiterId == request.auth.uid) || isAdmin();
     }
 
     match /applications/{applicationId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null;
-      allow update, delete: if request.auth != null;
+      allow read: if isSignedIn() && (
+        resource.data.candidateId == request.auth.uid || 
+        resource.data.recruiterId == request.auth.uid || 
+        isAdmin()
+      );
+      allow create: if isRole('candidate') && request.resource.data.candidateId == request.auth.uid;
+      allow update: if (isRole('recruiter') && resource.data.recruiterId == request.auth.uid) || 
+                      (isRole('candidate') && resource.data.candidateId == request.auth.uid) ||
+                      isAdmin();
+      allow delete: if isAdmin();
     }
   }
 }

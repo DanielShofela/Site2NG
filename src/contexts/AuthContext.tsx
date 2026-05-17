@@ -10,6 +10,8 @@ import {
   signInWithPopup, 
   GoogleAuthProvider, 
   signOut,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
   User as FirebaseUser
 } from 'firebase/auth';
 import { 
@@ -25,6 +27,8 @@ interface AuthContextType {
   user: UserProfile | null;
   loading: boolean;
   loginWithGoogle: (role?: UserRole) => Promise<void>;
+  signupWithEmail: (email: string, password: string, userData: Partial<UserProfile>) => Promise<void>;
+  loginWithEmail: (email: string, password: string) => Promise<void>;
   updateProfile: (data: Partial<UserProfile>) => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -37,14 +41,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      setLoading(true);
       if (firebaseUser) {
         // Sync with Firestore
         const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
         if (userDoc.exists()) {
           setUser(userDoc.data() as UserProfile);
         } else {
-          // If user exists in Auth but not Firestore, something is wrong or they are signing up
-          // For now, set user to null so they can complete signup if needed
           setUser(null);
         }
       } else {
@@ -63,17 +66,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const result = await signInWithPopup(auth, provider);
       const firebaseUser = result.user;
 
-      // Check if user profile exists
       const userRef = doc(db, 'users', firebaseUser.uid);
       const userDoc = await getDoc(userRef);
 
       if (!userDoc.exists()) {
-        // Create new profile
         const newProfile: UserProfile = {
           uid: firebaseUser.uid,
           email: firebaseUser.email || '',
           role: preferredRole,
-          status: 'approved' as ApprovalStatus, // Defaulting to approved for demo ease, change if needed
+          status: preferredRole === 'recruiter' ? 'pending' : 'approved',
           displayName: firebaseUser.displayName || 'Utilisateur',
           photoUrl: firebaseUser.photoURL || null,
           createdAt: serverTimestamp(),
@@ -81,6 +82,55 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await setDoc(userRef, newProfile);
         setUser(newProfile);
       } else {
+        setUser(userDoc.data() as UserProfile);
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const signupWithEmail = async (email: string, password: string, userData: Partial<UserProfile>) => {
+    setLoading(true);
+    try {
+      const result = await createUserWithEmailAndPassword(auth, email, password);
+      const firebaseUser = result.user;
+
+      const newProfile: UserProfile = {
+        uid: firebaseUser.uid,
+        email: email,
+        role: userData.role || 'candidate',
+        status: userData.role === 'recruiter' ? 'pending' : 'approved',
+        displayName: userData.displayName || 'Utilisateur',
+        photoUrl: null,
+        phone: userData.phone,
+        location: userData.location,
+        companyName: userData.companyName,
+        registrationNumber: userData.registrationNumber,
+        companyDescription: userData.companyDescription,
+        createdAt: serverTimestamp(),
+      };
+
+      await setDoc(doc(db, 'users', firebaseUser.uid), newProfile);
+      setUser(newProfile);
+    } catch (error) {
+      console.error('Signup error:', error);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loginWithEmail = async (email: string, password: string) => {
+    setLoading(true);
+    try {
+      const result = await signInWithEmailAndPassword(auth, email, password);
+      const firebaseUser = result.user;
+      
+      const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+      if (userDoc.exists()) {
         setUser(userDoc.data() as UserProfile);
       }
     } catch (error) {
