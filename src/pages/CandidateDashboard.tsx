@@ -9,7 +9,26 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Search, FileText, CheckCircle, Clock, MapPin, ExternalLink, Eye } from 'lucide-react';
+import { Progress } from '@/components/ui/progress';
+import { 
+  Search, 
+  FileText, 
+  CheckCircle, 
+  Clock, 
+  MapPin, 
+  ExternalLink, 
+  Eye, 
+  TrendingUp, 
+  AlertCircle, 
+  Download, 
+  Settings, 
+  Briefcase,
+  GraduationCap,
+  Globe,
+  Mail,
+  Phone,
+  Link as LinkIcon
+} from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { 
@@ -26,29 +45,23 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+} from "@/components/ui/dialog";
+import { calculateCompletionScore, getProfileSuggestions } from '@/lib/profileUtils';
+import { generateCV } from '@/lib/pdfUtils';
+import { motion } from 'motion/react';
 
 export default function CandidateDashboard() {
   const { user, updateProfile } = useAuth();
-  const [activeTab, setActiveTab] = useState('applied');
+  const [activeTab, setActiveTab] = useState('profile');
   const [applications, setApplications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  
-  // Profile edit state
-  const [isEditing, setIsEditing] = useState(false);
-  const [editName, setEditName] = useState('');
-  const [editTitle, setEditTitle] = useState('');
-  const [editLocation, setEditLocation] = useState('');
-  const [isSaving, setIsSaving] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [cvBlobUrl, setCvBlobUrl] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  const score = user ? calculateCompletionScore(user) : 0;
+  const suggestions = user ? getProfileSuggestions(user) : [];
 
   useEffect(() => {
     let url: string | null = null;
@@ -58,7 +71,6 @@ export default function CandidateDashboard() {
         const base64Data = user.cvUrl;
         const parts = base64Data.split(',');
         if (parts.length === 2) {
-          // Clean the base64 string to avoid atob errors
           const pureBase64 = parts[1].replace(/\s/g, '');
           const byteString = atob(pureBase64);
           const mimeString = parts[0].split(':')[1].split(';')[0];
@@ -79,25 +91,16 @@ export default function CandidateDashboard() {
       }
     } else if (user?.cvUrl) {
       setCvBlobUrl(user.cvUrl);
-    } else {
-      setCvBlobUrl(null);
     }
 
     return () => {
-      if (url) {
-        URL.revokeObjectURL(url);
-      }
+      if (url) URL.revokeObjectURL(url);
     };
   }, [user?.cvUrl]);
 
   useEffect(() => {
     if (!user) return;
     
-    // Initialize form with user data
-    setEditName(user.displayName || '');
-    setEditTitle(user.jobTitle || '');
-    setEditLocation(user.location || '');
-
     const fetchApplications = async () => {
       try {
         const q = query(
@@ -121,357 +124,300 @@ export default function CandidateDashboard() {
     fetchApplications();
   }, [user]);
 
-  const handleCvUpdate = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !user) return;
+  if (!user || user.role !== 'candidate') return null;
 
-    // Optional: check file size (max 600KB to stay safe with Firestore 1MB limit after base64 encoding)
-    if (file.size > 600 * 1024) {
-      alert("Le fichier est trop volumineux (max 600Ko).");
-      return;
-    }
-
-    try {
-      setIsSaving(true);
-      
-      const reader = new FileReader();
-      reader.onloadend = async () => {
-        const base64String = reader.result as string;
-        try {
-          await updateProfile({
-            cvName: file.name,
-            cvUrl: base64String,
-            cvUpdatedAt: new Date()
-          });
-        } catch (error) {
-          console.error('Error updating CV in Firestore:', error);
-        } finally {
-          setIsSaving(false);
-        }
-      };
-      
-      reader.onerror = () => {
-        console.error('Error reading file');
-        setIsSaving(false);
-      };
-      
-      reader.readAsDataURL(file);
-    } catch (error) {
-      console.error('Error in handleCvUpdate:', error);
-      setIsSaving(false);
-    }
-  };
-
-  if (!user || user.role !== 'candidate') {
-    return (
-      <div className="container py-20 text-center">
-        <h2 className="text-2xl font-bold">Accès restreint</h2>
-        <p className="text-muted-foreground mt-2">Vous devez être connecté en tant que candidat pour voir cette page.</p>
-      </div>
-    );
-  }
-
-  const getStatusBadgeProps = (status: string) => {
-    switch (status) {
-      case 'viewed': return { color: 'bg-blue-100 text-blue-700', label: 'Vue' };
-      case 'shortlisted': return { color: 'bg-green-100 text-green-700', label: 'Sélectionné' };
-      case 'rejected': return { color: 'bg-red-100 text-red-700', label: 'Refusé' };
-      case 'pending':
-      default: return { color: 'bg-yellow-100 text-yellow-700', label: 'En attente' };
-    }
+  const handleExportCV = () => {
+    generateCV(user);
   };
 
   return (
-    <div className="container py-10 px-4">
-      <div className="flex flex-col md:flex-row gap-8">
-        {/* Sidebar / Profile Summary */}
-        <div className="w-full md:w-80 space-y-6">
-          <Card className="border-none shadow-xl shadow-primary/5">
-            <CardContent className="pt-8 text-center">
-              <Avatar className="h-24 w-24 mx-auto mb-4 border-4 border-primary/10">
-                <AvatarImage src={user.photoUrl} />
-                <AvatarFallback className="text-2xl bg-primary/10 text-primary">
-                  {(user.displayName || '?').split(' ').map(n => n?.[0] || '').join('')}
-                </AvatarFallback>
-              </Avatar>
-              <h2 className="text-xl font-bold">{user.displayName}</h2>
-              <p className="text-sm text-muted-foreground">{user.jobTitle || 'Candidat'}</p>
-              <div className="flex items-center justify-center gap-1 mt-2 text-xs text-muted-foreground">
-                <MapPin className="h-3 w-3" /> {user.location}
-              </div>
-
-              <Dialog open={isEditing} onOpenChange={setIsEditing}>
-                <DialogTrigger asChild nativeButton={true}>
-                  <Button variant="outline" className="w-full mt-6 rounded-full">Modifier le profil</Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-[425px]">
-                  <DialogHeader>
-                    <DialogTitle>Modifier le profil</DialogTitle>
-                    <DialogDescription>
-                      Mettez à jour vos informations personnelles ici.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <div className="grid gap-4 py-4">
-                    <div className="grid gap-2">
-                      <Label htmlFor="name">Nom complet</Label>
-                      <Input
-                        id="name"
-                        value={editName}
-                        onChange={(e) => setEditName(e.target.value)}
-                      />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="title">Titre professionnel</Label>
-                      <Input
-                        id="title"
-                        value={editTitle}
-                        onChange={(e) => setEditTitle(e.target.value)}
-                      />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="location">Localisation</Label>
-                      <Input
-                        id="location"
-                        value={editLocation}
-                        onChange={(e) => setEditLocation(e.target.value)}
-                      />
-                    </div>
-                  </div>
-                  <DialogFooter>
-                    <Button 
-                      type="submit" 
-                      onClick={async () => {
-                        setIsSaving(true);
-                        try {
-                          await updateProfile({
-                            displayName: editName,
-                            jobTitle: editTitle,
-                            location: editLocation
-                          });
-                          setIsEditing(false);
-                        } catch (error) {
-                          console.error(error);
-                        } finally {
-                          setIsSaving(false);
-                        }
-                      }}
-                      disabled={isSaving}
-                    >
-                      {isSaving ? "Enregistrement..." : "Enregistrer"}
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
-            </CardContent>
-          </Card>
-
-          <Card className="border-none shadow-xl shadow-primary/5">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm uppercase tracking-wider text-muted-foreground">Mon CV</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-3 p-3 bg-accent/50 rounded-lg">
-                <FileText className="h-8 w-8 text-primary" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-bold truncate">{user.cvName || 'Aucun CV'}</p>
-                  <p className="text-[10px] text-muted-foreground">
-                    {(() => {
-                      if (!user.cvUpdatedAt) return 'Non renseigné';
-                      try {
-                        const date = user.cvUpdatedAt.seconds 
-                          ? new Date(user.cvUpdatedAt.seconds * 1000) 
-                          : new Date(user.cvUpdatedAt);
-                        
-                        if (isNaN(date.getTime())) return 'Date invalide';
-                        
-                        return `Mis à jour ${formatDistanceToNow(date, { addSuffix: true, locale: fr })}`;
-                      } catch (e) {
-                        return 'Date invalide';
-                      }
-                    })()}
-                  </p>
+    <div className="min-h-screen bg-slate-50/50 pb-20">
+      {/* Profile Header Banner */}
+      <div className="bg-slate-900 h-48 relative">
+        <div className="container mx-auto px-4 h-full flex items-end">
+          <div className="translate-y-12 flex flex-col md:flex-row items-center md:items-end gap-6 w-full">
+            <Avatar className="h-32 w-32 border-4 border-white shadow-xl">
+              <AvatarImage src={user.photoUrl || ''} />
+              <AvatarFallback className="text-4xl bg-orange-100 text-orange-600">
+                {user.displayName?.[0]}
+              </AvatarFallback>
+            </Avatar>
+            <div className="flex-1 text-center md:text-left pb-2">
+              <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight md:text-white md:drop-shadow-sm">
+                {user.firstName} {user.lastName}
+              </h1>
+              <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 mt-2">
+                <Badge className="bg-orange-600 text-white border-none px-3 py-1">
+                  {user.jobTitle || 'Candidat'}
+                </Badge>
+                <div className="flex items-center text-slate-500 md:text-slate-300 text-sm gap-1">
+                  <MapPin className="h-4 w-4" /> {user.city}, {user.commune}
                 </div>
               </div>
-              <div className="flex gap-2 mt-2">
-                <Button 
-                  size="sm" 
-                  variant="ghost" 
-                  className="flex-1 text-[10px] h-8"
-                  onClick={() => setIsPreviewOpen(true)}
-                  disabled={!user.cvUrl || user.cvUrl === '#'}
-                >
-                  <Eye className="mr-1 h-3 w-3" /> Voir
-                </Button>
-                <Button 
-                  size="sm" 
-                  variant="ghost" 
-                  className="flex-1 text-[10px] h-8"
-                  asChild
-                  nativeButton={false}
-                >
-                  <a 
-                    href={cvBlobUrl || user.cvUrl || '#'} 
-                    download={user.cvName || 'Mon_CV.pdf'}
-                    className="flex items-center justify-center"
-                  >
-                    <FileText className="mr-1 h-3 w-3" /> Télécharger
-                  </a>
-                </Button>
-                <Button 
-                  size="sm" 
-                  variant="ghost" 
-                  className="flex-1 text-[10px] h-8"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={isSaving}
-                >
-                  {isSaving ? '...' : 'Actualiser'}
-                </Button>
-              </div>
-              <input
-                type="file"
-                ref={fileInputRef}
-                className="hidden"
-                accept=".pdf,.doc,.docx"
-                onChange={handleCvUpdate}
-              />
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Main Content */}
-        <div className="flex-1 space-y-6">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-            <Card className="border-none shadow-xl shadow-primary/5 bg-white">
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Candidatures</p>
-                    <h3 className="text-2xl font-bold mt-1">{applications.length}</h3>
-                  </div>
-                  <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
-                    <CheckCircle className="h-5 w-5" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="border-none shadow-xl shadow-primary/5 bg-white">
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Vues Profil</p>
-                    <h3 className="text-2xl font-bold mt-1">{user.profileViews || 0}</h3>
-                  </div>
-                  <div className="p-2 bg-orange-50 text-orange-600 rounded-lg">
-                    <Eye className="h-5 w-5" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="border-none shadow-xl shadow-primary/5 bg-white">
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Offres Enregistrées</p>
-                    <h3 className="text-2xl font-bold mt-1">0</h3>
-                  </div>
-                  <div className="p-2 bg-purple-50 text-purple-600 rounded-lg">
-                    <Clock className="h-5 w-5" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-bold tracking-tight">Mes Candidatures</h1>
-            <Link to="/jobs">
-              <Button variant="link" className="text-primary pr-0 flex items-center">
-                Explorer plus d'offres <Search className="ml-2 h-4 w-4" />
-              </Button>
-            </Link>
-          </div>
-
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="bg-accent/50 p-1 mb-6">
-              <TabsTrigger value="applied">Postulées ({applications.length})</TabsTrigger>
-              <TabsTrigger value="saved">Enregistrées (0)</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="applied">
-              <div className="grid gap-4">
-                {applications.length > 0 ? (
-                  applications.map((app) => {
-                    const statusProps = getStatusBadgeProps(app.status);
-                    return (
-                      <Card key={app.id} className="hover:border-primary/20 transition-all border border-transparent shadow-sm">
-                        <CardContent className="py-4 flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left">
-                          <div className="flex items-center gap-4">
-                            <div className="h-12 w-12 bg-accent rounded-xl flex items-center justify-center font-bold text-muted-foreground">
-                              {app.companyName?.[0] || 'J'}
-                            </div>
-                            <div>
-                              <h3 className="font-bold">{app.jobTitle}</h3>
-                              <p className="text-sm text-muted-foreground tracking-tight">{app.companyName}</p>
-                            </div>
-                          </div>
-                          <div className="flex flex-col sm:flex-row items-center gap-4">
-                            <div className="text-xs text-muted-foreground flex items-center gap-1">
-                              <Clock className="h-3 w-3" /> 
-                              {(() => {
-                                try {
-                                  if (!app.appliedAt) return 'Récemment';
-                                  const date = app.appliedAt.seconds 
-                                    ? new Date(app.appliedAt.seconds * 1000) 
-                                    : new Date(app.appliedAt);
-                                  if (isNaN(date.getTime())) return 'Récemment';
-                                  return `Postulé ${formatDistanceToNow(date, { addSuffix: true, locale: fr })}`;
-                                } catch (e) {
-                                  return 'Récemment';
-                                }
-                              })()}
-                            </div>
-                            <Badge className={`${statusProps.color} border-none px-3`}>{statusProps.label}</Badge>
-                            <Button variant="ghost" size="sm">Détails</Button>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    );
-                  })
-                ) : (
-                  <div className="text-center py-10 bg-accent/20 rounded-2xl">
-                    <p className="text-muted-foreground">Vous n'avez pas encore postulé à des offres.</p>
-                    <Link to="/jobs">
-                      <Button variant="link">Voir les offres disponibles</Button>
-                    </Link>
-                  </div>
-                )}
-              </div>
-            </TabsContent>
-          </Tabs>
-
-          <section className="pt-6">
-            <h2 className="text-xl font-bold mb-4">Conseils pour booster votre profil</h2>
-            <div className="grid sm:grid-cols-2 gap-4">
-              <Card className="bg-primary/5 border-none shadow-none">
-                <CardContent className="pt-6">
-                  <CheckCircle className="h-6 w-6 text-primary mb-2" />
-                  <h4 className="font-bold mb-1 italic">Ajoutez vos compétences</h4>
-                  <p className="text-xs text-muted-foreground">Les profils avec des compétences précises attirent 3x plus les recruteurs.</p>
-                </CardContent>
-              </Card>
-              <Card className="bg-primary/5 border-none shadow-none">
-                <CardContent className="pt-6">
-                  <ExternalLink className="h-6 w-6 text-primary mb-2" />
-                  <h4 className="font-bold mb-1 italic">Profil public</h4>
-                  <p className="text-xs text-muted-foreground">Partagez votre profil AfriJob sur les réseaux sociaux professionnels.</p>
-                </CardContent>
-              </Card>
             </div>
-          </section>
+            <div className="flex items-center gap-3 pb-2">
+              <Link to="/onboarding">
+                <Button className="bg-white text-slate-900 border-none hover:bg-slate-100 font-bold rounded-xl shadow-lg">
+                  <Settings className="mr-2 h-4 w-4" /> Modifier Profil
+                </Button>
+              </Link>
+              <Button onClick={handleExportCV} variant="outline" className="bg-white/10 text-white border-white/20 hover:bg-white/20 rounded-xl font-bold backdrop-blur-md">
+                <Download className="mr-2 h-4 w-4" /> Export PDF
+              </Button>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* CV Preview Dialog */}
+      <div className="container mx-auto px-4 pt-20 grid grid-cols-1 lg:grid-cols-12 gap-8">
+        {/* Left Column: Stats & Completion */}
+        <div className="lg:col-span-4 space-y-6">
+          <Card className="border-none shadow-xl shadow-slate-200/50 overflow-hidden">
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg font-bold">Complétion Profil</CardTitle>
+                <span className="text-2xl font-black text-orange-600">{score}%</span>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <Progress value={score} className="h-3 mb-6" />
+              
+              <div className="space-y-4">
+                <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                   <AlertCircle className="h-3 w-3" /> Suggestions
+                </h4>
+                {suggestions.map((suggestion, idx) => (
+                  <div key={idx} className="flex items-center gap-3 p-3 bg-orange-50 rounded-xl text-sm font-medium text-orange-800">
+                    <div className="w-1.5 h-1.5 rounded-full bg-orange-400" />
+                    {suggestion}
+                  </div>
+                ))}
+                {suggestions.length === 0 && (
+                  <div className="text-center py-4 text-green-600 font-bold flex items-center justify-center gap-2">
+                    <CheckCircle className="h-5 w-5" /> Profil Parfait !
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-none shadow-xl shadow-slate-200/50">
+            <CardHeader>
+              <CardTitle className="text-lg font-bold">Coordonnées</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center text-slate-500">
+                  <Mail className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Email</p>
+                  <p className="text-sm font-bold text-slate-700">{user.email}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center text-slate-500">
+                  <Phone className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Téléphone</p>
+                  <p className="text-sm font-bold text-slate-700">{user.phone || 'Non renseigné'}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center text-slate-500">
+                  <LinkIcon className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">LinkedIn</p>
+                  <p className="text-sm font-bold text-slate-700 truncate max-w-[200px]">
+                    {user.social?.linkedin || 'Non renseigné'}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Right Column: Experience, Education, Skills */}
+        <div className="lg:col-span-8 space-y-6">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <div className="flex items-center justify-between mb-6 bg-white p-2 rounded-2xl shadow-sm border border-slate-100">
+              <TabsList className="bg-transparent border-none gap-2">
+                <TabsTrigger value="profile" className="rounded-xl font-bold py-2 px-6 data-[state=active]:bg-slate-900 data-[state=active]:text-white">Aperçu Profil</TabsTrigger>
+                <TabsTrigger value="applications" className="rounded-xl font-bold py-2 px-6 data-[state=active]:bg-slate-900 data-[state=active]:text-white">
+                  Candidatures 
+                  {applications.length > 0 && <Badge className="ml-2 bg-orange-600 text-white border-none">{applications.length}</Badge>}
+                </TabsTrigger>
+              </TabsList>
+            </div>
+
+            <TabsContent value="profile" className="space-y-6 outline-none">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Experiences */}
+                <Card className="border-none shadow-xl shadow-slate-200/50">
+                  <CardHeader className="flex flex-row items-center justify-between">
+                    <CardTitle className="text-lg font-bold flex items-center gap-2">
+                      <Briefcase className="h-5 w-5 text-orange-600" /> Expériences
+                    </CardTitle>
+                    <Link to="/onboarding">
+                      <Button variant="ghost" size="icon" className="text-slate-400 hover:text-orange-600"><Settings className="h-4 w-4" /></Button>
+                    </Link>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    {user.experiences && user.experiences.length > 0 ? (
+                      user.experiences.map((exp, idx) => (
+                        <div key={idx} className="relative pl-6 before:content-[''] before:absolute before:left-0 before:top-2 before:bottom-0 before:w-px before:bg-slate-100 last:before:hidden">
+                          <div className="absolute left-[-4px] top-2 w-2 h-2 rounded-full bg-orange-600" />
+                          <h4 className="font-bold text-slate-800">{exp.role}</h4>
+                          <p className="text-sm font-bold text-orange-600">{exp.company}</p>
+                          <p className="text-xs text-slate-400 mt-1 mb-2">
+                            {exp.startDate} - {exp.current ? 'Présent' : exp.endDate}
+                          </p>
+                          <p className="text-xs text-slate-600 line-clamp-3 leading-relaxed">{exp.description}</p>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-slate-400 text-sm italic text-center py-4">Aucune expérience renseignée</p>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Education */}
+                <Card className="border-none shadow-xl shadow-slate-200/50">
+                  <CardHeader className="flex flex-row items-center justify-between">
+                    <CardTitle className="text-lg font-bold flex items-center gap-2">
+                      <GraduationCap className="h-5 w-5 text-orange-600" /> Formations
+                    </CardTitle>
+                    <Link to="/onboarding">
+                      <Button variant="ghost" size="icon" className="text-slate-400 hover:text-orange-600"><Settings className="h-4 w-4" /></Button>
+                    </Link>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    {user.education && user.education.length > 0 ? (
+                      user.education.map((edu, idx) => (
+                        <div key={idx} className="relative pl-6 before:content-[''] before:absolute before:left-0 before:top-2 before:bottom-0 before:w-px before:bg-slate-100 last:before:hidden">
+                          <div className="absolute left-[-4px] top-2 w-2 h-2 rounded-full bg-orange-600" />
+                          <h4 className="font-bold text-slate-800">{edu.degree}</h4>
+                          <p className="text-sm font-bold text-slate-600">{edu.school}</p>
+                          <p className="text-xs text-orange-600 font-medium mb-2">{edu.field}</p>
+                          <p className="text-xs text-slate-400">
+                             {edu.startDate} - {edu.current ? 'En cours' : edu.endDate}
+                          </p>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-slate-400 text-sm italic text-center py-4">Aucune formation renseignée</p>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Skills & Languages */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <Card className="border-none shadow-xl shadow-slate-200/50">
+                  <CardHeader>
+                    <CardTitle className="text-lg font-bold flex items-center gap-2">
+                      <TrendingUp className="h-5 w-5 text-orange-600" /> Compétences
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex flex-wrap gap-2">
+                      {user.skills && user.skills.length > 0 ? (
+                        user.skills.map((skill, idx) => (
+                          <Badge key={idx} className="bg-slate-100 text-slate-700 hover:bg-slate-200 border-none rounded-xl px-4 py-2 font-bold transition-all">
+                            {skill.name}
+                          </Badge>
+                        ))
+                      ) : (
+                        <p className="text-slate-400 text-sm italic">Aucune compétence ajoutée</p>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-none shadow-xl shadow-slate-200/50">
+                  <CardHeader>
+                    <CardTitle className="text-lg font-bold flex items-center gap-2">
+                      <Globe className="h-5 w-5 text-orange-600" /> Langues
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {user.languages && user.languages.length > 0 ? (
+                      user.languages.map((lang, idx) => (
+                        <div key={idx} className="flex justify-between items-center">
+                          <span className="font-bold text-slate-700">{lang.language}</span>
+                          <Badge variant="outline" className="text-xs capitalize rounded-lg">{lang.level}</Badge>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-slate-400 text-sm italic">Aucune langue renseignée</p>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="applications" className="space-y-4 outline-none">
+              {applications.length > 0 ? (
+                applications.map((app) => (
+                  <motion.div
+                    key={app.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                  >
+                    <Card className="hover:border-orange-200 transition-all border border-transparent shadow-sm overflow-hidden group">
+                      <CardContent className="py-6 flex flex-col sm:flex-row items-center justify-between gap-6 px-8">
+                        <div className="flex items-center gap-6">
+                          <div className="h-16 w-16 bg-slate-900 rounded-2xl flex items-center justify-center font-black text-white text-xl shadow-lg shadow-slate-900/10 transition-transform group-hover:scale-110">
+                            {app.companyName?.[0] || 'J'}
+                          </div>
+                          <div>
+                            <h3 className="text-lg font-extrabold text-slate-900">{app.jobTitle}</h3>
+                            <p className="text-slate-500 font-medium">{app.companyName}</p>
+                            <div className="flex items-center gap-3 mt-1">
+                              <span className="text-[10px] text-slate-400 flex items-center gap-1 font-bold uppercase tracking-wider">
+                                <Clock className="h-3 w-3" /> Postulé {formatDistanceToNow(app.appliedAt?.seconds ? new Date(app.appliedAt.seconds * 1000) : new Date(app.appliedAt), { addSuffix: true, locale: fr })}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-4">
+                          <Badge className={`
+                            ${app.status === 'pending' ? 'bg-yellow-100 text-yellow-700' : ''}
+                            ${app.status === 'viewed' ? 'bg-blue-100 text-blue-700' : ''}
+                            ${app.status === 'shortlisted' ? 'bg-green-100 text-green-700' : ''}
+                            ${app.status === 'rejected' ? 'bg-red-100 text-red-700' : ''}
+                            px-4 py-1.5 border-none font-bold rounded-lg
+                          `}>
+                            {app.status === 'pending' ? 'En attente' : 
+                             app.status === 'viewed' ? 'Consultée' :
+                             app.status === 'shortlisted' ? 'Sélectionné' : 'Refusé'}
+                          </Badge>
+                          <Button variant="ghost" className="h-10 rounded-xl font-bold bg-slate-50 hover:bg-slate-100">Détails</Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+                ))
+              ) : (
+                <div className="text-center py-20 bg-white rounded-3xl border-2 border-dashed border-slate-100 shadow-sm">
+                  <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Search className="h-10 w-10 text-slate-300" />
+                  </div>
+                  <h3 className="text-xl font-bold text-slate-800">Aucune candidature</h3>
+                  <p className="text-slate-400 mt-2 max-w-xs mx-auto mb-8">Commencez à explorer les offres pour trouver votre prochain job.</p>
+                  <Link to="/jobs">
+                    <Button className="h-12 px-8 bg-orange-600 text-white rounded-xl font-bold">Parcourir les offres</Button>
+                  </Link>
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
+        </div>
+      </div>
+
+      {/* CV Preview Dialog - Simple preview of uploaded CV */}
       <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
         <DialogContent className="sm:max-w-[800px] h-[90vh] p-0">
           <DialogHeader className="p-6 pb-0">
@@ -479,42 +425,20 @@ export default function CandidateDashboard() {
             <DialogDescription>{user.cvName}</DialogDescription>
           </DialogHeader>
           <div className="flex-1 w-full h-full p-4">
-            {(() => {
-              if (!user.cvUrl || user.cvUrl === '#') {
-                return (
-                  <div className="flex flex-col items-center justify-center h-full space-y-4 bg-accent/10 rounded-md border-2 border-dashed">
-                    <FileText className="h-16 w-16 text-muted-foreground" />
-                    <div className="text-center">
-                      <p className="font-semibold text-lg">Aperçu non disponible</p>
-                      <p className="text-sm text-muted-foreground max-w-[300px]">
-                        L'aperçu sera disponible une fois que vous aurez téléchargé un fichier.
-                      </p>
-                    </div>
-                  </div>
-                );
-              }
-
-              // Use an embed. For base64, it's often better to show it via Blob URL
-              return (
-                <div className="w-full h-[calc(90vh-140px)] rounded-md border shadow-inner bg-white overflow-hidden relative">
-                  <embed 
-                    src={cvBlobUrl || ''} 
-                    type="application/pdf"
-                    className="w-full h-full"
-                  />
-                  <div className="absolute bottom-4 right-4 z-10">
-                    <Button size="sm" asChild variant="secondary" className="shadow-md" nativeButton={false}>
-                      <a href={cvBlobUrl || ''} target="_blank" rel="noopener noreferrer">
-                        Ouvrir en plein écran
-                      </a>
-                    </Button>
-                  </div>
-                </div>
-              );
-            })()}
+            {cvBlobUrl ? (
+              <div className="w-full h-[calc(90vh-140px)] rounded-md border shadow-inner bg-white overflow-hidden relative text-center">
+                 <embed src={cvBlobUrl} type="application/pdf" className="w-full h-full" />
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full space-y-4">
+                <FileText className="h-16 w-16 text-slate-200" />
+                <p className="text-slate-400 font-medium">Aucun aperçu disponible</p>
+              </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>
     </div>
   );
 }
+
