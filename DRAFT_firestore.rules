@@ -1,0 +1,97 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 1. Default Deny Catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // 2. Global Helpers
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function getRole(userId) {
+      return get(/databases/$(database)/documents/users/$(userId)).data.role;
+    }
+
+    // 3. Entity Validation Helpers
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'email', 'role']) &&
+             data.keys().size() <= 9 &&
+             data.uid == request.auth.uid &&
+             data.email is string &&
+             data.role in ['candidate', 'recruiter', 'admin'] &&
+             (data.status == null || data.status in ['pending', 'approved', 'rejected']) &&
+             (data.displayName == null || (data.displayName is string && data.displayName.size() <= 100)) &&
+             (data.phone == null || (data.phone is string && data.phone.size() <= 20)) &&
+             (data.location == null || (data.location is string && data.location.size() <= 100));
+    }
+
+    function isValidJob(data) {
+      return data.keys().hasAll(['recruiterId', 'title', 'description', 'location']) &&
+             data.keys().size() <= 11 &&
+             data.recruiterId == request.auth.uid &&
+             data.title is string && data.title.size() <= 200 &&
+             data.description is string && data.description.size() <= 5000 &&
+             data.location is string && data.location.size() <= 200 &&
+             (data.companyName == null || (data.companyName is string && data.companyName.size() <= 200)) &&
+             (data.salary == null || (data.salary is string && data.salary.size() <= 100)) &&
+             (data.status == null || data.status in ['active', 'closed']);
+    }
+
+    function isValidApplication(data) {
+      return data.keys().hasAll(['jobId', 'candidateId', 'recruiterId']) &&
+             data.keys().size() <= 6 &&
+             data.candidateId == request.auth.uid &&
+             data.jobId is string &&
+             data.recruiterId is string &&
+             (data.status == null || data.status in ['pending', 'viewed', 'shortlisted', 'rejected']);
+    }
+
+    // 4. Match Blocks
+    match /users/{userId} {
+      allow get: if isSignedIn(); // Basic profile read for all users
+      allow create: if isSignedIn() && isOwner(userId) && isValidUser(incoming());
+      allow update: if isSignedIn() && isOwner(userId) && isValidUser(incoming()) && (
+        incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'phone', 'location', 'photoUrl', 'metadata'])
+      );
+    }
+
+    match /jobs/{jobId} {
+      allow list, get: if isSignedIn();
+      allow create: if isSignedIn() && getRole(request.auth.uid) == 'recruiter' && isValidJob(incoming());
+      allow update: if isSignedIn() && isOwner(existing().recruiterId) && isValidJob(incoming()) && (
+        incoming().diff(existing()).affectedKeys().hasOnly(['title', 'description', 'location', 'salary', 'status', 'companyName'])
+      );
+      allow delete: if isSignedIn() && isOwner(existing().recruiterId);
+    }
+
+    match /applications/{applicationId} {
+      allow list, get: if isSignedIn() && (isOwner(existing().candidateId) || isOwner(existing().recruiterId));
+      allow create: if isSignedIn() && getRole(request.auth.uid) == 'candidate' && isValidApplication(incoming()) && 
+                    exists(/databases/$(database)/documents/jobs/$(incoming().jobId));
+      allow update: if isSignedIn() && (
+        // Recruiter updating status
+        (isOwner(existing().recruiterId) && incoming().diff(existing()).affectedKeys().hasOnly(['status']))
+      ) && isValidApplication(incoming());
+      allow delete: if isSignedIn() && isOwner(existing().candidateId);
+    }
+  }
+}

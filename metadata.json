@@ -1,0 +1,11 @@
+{
+  "name": "AfriJob Marketplace",
+  "description": "Plateforme de recrutement mobile-first optimisée pour le marché africain, connectant candidats et recruteurs avec un système de validation rigoureux.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
