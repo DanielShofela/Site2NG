@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -18,8 +18,20 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const { loginWithGoogle } = useAuth();
+  const { user, loginWithGoogle, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!authLoading && user) {
+      if (user.role === 'recruiter') {
+        navigate('/recruiter');
+      } else if (user.role === 'candidate') {
+        navigate('/candidate');
+      } else {
+        navigate('/');
+      }
+    }
+  }, [user, authLoading, navigate]);
 
   const handleGoogleLogin = async () => {
     setIsLoading(true);

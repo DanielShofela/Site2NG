@@ -2,10 +2,13 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Link } from 'react-router-dom';
-import { Briefcase, Building2, Search, ArrowRight, CheckCircle2, Globe2 } from 'lucide-react';
+import { Briefcase, Building2, Search, ArrowRight, CheckCircle2, Globe2, LayoutDashboard } from 'lucide-react';
 import { motion } from 'motion/react';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function Home() {
+  const { user, loading } = useAuth();
+  
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: { opacity: 1, transition: { staggerChildren: 0.1 } },
@@ -14,6 +17,13 @@ export default function Home() {
   const itemVariants = {
     hidden: { y: 20, opacity: 0 },
     visible: { y: 0, opacity: 1 },
+  };
+
+  const getDashboardLink = () => {
+    if (!user) return '/';
+    if (user.role === 'admin') return '/admin';
+    if (user.role === 'recruiter') return '/recruiter';
+    return '/candidate';
   };
 
   return (
@@ -46,6 +56,21 @@ export default function Home() {
           >
             La première marketplace de placement de personnel adaptée aux réalités locales, simple, rapide et sécurisée.
           </motion.p>
+          
+          {user && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4 }}
+              className="mt-8"
+            >
+              <Link to={getDashboardLink()}>
+                <Button className="h-14 px-8 bg-slate-900 text-white rounded-2xl font-bold shadow-xl flex items-center gap-2 mx-auto">
+                  <LayoutDashboard className="h-5 w-5" /> Accéder à mon tableau de bord
+                </Button>
+              </Link>
+            </motion.div>
+          )}
         </div>
 
         {/* Main Choice Panels */}
@@ -74,9 +99,9 @@ export default function Home() {
                 </li>
               ))}
             </ul>
-            <Link to="/signup?role=candidate">
+            <Link to={user ? "/candidate" : "/signup?role=candidate"}>
               <Button className="w-full py-7 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-2xl transition-colors text-lg shadow-lg shadow-orange-600/20">
-                Démarrer mon profil
+                {user && user.role === 'candidate' ? "Mon Profil Candidat" : "Démarrer mon profil"}
               </Button>
             </Link>
           </motion.div>
@@ -105,9 +130,9 @@ export default function Home() {
                 </li>
               ))}
             </ul>
-            <Link to="/signup?role=recruiter">
+            <Link to={user ? "/recruiter" : "/signup?role=recruiter"}>
               <Button className="w-full py-7 bg-teal-600 hover:bg-teal-500 text-white font-bold rounded-2xl transition-colors text-lg shadow-lg shadow-teal-600/20 border-none">
-                Publier une offre
+                {user && user.role === 'recruiter' ? "Mon Espace Recruteur" : "Publier une offre"}
               </Button>
             </Link>
           </motion.div>
