@@ -113,21 +113,21 @@ export default function Onboarding() {
   if (loading || !user) return null;
 
   return (
-    <div className="min-h-screen bg-slate-50 pt-10 pb-20 px-4">
+    <div className="min-h-screen bg-slate-50 pt-6 md:pt-10 pb-20 px-4">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
-        <div className="mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
+        <div className="mb-6 md:mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight leading-tight">
               Complétez votre profil professionnel
             </h1>
             <p className="text-slate-500 mt-2 text-sm sm:text-base">
               Laissez les recruteurs découvrir votre plein potentiel.
             </p>
           </div>
-          <div className="text-left sm:text-right w-full sm:w-auto">
-            <span className="text-sm font-bold text-orange-600">
-              Etape {currentStep + 1} sur {STEPS.length}
+          <div className="text-left sm:text-right w-full sm:w-auto bg-white p-4 rounded-xl shadow-sm border border-slate-100 sm:bg-transparent sm:p-0 sm:border-none sm:shadow-none">
+            <span className="text-xs sm:text-sm font-bold text-orange-600 uppercase tracking-wider">
+              Etape {currentStep + 1} / {STEPS.length}
             </span>
             <div className="w-full sm:w-48 h-2 bg-slate-200 rounded-full mt-2 overflow-hidden">
               <motion.div 
@@ -150,21 +150,21 @@ export default function Onboarding() {
                 exit={{ opacity: 0, x: -20 }}
                 transition={{ duration: 0.3 }}
               >
-                <Card className="border-none shadow-xl shadow-slate-200/60 transition-all">
-                  <CardHeader className="bg-slate-900 text-white rounded-t-xl py-6">
+                <Card className="border-none shadow-xl shadow-slate-200/60 transition-all rounded-2xl md:rounded-3xl overflow-hidden">
+                  <CardHeader className="bg-slate-900 text-white rounded-none py-6">
                     <div className="flex items-center gap-3">
                       <div className="p-2 bg-white/10 rounded-lg">
                         {React.createElement(STEPS[currentStep].icon, { className: "h-5 w-5" })}
                       </div>
                       <div>
-                        <CardTitle className="text-xl">{STEPS[currentStep].title}</CardTitle>
-                        <CardDescription className="text-slate-400">
+                        <CardTitle className="text-lg md:text-xl">{STEPS[currentStep].title}</CardTitle>
+                        <CardDescription className="text-slate-400 text-xs md:text-sm">
                           Les champs marqués d'un * sont importants
                         </CardDescription>
                       </div>
                     </div>
                   </CardHeader>
-                  <CardContent className="p-8">
+                  <CardContent className="p-6 md:p-8">
                     {currentStep === 0 && (
                       <PersonalInfoStep data={formData} onChange={updateFormData} />
                     )}
@@ -189,19 +189,19 @@ export default function Onboarding() {
             </AnimatePresence>
 
             {/* Navigation Buttons */}
-            <div className="flex justify-between items-center py-4">
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-4 py-4">
               <Button
                 variant="ghost"
                 onClick={handleBack}
                 disabled={currentStep === 0 || isSaving}
-                className="font-bold text-slate-600 h-12 rounded-xl px-6"
+                className="w-full sm:w-auto font-bold text-slate-600 h-12 rounded-xl px-6"
               >
                 <ChevronLeft className="mr-2 h-4 w-4" /> Précédent
               </Button>
               <Button
                 onClick={handleNext}
                 disabled={isSaving}
-                className="font-bold h-12 rounded-xl px-10 bg-orange-600 hover:bg-orange-700 shadow-lg shadow-orange-600/20 border-none text-white"
+                className="w-full sm:w-auto font-bold h-12 rounded-xl px-10 bg-orange-600 hover:bg-orange-700 shadow-lg shadow-orange-600/20 border-none text-white transition-all active:scale-[0.98]"
               >
                 {currentStep === STEPS.length - 1 ? 'Terminer' : 'Suivant'}
                 <ChevronRight className="ml-2 h-4 w-4" />

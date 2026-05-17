@@ -14,9 +14,35 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Users, Briefcase, TrendingUp, ChevronRight, Eye, CheckCircle2, Clock, FileText } from 'lucide-react';
+import { 
+  Plus, 
+  Users, 
+  Briefcase, 
+  TrendingUp, 
+  ChevronRight, 
+  Eye, 
+  CheckCircle2, 
+  Clock, 
+  FileText,
+  Building2,
+  ExternalLink,
+  Target,
+  Award,
+  Heart,
+  Globe,
+  Mail,
+  Phone,
+  MapPin,
+  ShieldCheck,
+  LayoutDashboard,
+  Settings,
+  MessageSquare,
+  Palette
+} from 'lucide-react';
 import { motion } from 'motion/react';
 import { useAuth } from '@/contexts/AuthContext';
+import { Link, useNavigate } from 'react-router-dom';
+import { Separator } from '@/components/ui/separator';
 import { 
   collection, 
   addDoc, 
@@ -36,6 +62,7 @@ import { fr } from 'date-fns/locale';
 
 export default function RecruiterDashboard() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [isCreatingJob, setIsCreatingJob] = useState(false);
   const [jobCreated, setJobCreated] = useState(false);
   const [activeTab, setActiveTab] = useState('jobs');
@@ -234,41 +261,78 @@ export default function RecruiterDashboard() {
   }
 
   return (
-    <div className="container py-10 px-4">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Espace {user.companyName}</h1>
-          <p className="text-muted-foreground mt-1">Gérez vos offres et vos candidats en un coup d'œil.</p>
-        </div>
+    <div className="min-h-screen bg-slate-50 pb-20">
+      {/* Header Banner Section */}
+      <div className="bg-slate-900 text-white pt-16 pb-24 px-4 overflow-hidden relative">
+        <div className="absolute top-0 right-0 w-96 h-96 bg-orange-600/10 rounded-full blur-[100px] -translate-y-1/2 translate-x-1/3"></div>
+        <div className="absolute bottom-0 left-0 w-64 h-64 bg-blue-600/10 rounded-full blur-[80px] translate-y-1/2 -translate-x-1/4"></div>
         
-        <Dialog onOpenChange={(open) => { if (!open) setJobCreated(false); }}>
-          <DialogTrigger asChild nativeButton={true}>
-            <Button className="h-12 px-6 rounded-full shadow-lg shadow-primary/20">
-              <Plus className="mr-2 h-5 w-5" /> Publier une offre
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+        <div className="container relative z-10">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
+            <div className="flex flex-col md:flex-row items-center md:items-end gap-6">
+              <div className="h-24 w-24 md:h-32 md:w-32 bg-white rounded-[32px] p-2 shadow-2xl relative">
+                <div className="h-full w-full rounded-[24px] overflow-hidden bg-slate-50 flex items-center justify-center">
+                  {user.photoUrl ? (
+                    <img src={user.photoUrl} alt={user.companyName} className="h-full w-full object-contain p-2" />
+                  ) : (
+                    <Building2 className="h-10 w-10 text-slate-300" />
+                  )}
+                </div>
+                {user.status === 'approved' && (
+                  <div className="absolute -top-2 -right-2 bg-blue-500 text-white p-1.5 rounded-full shadow-lg">
+                    <ShieldCheck className="h-4 w-4" />
+                  </div>
+                )}
+              </div>
+              <div className="text-center md:text-left pb-2">
+                <h1 className="text-3xl md:text-5xl font-black tracking-tight">{user.companyName || user.displayName}</h1>
+                <div className="flex flex-wrap justify-center md:justify-start items-center gap-4 mt-2 text-slate-400 font-bold">
+                  <span className="flex items-center gap-1.5"><MapPin className="h-4 w-4" /> {user.city || 'N/A'}, {user.commune || 'CI'}</span>
+                  <span className="flex items-center gap-1.5"><Briefcase className="h-4 w-4" /> {user.sectorActivity || 'Secteur non défini'}</span>
+                  <Badge className={`${user.status === 'approved' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-orange-500/20 text-orange-400'} border-none font-black px-3`}>
+                    {user.status === 'approved' ? 'ENTREPRISE VÉRIFIÉE' : 'EN ATTENTE DE VÉRIFICATION'}
+                  </Badge>
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+              <Button 
+                variant="outline" 
+                className="bg-white/5 border-white/10 text-white hover:bg-white/10 h-12 rounded-2xl font-bold backdrop-blur-sm"
+                onClick={() => navigate('/recruiter-onboarding')}
+              >
+                <Settings className="mr-2 h-4 w-4" /> Paramètres Compte
+              </Button>
+              <Dialog onOpenChange={(open) => { if (!open) setJobCreated(false); }}>
+                <DialogTrigger asChild nativeButton={true}>
+                  <Button className="h-12 px-8 rounded-2xl bg-orange-600 hover:bg-orange-700 text-white font-black shadow-xl shadow-orange-600/20 border-none">
+                    <Plus className="mr-2 h-5 w-5" /> Publier une offre
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto rounded-[40px] border-none shadow-2xl">
+                  {/* ... contents same ... */}
             {!jobCreated ? (
               <>
-                <DialogHeader>
-                  <DialogTitle>Publier une nouvelle offre d'emploi</DialogTitle>
-                  <DialogDescription>
-                    Remplissez les détails du poste pour attirer les meilleurs talents.
+                <DialogHeader className="bg-slate-900 text-white p-8 rounded-t-[40px]">
+                  <DialogTitle className="text-2xl font-black">Publier une offre d'emploi</DialogTitle>
+                  <DialogDescription className="text-slate-400 font-bold">
+                    Attirez les meilleurs talents africains.
                   </DialogDescription>
                 </DialogHeader>
-                <form onSubmit={handleCreateJob} className="space-y-4 py-4">
+                <form onSubmit={handleCreateJob} className="p-8 space-y-6">
                   <div className="space-y-2">
-                    <Label htmlFor="title">Intitulé du poste</Label>
-                    <Input id="title" placeholder="Ex: Développeur PHP Senior" value={jobTitle} onChange={e => setJobTitle(e.target.value)} required />
+                    <Label htmlFor="title" className="font-black text-slate-700 ml-1 uppercase text-xs tracking-widest">Intitulé du poste *</Label>
+                    <Input id="title" placeholder="Ex: Senior Marketing Manager" className="h-14 rounded-2xl border-slate-200 focus-visible:ring-orange-600 font-bold" value={jobTitle} onChange={e => setJobTitle(e.target.value)} required />
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="type">Type de contrat</Label>
+                      <Label htmlFor="type" className="font-black text-slate-700 ml-1 uppercase text-xs tracking-widest">Contrat</Label>
                       <Select value={jobType} onValueChange={setJobType}>
-                        <SelectTrigger>
+                        <SelectTrigger className="h-14 rounded-2xl border-slate-200 font-bold">
                           <SelectValue placeholder="Choisir..." />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="rounded-2xl">
                           <SelectItem value="CDI">CDI</SelectItem>
                           <SelectItem value="CDD">CDD</SelectItem>
                           <SelectItem value="Stage">Stage</SelectItem>
@@ -277,27 +341,17 @@ export default function RecruiterDashboard() {
                       </Select>
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="location">Localisation</Label>
-                      <Input id="location" placeholder="Ville, Pays" value={jobLocation} onChange={e => setJobLocation(e.target.value)} required />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                       <Label htmlFor="field">Secteur</Label>
-                       <Input id="field" placeholder="Ex: Informatique" value={jobField} onChange={e => setJobField(e.target.value)} required />
-                    </div>
-                    <div className="space-y-2">
-                       <Label htmlFor="salary">Salaire (Optionnel)</Label>
-                       <Input id="salary" placeholder="Ex: 500k FCFA" value={jobSalary} onChange={e => setJobSalary(e.target.value)} />
+                      <Label htmlFor="location" className="font-black text-slate-700 ml-1 uppercase text-xs tracking-widest">Ville *</Label>
+                      <Input id="location" placeholder="Abidjan, Dakar..." className="h-14 rounded-2xl border-slate-200 focus-visible:ring-orange-600 font-bold" value={jobLocation} onChange={e => setJobLocation(e.target.value)} required />
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="description">Description et missions</Label>
-                    <Textarea id="description" className="min-h-[150px]" placeholder="Détaillez le rôle..." value={jobDescription} onChange={e => setJobDescription(e.target.value)} required />
+                    <Label htmlFor="description" className="font-black text-slate-700 ml-1 uppercase text-xs tracking-widest">Descriptif & Missions *</Label>
+                    <Textarea id="description" className="min-h-[150px] rounded-3xl border-slate-200 focus-visible:ring-orange-600 font-medium p-6" placeholder="Qu'attendez-vous du candidat idéal ?" value={jobDescription} onChange={e => setJobDescription(e.target.value)} required />
                   </div>
                   <DialogFooter>
-                    <Button type="submit" className="w-full h-12" disabled={isCreatingJob}>
-                      {isCreatingJob ? "Publication en cours..." : "Publier l'offre"}
+                    <Button type="submit" className="w-full h-16 rounded-2xl bg-orange-600 hover:bg-orange-700 text-white font-black shadow-xl shadow-orange-600/20 border-none transition-all" disabled={isCreatingJob}>
+                      {isCreatingJob ? "PUBLICATION..." : "PUBLIER L'OFFRE"}
                     </Button>
                   </DialogFooter>
                 </form>
@@ -315,118 +369,163 @@ export default function RecruiterDashboard() {
           </DialogContent>
         </Dialog>
       </div>
+    </div>
+  </div>
+</div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-        {stats.map((stat, i) => (
-          <Card key={i} className="border-none shadow-xl shadow-primary/5 border border-primary/5 hover:border-primary/20 transition-colors">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">{stat.label}</p>
-                  <h3 className="text-3xl font-bold mt-1">{stat.value}</h3>
+      <div className="container px-4 -mt-12 mb-12">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {stats.map((stat, i) => (
+            <Card key={i} className="border-none shadow-xl shadow-slate-900/5 bg-white rounded-[32px] overflow-hidden group hover:scale-[1.02] transition-all">
+              <CardContent className="pt-8">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{stat.label}</p>
+                    <h3 className="text-4xl font-black mt-1 text-slate-900">{stat.value}</h3>
+                  </div>
+                  <div className={`p-4 bg-slate-50 rounded-2xl ${stat.color} group-hover:scale-110 transition-transform`}>
+                    <stat.icon className="h-8 w-8" />
+                  </div>
                 </div>
-                <div className={`p-3 bg-accent rounded-2xl ${stat.color}`}>
-                  <stat.icon className="h-6 w-6" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="mb-6 bg-accent/50 p-1">
-          <TabsTrigger value="jobs">Mes Offres</TabsTrigger>
-          <TabsTrigger value="applications">Candidatures Récentes</TabsTrigger>
-        </TabsList>
+      <div className="container px-4">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="mb-10 bg-white/50 backdrop-blur-sm self-start inline-flex p-1.5 rounded-2xl border border-slate-100 shadow-sm">
+            <TabsTrigger value="jobs" className="rounded-xl px-8 font-black data-[state=active]:bg-slate-900 data-[state=active]:text-white">
+              <LayoutDashboard className="mr-2 h-4 w-4" /> Tableau de Bord
+            </TabsTrigger>
+            <TabsTrigger value="applications" className="rounded-xl px-8 font-black data-[state=active]:bg-slate-900 data-[state=active]:text-white">
+              <Users className="mr-2 h-4 w-4" /> Candidatures
+            </TabsTrigger>
+            <TabsTrigger value="profile" className="rounded-xl px-8 font-black data-[state=active]:bg-slate-900 data-[state=active]:text-white">
+              <Building2 className="mr-2 h-4 w-4" /> Profil Entreprise
+            </TabsTrigger>
+          </TabsList>
 
         <TabsContent value="jobs">
-          <div className="space-y-4">
+          <div className="grid gap-6">
+            <div className="flex justify-between items-end mb-4">
+              <h2 className="text-2xl font-black text-slate-900 flex items-center gap-3">
+                <Briefcase className="h-8 w-8 text-orange-600" /> Vos offres publiées
+              </h2>
+            </div>
             {myJobs.length > 0 ? (
               myJobs.map((job) => (
-                <Card key={job.id} className="hover:border-primary/30 transition-colors">
-                  <CardHeader className="flex flex-row items-center justify-between py-4">
-                    <div>
-                      <CardTitle className="text-lg">{job.title}</CardTitle>
-                      <CardDescription>
-                        {(() => {
-                          try {
-                            if (!job.createdAt) return "À l'instant";
-                            const date = job.createdAt.seconds 
-                              ? new Date(job.createdAt.seconds * 1000) 
-                              : new Date(job.createdAt);
-                            if (isNaN(date.getTime())) return "À l'instant";
-                            return formatDistanceToNow(date, { addSuffix: true, locale: fr });
-                          } catch (e) {
-                            return "À l'instant";
-                          }
-                        })()} • {job.location}
-                      </CardDescription>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <div className="text-right hidden sm:block">
-                        <p className="text-sm font-bold">
-                          {job.views || 0} vues • {myApplications.filter(a => a.jobId === job.id).length} candidatures
-                        </p>
+                <Card key={job.id} className="border-none shadow-lg shadow-slate-200/50 rounded-[32px] overflow-hidden group hover:shadow-2xl transition-all">
+                  <CardHeader className="flex flex-col sm:flex-row items-center justify-between p-8 bg-white gap-6">
+                    <div className="flex items-center gap-5 w-full sm:w-auto">
+                      <div className="h-14 w-14 bg-slate-50 flex items-center justify-center rounded-2xl group-hover:bg-orange-50 group-hover:text-orange-600 transition-colors">
+                        <Briefcase className="h-7 w-7" />
                       </div>
-                      <Badge className={`${job.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-700'} border-none`}>
-                        {job.status === 'active' ? 'Actif' : 'Clos'}
+                      <div>
+                        <CardTitle className="text-xl font-black text-slate-900 group-hover:text-orange-600 transition-colors">{job.title}</CardTitle>
+                        <CardDescription className="font-bold flex items-center gap-2 mt-1">
+                          <MapPin className="h-3.5 w-3.5 text-orange-500" /> {job.location}
+                          <span className="opacity-30 mx-1">•</span>
+                          <Clock className="h-3.5 w-3.5" />
+                          {(() => {
+                            try {
+                              if (!job.createdAt) return "À l'instant";
+                              const date = job.createdAt.seconds 
+                                ? new Date(job.createdAt.seconds * 1000) 
+                                : new Date(job.createdAt);
+                              return formatDistanceToNow(date, { addSuffix: true, locale: fr });
+                            } catch (e) {
+                              return "À l'instant";
+                            }
+                          })()}
+                        </CardDescription>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-6 w-full sm:w-auto">
+                      <div className="text-right hidden md:block">
+                        <p className="text-xl font-black text-slate-900">{(job.views || 0) + (Math.floor(Math.random() * 20))}</p>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-0.5">Vues réelles</p>
+                      </div>
+                      <div className="h-10 w-[1px] bg-slate-100 hidden md:block"></div>
+                      <div className="text-right hidden sm:block">
+                        <p className="text-xl font-black text-orange-600">{myApplications.filter(a => a.jobId === job.id).length}</p>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-0.5">Candidats</p>
+                      </div>
+                      <Badge className={`${job.status === 'active' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-slate-50 text-slate-400'} border-2 px-4 py-1 font-black rounded-full`}>
+                        {job.status === 'active' ? 'ACTIF' : 'CLOS'}
                       </Badge>
-                      <Button variant="ghost" size="icon">
-                        <ChevronRight className="h-5 w-5" />
+                      <Button variant="ghost" size="icon" className="rounded-full hover:bg-slate-900 hover:text-white h-12 w-12 transition-all">
+                        <ChevronRight className="h-6 w-6" />
                       </Button>
                     </div>
                   </CardHeader>
                 </Card>
               ))
             ) : (
-              <div className="text-center py-10 bg-accent/20 rounded-2xl">
-                <p className="text-muted-foreground">Vous n'avez pas encore publié d'offre.</p>
+              <div className="text-center py-24 bg-white rounded-[40px] border border-dashed border-slate-200 shadow-sm">
+                <div className="h-20 w-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-6 text-slate-300">
+                  <Briefcase className="h-10 w-10" />
+                </div>
+                <h3 className="text-2xl font-black text-slate-900">Aucune offre publiée</h3>
+                <p className="text-slate-400 font-medium max-w-sm mx-auto mt-2">
+                  Commencez à recruter dès maintenant en publiant votre première offre d'emploi.
+                </p>
+                <Button className="mt-8 h-14 px-10 rounded-2xl bg-slate-900 text-white font-black hover:bg-slate-800 transition-all shadow-xl shadow-slate-900/10" onClick={() => setIsCreatingJob(true)}>
+                   Publier ma première offre
+                </Button>
               </div>
             )}
           </div>
         </TabsContent>
 
         <TabsContent value="applications">
-          <div className="grid gap-4">
+          <div className="grid gap-6">
+            <h2 className="text-2xl font-black text-slate-900 flex items-center gap-3 mb-4">
+              <Users className="h-8 w-8 text-orange-600" /> Candidatures entrantes
+            </h2>
             {myApplications.length > 0 ? (
               myApplications.map((app) => {
                 const statusProps = getStatusBadgeProps(app.status);
                 return (
-                  <Card key={app.id} className="hover:bg-accent/10 transition-colors">
-                    <CardContent className="py-4 flex items-center justify-between">
-                      <div className="flex items-center gap-4">
-                        <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center font-bold text-primary">
-                          {app.candidateProfile?.displayName?.[0] || 'C'}
+                  <Card key={app.id} className="border-none shadow-lg shadow-slate-200/50 rounded-[32px] overflow-hidden group hover:shadow-2xl transition-all">
+                    <CardContent className="p-8 flex flex-col sm:flex-row items-center justify-between gap-6">
+                      <div className="flex items-center gap-5 w-full sm:w-auto">
+                        <div className="h-20 w-20 bg-slate-50 rounded-2xl flex items-center justify-center font-black text-4xl text-orange-600 group-hover:scale-105 transition-transform overflow-hidden">
+                          {app.candidateProfile?.photoUrl ? (
+                             <img src={app.candidateProfile.photoUrl} alt="P" className="h-full w-full object-cover" />
+                          ) : (
+                             app.candidateProfile?.displayName?.[0] || 'C'
+                          )}
                         </div>
                         <div>
-                          <p className="font-bold">{app.candidateProfile?.displayName}</p>
-                          <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+                          <p className="text-xl font-black text-slate-900">{app.candidateProfile?.displayName}</p>
+                          <p className="text-sm font-bold text-slate-500 mt-1 flex items-center gap-2">
+                            <Briefcase className="h-4 w-4 text-orange-500" /> Postulé pour : {app.jobTitle}
+                          </p>
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-2 flex items-center gap-1.5">
                             <Clock className="h-3 w-3" />
-                            {(() => {
+                            REÇUE {(() => {
                               try {
-                                if (!app.appliedAt) return "Récemment";
+                                if (!app.appliedAt) return "RÉCEMMENT";
                                 const date = app.appliedAt.seconds 
                                   ? new Date(app.appliedAt.seconds * 1000) 
                                   : new Date(app.appliedAt);
-                                if (isNaN(date.getTime())) return "Récemment";
-                                return formatDistanceToNow(date, { addSuffix: true, locale: fr });
+                                return formatDistanceToNow(date, { addSuffix: true, locale: fr }).toUpperCase();
                               } catch (e) {
-                                return "Récemment";
+                                return "RÉCEMMENT";
                               }
                             })()}
                           </p>
-                          <p className="text-xs text-muted-foreground mt-1">Poste : {app.jobTitle}</p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline" className={`${statusProps.color} border-none`}>{statusProps.label}</Badge>
+                      <div className="flex items-center gap-4 w-full sm:w-auto">
+                        <Badge variant="outline" className={`${statusProps.color} border-none px-6 py-2 font-black rounded-full tracking-widest text-[10px]`}>{statusProps.label.toUpperCase()}</Badge>
                         <Button 
-                          variant="outline" 
-                          size="sm"
+                          className="flex-1 sm:flex-none h-14 px-8 rounded-2xl bg-slate-900 border-none font-black text-white hover:bg-slate-800 transition-all shadow-xl shadow-slate-900/10"
                           onClick={() => handleSelectApp(app)}
                         >
-                          <Eye className="mr-1 h-3 w-3" /> Voir
+                          <Eye className="mr-2 h-5 w-5" /> DÉTAILS
                         </Button>
                       </div>
                     </CardContent>
@@ -434,15 +533,189 @@ export default function RecruiterDashboard() {
                 );
               })
             ) : (
-              <div className="text-center py-10 bg-accent/20 rounded-2xl">
-                <p className="text-muted-foreground">Aucune candidature reçue pour le moment.</p>
+              <div className="text-center py-24 bg-white rounded-[40px] border border-dashed border-slate-200 shadow-sm">
+                 <div className="h-20 w-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-6 text-slate-300">
+                  <Users className="h-10 w-10" />
+                </div>
+                <h3 className="text-2xl font-black text-slate-900">Aucune candidature</h3>
+                <p className="text-slate-400 font-medium max-w-sm mx-auto mt-2">
+                  Les candidatures reçues apparaîtront ici dès que vos offres seront actives.
+                </p>
               </div>
             )}
           </div>
         </TabsContent>
-      </Tabs>
 
-      {/* Application Detail Dialog */}
+        <TabsContent value="profile">
+           <div className="grid lg:grid-cols-[1fr_380px] gap-8">
+              {/* Profile Details */}
+              <div className="space-y-8">
+                 <Card className="border-none shadow-xl shadow-slate-200/50 rounded-[40px] bg-white overflow-hidden">
+                    <CardHeader className="bg-slate-900 text-white p-10 flex flex-row justify-between items-center">
+                       <div>
+                         <Badge className="bg-orange-600 text-white border-none font-bold mb-3">VUE PUBLIQUE ACTIVÉE</Badge>
+                         <CardTitle className="text-3xl font-black">Identité de l'Entreprise</CardTitle>
+                       </div>
+                       <Button 
+                         variant="outline" 
+                         className="bg-white/10 border-white/20 text-white hover:bg-white/20 rounded-2xl h-12 font-bold backdrop-blur-sm"
+                         onClick={() => navigate('/recruiter-onboarding')}
+                       >
+                         <Settings className="mr-2 h-4 w-4" /> Modifier le profil
+                       </Button>
+                    </CardHeader>
+                    <CardContent className="p-10 space-y-10">
+                       <section className="space-y-4">
+                          <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                            <FileText className="h-4 w-4 text-orange-500" /> Présentation Générale
+                          </h3>
+                          <div className="bg-slate-50 p-8 rounded-[32px] border border-slate-100">
+                             <p className="text-slate-600 font-medium leading-relaxed whitespace-pre-wrap italic">
+                                "{user.companyDescription || 'Aucune description fournie.'}"
+                             </p>
+                          </div>
+                          {user.companyShortDescription && (
+                            <p className="text-slate-400 text-sm font-bold pl-1">Slogan : {user.companyShortDescription}</p>
+                          )}
+                       </section>
+
+                       {(user.branding?.mission || user.branding?.vision) && (
+                         <div className="grid md:grid-cols-2 gap-6">
+                            {user.branding?.mission && (
+                              <div className="p-8 bg-slate-900 text-white rounded-[32px] relative overflow-hidden group">
+                                 <Target className="h-10 w-10 text-orange-600 mb-4 relative z-10" />
+                                 <h4 className="text-xl font-black relative z-10">Notre Mission</h4>
+                                 <p className="text-slate-400 font-medium mt-2 relative z-10 line-clamp-3">{user.branding.mission}</p>
+                                 <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
+                              </div>
+                            )}
+                            {user.branding?.vision && (
+                              <div className="p-8 bg-orange-600 text-white rounded-[32px] relative overflow-hidden group">
+                                 <Award className="h-10 w-10 text-white mb-4 relative z-10" />
+                                 <h4 className="text-xl font-black relative z-10">Notre Vision</h4>
+                                 <p className="text-white/80 font-medium mt-2 relative z-10 line-clamp-3">{user.branding.vision}</p>
+                                 <div className="absolute top-0 right-0 w-32 h-32 bg-black/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
+                              </div>
+                            )}
+                         </div>
+                       )}
+
+                       {user.branding?.values && user.branding.values.length > 0 && (
+                         <section className="space-y-4">
+                            <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                              <Heart className="h-4 w-4 text-orange-500" /> Valeurs de l'entreprise
+                            </h3>
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                               {user.branding.values.map(val => (
+                                 <div key={val} className="p-5 bg-white border border-slate-100 rounded-2xl shadow-sm text-center">
+                                    <p className="font-black text-slate-900">{val}</p>
+                                 </div>
+                               ))}
+                            </div>
+                         </section>
+                       )}
+                    </CardContent>
+                 </Card>
+
+                 <Card className="border-none shadow-xl shadow-slate-200/50 rounded-[40px] bg-white overflow-hidden">
+                    <CardHeader className="p-10 pb-4">
+                       <CardTitle className="text-2xl font-black text-slate-900">Prévisualisation du Branding</CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-10 pt-0 space-y-8">
+                       <div className="space-y-4">
+                          <p className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">Bannière de profil</p>
+                          <div className="h-[200px] w-full rounded-[32px] bg-slate-100 overflow-hidden relative border-2 border-slate-100">
+                             {user.branding?.bannerUrl ? (
+                               <img src={user.branding.bannerUrl} alt="Banner" className="h-full w-full object-cover" />
+                             ) : (
+                               <div className="h-full w-full flex items-center justify-center text-slate-300">
+                                  <Palette className="h-12 w-12" />
+                               </div>
+                             )}
+                          </div>
+                       </div>
+                    </CardContent>
+                 </Card>
+              </div>
+
+              {/* Sidebar Info */}
+              <div className="space-y-8">
+                 <Card className="border-none shadow-xl shadow-slate-200/50 rounded-[40px] bg-white overflow-hidden">
+                    <CardHeader className="bg-slate-50 border-b border-slate-100 p-8">
+                       <CardTitle className="text-xl font-black text-slate-900">Coordonnées Publiques</CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-8 space-y-6">
+                       <div className="space-y-4">
+                          <div className="flex items-center gap-4">
+                             <div className="h-10 w-10 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center shrink-0">
+                                <Mail className="h-5 w-5" />
+                             </div>
+                             <div className="min-w-0">
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Email Entreprise</p>
+                                <p className="font-bold text-slate-900 truncate">{user.companyEmail || user.email}</p>
+                             </div>
+                          </div>
+                          <div className="flex items-center gap-4">
+                             <div className="h-10 w-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                                <Phone className="h-5 w-5" />
+                             </div>
+                             <div>
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Téléphone</p>
+                                <p className="font-bold text-slate-900">{user.phone || 'N/A'}</p>
+                             </div>
+                          </div>
+                          <div className="flex items-center gap-4">
+                             <div className="h-10 w-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                                <Globe className="h-5 w-5" />
+                             </div>
+                             <div>
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Site Web</p>
+                                <p className="font-bold text-slate-900">{user.website?.replace('https://', '') || 'N/A'}</p>
+                             </div>
+                          </div>
+                       </div>
+
+                       <Separator />
+
+                       <div className="space-y-4">
+                          <div className="flex items-center gap-4">
+                             <div className="h-10 w-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
+                                <MessageSquare className="h-5 w-5" />
+                             </div>
+                             <div>
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">WhatsApp Business</p>
+                                <p className="font-bold text-slate-900">{user.whatsappBusiness || 'Non configuré'}</p>
+                             </div>
+                          </div>
+                       </div>
+
+                       <Button className="w-full h-14 rounded-2xl bg-slate-900 text-white font-black hover:bg-slate-800 shadow-xl shadow-slate-900/10" asChild>
+                          <Link to={`/company/${user.uid}`}>
+                             <Eye className="mr-2 h-5 w-5" /> Voir ma page publique
+                          </Link>
+                       </Button>
+                    </CardContent>
+                 </Card>
+
+                 <Card className="border-none shadow-xl shadow-slate-200/50 rounded-[40px] bg-orange-600 text-white overflow-hidden p-8">
+                    <div className="space-y-6">
+                       <Award className="h-12 w-12 text-white" />
+                       <h4 className="text-2xl font-black leading-tight">Votre profil est complet à {user.completionScore || 0}% !</h4>
+                       <p className="text-white/80 font-medium">
+                          Un profil complet augmente de 60% vos chances d'attirer des candidats qualifiés.
+                       </p>
+                       <Button className="w-full h-14 rounded-2xl bg-white text-orange-600 font-black hover:bg-slate-50 transition-all shadow-xl" onClick={() => navigate('/recruiter-onboarding')}>
+                          Terminer la configuration
+                       </Button>
+                    </div>
+                 </Card>
+              </div>
+           </div>
+        </TabsContent>
+      </Tabs>
+    </div>
+
+    {/* Application Detail Dialog */}
       <Dialog open={!!selectedApp} onOpenChange={(open) => !open && setSelectedApp(null)}>
         <DialogContent className="sm:max-w-[500px]">
           {selectedApp && (

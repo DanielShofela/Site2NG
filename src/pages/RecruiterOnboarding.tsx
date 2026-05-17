@@ -132,22 +132,22 @@ export default function RecruiterOnboarding() {
   if (loading || !user) return null;
 
   return (
-    <div className="min-h-screen bg-slate-50 pt-10 pb-20 px-4">
+    <div className="min-h-screen bg-slate-50 pt-6 md:pt-10 pb-20 px-4">
       <div className="max-w-5xl mx-auto">
         {/* Header */}
-        <div className="mb-10 flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
+        <div className="mb-8 md:mb-10 flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
           <div className="space-y-2">
-            <Badge className="bg-orange-600 text-white border-none px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">
+            <Badge className="bg-orange-600 text-white border-none px-3 py-1 rounded-full text-[10px] md:text-xs font-bold uppercase tracking-wider">
               Onboarding Recrutement
             </Badge>
-            <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight">
+            <h1 className="text-2xl md:text-4xl font-black text-slate-900 tracking-tight leading-tight">
               Configurez votre profil entreprise
             </h1>
-            <p className="text-slate-500 text-lg font-medium max-w-2xl">
+            <p className="text-slate-500 text-base md:text-lg font-medium max-w-2xl">
               Un profil complet et vérifié attire les meilleurs talents. Prenez le temps de bien détailler votre identité.
             </p>
           </div>
-          <div className="bg-white p-6 rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-100 min-w-[240px]">
+          <div className="bg-white p-5 md:p-6 rounded-2xl md:rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-100 w-full md:w-auto md:min-w-[240px]">
             <div className="flex justify-between items-end mb-3">
               <span className="text-sm font-bold text-slate-500 uppercase tracking-widest">Etape {currentStep + 1}/{STEPS.length}</span>
               <span className="text-2xl font-black text-orange-600">{Math.round(currentStepProgress)}%</span>
@@ -174,25 +174,25 @@ export default function RecruiterOnboarding() {
                 exit={{ opacity: 0, y: -20 }}
                 transition={{ duration: 0.4 }}
               >
-                <Card className="border-none shadow-2xl shadow-slate-200/60 rounded-[40px] overflow-hidden bg-white">
-                  <div className="bg-slate-900 p-8 text-white relative overflow-hidden">
+                <Card className="border-none shadow-2xl shadow-slate-200/60 rounded-3xl md:rounded-[40px] overflow-hidden bg-white">
+                  <div className="bg-slate-900 p-6 md:p-8 text-white relative overflow-hidden">
                     {/* Background decoration */}
-                    <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl"></div>
+                    <div className="absolute top-0 right-0 w-48 md:w-64 h-48 md:h-64 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl"></div>
                     
-                    <div className="flex items-center gap-5 relative z-10">
-                      <div className="p-4 bg-white/10 backdrop-blur-md rounded-2xl border border-white/10 text-orange-500">
-                        {React.createElement(STEPS[currentStep].icon, { className: "h-8 w-8" })}
+                    <div className="flex items-center gap-4 md:gap-5 relative z-10">
+                      <div className="p-3 md:p-4 bg-white/10 backdrop-blur-md rounded-xl md:rounded-2xl border border-white/10 text-orange-500">
+                        {React.createElement(STEPS[currentStep].icon, { className: "h-6 w-6 md:h-8 md:w-8" })}
                       </div>
                       <div>
-                        <CardTitle className="text-2xl font-black">{STEPS[currentStep].title}</CardTitle>
-                        <CardDescription className="text-slate-400 text-base font-medium mt-1">
+                        <CardTitle className="text-xl md:text-2xl font-black">{STEPS[currentStep].title}</CardTitle>
+                        <CardDescription className="text-slate-400 text-sm md:text-base font-medium mt-1">
                           Veuillez remplir les informations avec précision.
                         </CardDescription>
                       </div>
                     </div>
                   </div>
                   
-                  <CardContent className="p-8 md:p-12">
+                  <CardContent className="p-6 md:p-12">
                     {currentStep === 0 && <GeneralStep data={formData} onChange={updateFormData} />}
                     {currentStep === 1 && <LegalStep data={formData} onChange={updateFormData} />}
                     {currentStep === 2 && <ContactStep data={formData} onChange={updateFormData} />}
@@ -206,21 +206,21 @@ export default function RecruiterOnboarding() {
               </motion.div>
             </AnimatePresence>
 
-            <div className="flex justify-between items-center py-4 px-2">
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-4 py-4 px-2">
               <Button
                 variant="ghost"
                 onClick={handleBack}
                 disabled={currentStep === 0 || isSaving}
-                className="font-black text-slate-500 hover:text-slate-900 h-14 rounded-2xl px-8 transition-all"
+                className="w-full sm:w-auto font-black text-slate-500 hover:text-slate-900 h-14 rounded-2xl px-8 transition-all"
               >
                 <ChevronLeft className="mr-2 h-5 w-5" /> Précédent
               </Button>
               <Button
                 onClick={handleNext}
                 disabled={isSaving}
-                className="font-black h-14 rounded-2xl px-12 bg-slate-900 text-white hover:bg-slate-800 shadow-xl shadow-slate-900/10 border-none transition-all hover:scale-[1.02] active:scale-[0.98]"
+                className="w-full sm:w-auto font-black h-14 rounded-2xl px-12 bg-slate-900 text-white hover:bg-slate-800 shadow-xl shadow-slate-900/10 border-none transition-all hover:scale-[1.02] active:scale-[0.98]"
               >
-                {isSaving ? "Sauvegarde..." : currentStep === STEPS.length - 1 ? 'Soumettre le profil' : 'Continuer'}
+                {isSaving ? "Sauvegarde..." : currentStep === STEPS.length - 1 ? 'Soumettre' : 'Continuer'}
                 {!isSaving && <ChevronRight className="ml-2 h-5 w-5" />}
               </Button>
             </div>
@@ -287,12 +287,12 @@ function GeneralStep({ data, onChange }: { data: Partial<UserProfile>, onChange:
   ];
 
   return (
-    <div className="space-y-10">
-       <div className="flex flex-col md:flex-row gap-8 items-start">
+    <div className="space-y-8 md:space-y-10">
+       <div className="flex flex-col md:flex-row gap-6 md:gap-8 items-center md:items-start text-center md:text-left">
         <div className="shrink-0">
-          <Label className="block text-sm font-bold text-slate-700 mb-3 ml-1 uppercase tracking-wider">Logo Entreprise</Label>
-          <div className="relative group">
-            <div className="h-32 w-32 rounded-[32px] bg-slate-100 border-2 border-dashed border-slate-200 flex items-center justify-center overflow-hidden transition-all group-hover:border-orange-300">
+          <Label className="block text-xs font-bold text-slate-700 mb-3 ml-1 uppercase tracking-wider">Logo Entreprise</Label>
+          <div className="relative group mx-auto md:mx-0">
+            <div className="h-28 w-28 md:h-32 md:w-32 rounded-2xl md:rounded-[32px] bg-slate-100 border-2 border-dashed border-slate-200 flex items-center justify-center overflow-hidden transition-all group-hover:border-orange-300">
               {data.photoUrl ? (
                 <img src={data.photoUrl} alt="Logo" className="h-full w-full object-cover" />
               ) : (
@@ -436,21 +436,16 @@ function LegalStep({ data, onChange }: { data: Partial<UserProfile>, onChange: (
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="space-y-4">
-          <Label className="font-black text-xs text-slate-400 uppercase tracking-widest block ml-1">Upload RCCM (PDF/IMAGE) *</Label>
-          <div className="border-2 border-dashed border-slate-200 rounded-3xl p-6 text-center hover:border-orange-400 transition-all cursor-pointer group bg-slate-50/50">
-            <Upload className="h-8 w-8 text-slate-300 mx-auto mb-2 group-hover:text-orange-500 transition-colors" />
-            <p className="text-sm font-bold text-slate-600">Registre du Commerce</p>
-            <p className="text-xs text-slate-400">PDF, JPG ou PNG</p>
+      <div className="space-y-3">
+        <Label className="font-black text-xs text-slate-400 uppercase tracking-widest block ml-1">Documents Vérification (PDF/IMAGE) *</Label>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="border-2 border-dashed border-slate-200 rounded-2xl p-5 text-center hover:border-orange-400 transition-all cursor-pointer group bg-slate-50/50">
+            <Upload className="h-6 w-6 text-slate-300 mx-auto mb-2 group-hover:text-orange-500 transition-colors" />
+            <p className="text-xs font-bold text-slate-600">Registre du Commerce</p>
           </div>
-        </div>
-        <div className="space-y-4">
-          <Label className="font-black text-xs text-slate-400 uppercase tracking-widest block ml-1">Attestation Fiscale *</Label>
-          <div className="border-2 border-dashed border-slate-200 rounded-3xl p-6 text-center hover:border-orange-400 transition-all cursor-pointer group bg-slate-50/50">
-            <Upload className="h-8 w-8 text-slate-300 mx-auto mb-2 group-hover:text-orange-500 transition-colors" />
-            <p className="text-sm font-bold text-slate-600">Dernier document fiscal</p>
-            <p className="text-xs text-slate-400">PDF uniquement</p>
+          <div className="border-2 border-dashed border-slate-200 rounded-2xl p-5 text-center hover:border-orange-400 transition-all cursor-pointer group bg-slate-50/50">
+            <Upload className="h-6 w-6 text-slate-300 mx-auto mb-2 group-hover:text-orange-500 transition-colors" />
+            <p className="text-xs font-bold text-slate-600">Attestation Fiscale</p>
           </div>
         </div>
       </div>
@@ -655,20 +650,20 @@ function SizeTypeStep({ data, onChange }: { data: Partial<UserProfile>, onChange
   return (
     <div className="space-y-8">
       <div className="space-y-4">
-        <Label className="text-xl font-black text-slate-900 block ml-1">Quelle est la taille de votre entreprise ?</Label>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Label className="text-lg md:text-xl font-black text-slate-900 block ml-1">Quelle est la taille de votre entreprise ?</Label>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {sizes.map(size => (
             <button
               key={size}
               onClick={() => onChange({ companySize: size })}
-              className={`p-6 rounded-[28px] border-2 text-left transition-all ${
+              className={`p-5 md:p-6 rounded-2xl md:rounded-[28px] border-2 text-left transition-all ${
                 data.companySize === size 
                   ? 'border-orange-600 bg-orange-50 text-orange-700 ring-4 ring-orange-100' 
                   : 'border-slate-100 bg-slate-50 text-slate-600 hover:border-orange-300'
               }`}
             >
               <div className="flex items-center justify-between">
-                <span className="font-bold">{size}</span>
+                <span className="font-bold text-sm md:text-base">{size}</span>
                 {data.companySize === size && <CheckCircle2 className="h-5 w-5 text-orange-600" />}
               </div>
             </button>
@@ -679,13 +674,13 @@ function SizeTypeStep({ data, onChange }: { data: Partial<UserProfile>, onChange
       <Separator />
 
       <div className="space-y-4">
-        <Label className="text-xl font-black text-slate-900 block ml-1">Type de structure</Label>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <Label className="text-lg md:text-xl font-black text-slate-900 block ml-1">Type de structure</Label>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {types.map(type => (
             <button
               key={type}
               onClick={() => onChange({ companyType: type })}
-              className={`p-4 rounded-2xl border-2 text-sm font-bold transition-all ${
+              className={`p-3 md:p-4 rounded-xl md:rounded-2xl border-2 text-xs md:text-sm font-bold transition-all ${
                 data.companyType === type 
                   ? 'border-orange-600 bg-orange-600 text-white shadow-lg' 
                   : 'border-slate-100 bg-white text-slate-500 hover:border-orange-200'
@@ -917,13 +912,13 @@ function DocumentsStep({ data, onChange }: { data: Partial<UserProfile>, onChang
         </div>
       </div>
 
-      <div className="p-8 bg-blue-50 rounded-[40px] border border-blue-100 flex items-start gap-6">
-        <div className="p-3 bg-blue-600 text-white rounded-2xl shadow-lg shadow-blue-600/20">
+      <div className="p-5 md:p-8 bg-blue-50 rounded-2xl md:rounded-[40px] border border-blue-100 flex flex-col sm:flex-row items-start gap-4 md:gap-6">
+        <div className="p-3 bg-blue-600 text-white rounded-xl md:rounded-2xl shadow-lg shadow-blue-600/20 shrink-0">
           <ShieldCheck className="h-6 w-6" />
         </div>
-        <div className="space-y-2">
-          <p className="font-black text-blue-900 text-lg tracking-tight">Vérification de sécurité</p>
-          <p className="text-blue-700/80 font-medium leading-relaxed">
+        <div className="space-y-1">
+          <p className="font-black text-blue-900 text-base md:text-lg tracking-tight">Vérification de sécurité</p>
+          <p className="text-blue-700/80 font-medium text-xs md:text-sm leading-relaxed">
             En soumettant ces documents, vous certifiez leur authenticité. Notre équipe admin examinera votre profil sous 24h ouvrées. Une fois approuvé, vous recevrez le badge <span className="font-black text-blue-900">"Entreprise Vérifiée"</span> visible par tous les candidats.
           </p>
         </div>
