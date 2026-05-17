@@ -400,7 +400,18 @@ export default function CandidateDashboard() {
                           </div>
                           <div>
                             <h3 className="text-lg font-extrabold text-slate-900">{app.jobTitle}</h3>
-                            <p className="text-slate-500 font-medium">{app.companyName}</p>
+                            <div className="flex items-center gap-2">
+                              <p className="text-slate-500 font-medium">{app.companyName}</p>
+                              {app.recruiterId && (
+                                <Link 
+                                  to={`/company/${app.recruiterId}`}
+                                  className="text-slate-400 hover:text-orange-600 transition-colors"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <ExternalLink className="h-3 w-3" />
+                                </Link>
+                              )}
+                            </div>
                             <div className="flex items-center gap-3 mt-1">
                               <span className="text-[10px] text-slate-400 flex items-center gap-1 font-bold uppercase tracking-wider">
                                 <Clock className="h-3 w-3" /> Postulé {formatDistanceToNow(app.appliedAt?.seconds ? new Date(app.appliedAt.seconds * 1000) : new Date(app.appliedAt), { addSuffix: true, locale: fr })}
@@ -486,12 +497,22 @@ export default function CandidateDashboard() {
 
               <div className="p-8 space-y-6">
                 <div className="flex items-center gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                  <div className="h-12 w-12 bg-slate-900 rounded-xl flex items-center justify-center font-black text-white text-lg">
+                  <div className="h-12 w-12 bg-slate-900 rounded-xl flex items-center justify-center font-black text-white text-lg shrink-0">
                     {selectedApp.companyName?.[0] || 'J'}
                   </div>
-                  <div>
-                    <h4 className="font-extrabold text-slate-900">{selectedApp.jobTitle}</h4>
-                    <p className="text-slate-500 text-sm font-medium">{selectedApp.companyName}</p>
+                  <div className="min-w-0">
+                    <h4 className="font-extrabold text-slate-900 truncate">{selectedApp.jobTitle}</h4>
+                    <div className="flex items-center gap-2">
+                      <p className="text-slate-500 text-sm font-medium truncate">{selectedApp.companyName}</p>
+                      {selectedApp.recruiterId && (
+                        <Link 
+                           to={`/company/${selectedApp.recruiterId}`}
+                           className="text-slate-400 hover:text-orange-600 transition-colors"
+                        >
+                          <ExternalLink className="h-3 w-3" />
+                        </Link>
+                      )}
+                    </div>
                   </div>
                   <Badge className={`ml-auto
                     ${selectedApp.status === 'pending' ? 'bg-yellow-100 text-yellow-700' : ''}

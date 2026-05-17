@@ -117,15 +117,15 @@ export default function Onboarding() {
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="mb-6 md:mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight leading-tight">
+          <div className="text-center sm:text-left w-full sm:w-auto">
+            <h1 className="text-xl sm:text-3xl font-extrabold text-slate-900 tracking-tight leading-tight">
               Complétez votre profil professionnel
             </h1>
-            <p className="text-slate-500 mt-2 text-sm sm:text-base">
+            <p className="text-slate-500 mt-2 text-xs sm:text-base">
               Laissez les recruteurs découvrir votre plein potentiel.
             </p>
           </div>
-          <div className="text-left sm:text-right w-full sm:w-auto bg-white p-4 rounded-xl shadow-sm border border-slate-100 sm:bg-transparent sm:p-0 sm:border-none sm:shadow-none">
+          <div className="text-center sm:text-right w-full sm:w-auto bg-white p-4 rounded-xl shadow-sm border border-slate-100 sm:bg-transparent sm:p-0 sm:border-none sm:shadow-none">
             <span className="text-xs sm:text-sm font-bold text-orange-600 uppercase tracking-wider">
               Etape {currentStep + 1} / {STEPS.length}
             </span>
@@ -799,6 +799,13 @@ function DocumentsStep({ data, onChange }: { data: Partial<UserProfile>, onChang
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, type: string) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    // Check file size (limit to 700KB to stay within Firestore 1MB doc limit after base64 overhead)
+    const MAX_SIZE = 700 * 1024;
+    if (file.size > MAX_SIZE) {
+      alert("Le fichier est trop volumineux (Max 700 Ko). Veuillez compresser votre PDF ou utiliser un lien vers votre CV en ligne.");
+      return;
+    }
     
     // Simulate upload
     const reader = new FileReader();

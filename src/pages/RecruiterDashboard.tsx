@@ -299,15 +299,24 @@ export default function RecruiterDashboard() {
             <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
               <Button 
                 variant="outline" 
-                className="bg-white/5 border-white/10 text-white hover:bg-white/10 h-11 md:h-12 rounded-xl md:rounded-2xl font-bold backdrop-blur-sm flex-1 md:flex-none"
+                className="bg-white/10 border-white/20 text-white hover:bg-white/20 h-11 md:h-12 rounded-xl md:rounded-2xl font-bold backdrop-blur-sm flex-1 md:flex-none"
                 onClick={() => navigate('/recruiter-onboarding')}
               >
-                <Settings className="mr-2 h-4 w-4" /> Paramètres
+                <Settings className="mr-2 h-4 w-4" /> Modifier Profil
+              </Button>
+              <Button 
+                variant="outline" 
+                className="bg-orange-600/10 border-orange-600/20 text-white hover:bg-orange-600/20 h-11 md:h-12 rounded-xl md:rounded-2xl font-bold backdrop-blur-sm flex-1 md:flex-none"
+                asChild
+              >
+                <Link to={`/company/${user.uid}`}>
+                  <Eye className="mr-2 h-4 w-4" /> Voir Page Publique
+                </Link>
               </Button>
               <Dialog onOpenChange={(open) => { if (!open) setJobCreated(false); }}>
-                <DialogTrigger asChild nativeButton={true}>
+                <DialogTrigger asChild>
                   <Button className="h-11 md:h-12 px-6 md:px-8 rounded-xl md:rounded-2xl bg-orange-600 hover:bg-orange-700 text-white font-black shadow-xl shadow-orange-600/20 border-none flex-1 md:flex-none">
-                    <Plus className="mr-2 h-5 w-5" /> Publier
+                    <Plus className="mr-2 h-5 w-5" /> Publier Offre
                   </Button>
                 </DialogTrigger>
                 <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto rounded-[40px] border-none shadow-2xl">
@@ -616,6 +625,30 @@ export default function RecruiterDashboard() {
                             </div>
                          </section>
                        )}
+
+                       <section className="space-y-4">
+                         <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                           <ShieldCheck className="h-4 w-4 text-orange-500" /> Informations Légales
+                         </h3>
+                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="p-6 bg-slate-50 rounded-2xl border border-slate-100 flex justify-between items-center">
+                               <span className="text-slate-500 font-bold">N° RCCM</span>
+                               <span className="font-black text-slate-900">{user.registrationNumber || 'N/A'}</span>
+                            </div>
+                            <div className="p-6 bg-slate-50 rounded-2xl border border-slate-100 flex justify-between items-center">
+                               <span className="text-slate-500 font-bold">Forme Juridique</span>
+                               <span className="font-black text-slate-900">{user.legalForm || 'N/A'}</span>
+                            </div>
+                            <div className="p-6 bg-slate-50 rounded-2xl border border-slate-100 flex justify-between items-center">
+                               <span className="text-slate-500 font-bold">N° Contribuable</span>
+                               <span className="font-black text-slate-900">{user.taxNumber || 'N/A'}</span>
+                            </div>
+                            <div className="p-6 bg-slate-50 rounded-2xl border border-slate-100 flex justify-between items-center">
+                               <span className="text-slate-500 font-bold">Date de création</span>
+                               <span className="font-black text-slate-900">{user.creationDate || 'N/A'}</span>
+                            </div>
+                         </div>
+                       </section>
                     </CardContent>
                  </Card>
 

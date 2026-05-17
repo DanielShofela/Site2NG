@@ -110,8 +110,8 @@ export default function Jobs() {
     <div className="container py-12 px-6 mx-auto">
       <div className="max-w-4xl mx-auto">
         <div className="flex flex-col md:flex-row items-center justify-between gap-6 mb-12">
-          <div>
-            <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Opportunités Ouvertes</h1>
+          <div className="text-center md:text-left">
+            <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900 tracking-tight">Opportunités Ouvertes</h1>
             <p className="text-slate-500 text-sm mt-1">Trouvez le poste qui correspond à vos ambitions.</p>
           </div>
           <div className="relative w-full md:w-[400px]">
@@ -158,17 +158,23 @@ export default function Jobs() {
                             <CardTitle className="text-2xl font-bold text-slate-800 group-hover:text-orange-600 transition-colors">
                               {job.title}
                             </CardTitle>
-                            <div className="flex items-center text-sm font-medium text-slate-500">
-                              <Link 
-                                to={`/company/${job.recruiterId}`} 
-                                className="text-slate-900 hover:text-orange-600 transition-colors flex items-center gap-1 group/company"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                {job.companyName}
-                                <ExternalLink className="h-3 w-3 opacity-0 group-hover/company:opacity-100 transition-opacity" />
-                              </Link>
+                            <div className="flex flex-wrap items-center text-sm font-medium text-slate-500">
+                              {job.recruiterId ? (
+                                <Link 
+                                  to={`/company/${job.recruiterId}`} 
+                                  className="text-slate-900 hover:text-orange-600 transition-colors flex items-center gap-1 group/company relative z-10"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  {job.companyName}
+                                  <ExternalLink className="h-3 w-3 opacity-0 group-hover/company:opacity-100 transition-opacity" />
+                                </Link>
+                              ) : (
+                                <span>{job.companyName}</span>
+                              )}
                               <span className="mx-2 opacity-30">•</span>
-                              <MapPin className="h-3.5 w-3.5 mr-1 text-orange-600" /> {job.location}
+                              <div className="flex items-center">
+                                <MapPin className="h-3.5 w-3.5 mr-1 text-orange-600" /> {job.location}
+                              </div>
                             </div>
                           </div>
                           <Badge variant="secondary" className="bg-orange-50 text-orange-600 border-none font-bold px-3 py-1">
@@ -218,14 +224,20 @@ export default function Jobs() {
                       <div className="bg-slate-900 p-8 text-white">
                         <DialogHeader>
                           <DialogTitle className="text-3xl font-extrabold tracking-tight">{selectedJob.title}</DialogTitle>
-                          <DialogDescription className="flex items-center gap-2 mt-3 text-slate-300 font-medium">
-                            <Link 
-                              to={`/company/${selectedJob.recruiterId}`}
-                              className="text-white bg-white/10 px-3 py-1 rounded-lg hover:bg-white/20 transition-all flex items-center gap-2"
-                            >
-                              {selectedJob.companyName}
-                              <ExternalLink className="h-3 w-3" />
-                            </Link>
+                          <DialogDescription className="flex flex-wrap items-center gap-2 mt-3 text-slate-300 font-medium">
+                            {selectedJob.recruiterId ? (
+                              <Link 
+                                to={`/company/${selectedJob.recruiterId}`}
+                                className="text-white bg-white/10 px-3 py-1 rounded-lg hover:bg-white/20 transition-all flex items-center gap-2"
+                              >
+                                {selectedJob.companyName}
+                                <ExternalLink className="h-3 w-3" />
+                              </Link>
+                            ) : (
+                              <span className="bg-white/5 px-2 py-1 rounded overflow-hidden truncate max-w-[150px]">
+                                {selectedJob.companyName}
+                              </span>
+                            )}
                             <span className="opacity-50">•</span>
                             <span className="flex items-center gap-1.5"><MapPin className="h-4 w-4 text-orange-500" /> {selectedJob.location}</span>
                           </DialogDescription>

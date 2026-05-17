@@ -135,19 +135,19 @@ export default function RecruiterOnboarding() {
     <div className="min-h-screen bg-slate-50 pt-6 md:pt-10 pb-20 px-4">
       <div className="max-w-5xl mx-auto">
         {/* Header */}
-        <div className="mb-8 md:mb-10 flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
-          <div className="space-y-2">
+        <div className="mb-6 md:mb-10 flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
+          <div className="space-y-2 text-center md:text-left w-full md:w-auto">
             <Badge className="bg-orange-600 text-white border-none px-3 py-1 rounded-full text-[10px] md:text-xs font-bold uppercase tracking-wider">
               Onboarding Recrutement
             </Badge>
-            <h1 className="text-2xl md:text-4xl font-black text-slate-900 tracking-tight leading-tight">
+            <h1 className="text-xl md:text-4xl font-black text-slate-900 tracking-tight leading-tight">
               Configurez votre profil entreprise
             </h1>
-            <p className="text-slate-500 text-base md:text-lg font-medium max-w-2xl">
-              Un profil complet et vérifié attire les meilleurs talents. Prenez le temps de bien détailler votre identité.
+            <p className="text-slate-500 text-sm md:text-lg font-medium max-w-2xl">
+              Un profil complet et vérifié attire les meilleurs talents.
             </p>
           </div>
-          <div className="bg-white p-5 md:p-6 rounded-2xl md:rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-100 w-full md:w-auto md:min-w-[240px]">
+          <div className="bg-white p-4 md:p-6 rounded-2xl md:rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-100 w-full md:w-auto md:min-w-[240px]">
             <div className="flex justify-between items-end mb-3">
               <span className="text-sm font-bold text-slate-500 uppercase tracking-widest">Etape {currentStep + 1}/{STEPS.length}</span>
               <span className="text-2xl font-black text-orange-600">{Math.round(currentStepProgress)}%</span>
@@ -192,7 +192,7 @@ export default function RecruiterOnboarding() {
                     </div>
                   </div>
                   
-                  <CardContent className="p-6 md:p-12">
+                  <CardContent className="p-5 md:p-12">
                     {currentStep === 0 && <GeneralStep data={formData} onChange={updateFormData} />}
                     {currentStep === 1 && <LegalStep data={formData} onChange={updateFormData} />}
                     {currentStep === 2 && <ContactStep data={formData} onChange={updateFormData} />}
@@ -877,37 +877,93 @@ function DocumentsStep({ data, onChange }: { data: Partial<UserProfile>, onChang
   const docs = data.legalDocuments || { brochureUrl: '', presentationUrl: '' };
   const updateDocs = (fields: any) => onChange({ legalDocuments: { ...docs, ...fields } });
 
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, field: 'brochureUrl' | 'presentationUrl') => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Check size - very strict here because recruiter profile already has lots of data
+    const MAX_SIZE = 500 * 1024; // 500KB
+    if (file.size > MAX_SIZE) {
+      alert("Ce fichier est trop volumineux (Max 500 Ko). Pour des documents plus lourds, veuillez utiliser un lien URL vers Google Drive ou votre site web.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      updateDocs({ [field]: reader.result as string, [`${field}Name`]: file.name });
+    };
+    reader.readAsDataURL(file);
+  };
+
   return (
     <div className="space-y-10">
       <div className="space-y-6">
-        <h4 className="text-xl font-black text-slate-900">Documents de présentation</h4>
-        <p className="text-slate-500 font-medium">Téléchargez des documents qui aideront les candidats à mieux connaître votre entreprise.</p>
+        <h4 className="text-xl font-black text-slate-900">Branding & Présentation</h4>
+        <p className="text-slate-500 font-medium italic text-sm text-center bg-slate-100 p-3 rounded-xl mb-4">
+          Note: Pour préserver les performances, les fichiers directs sont limités à 500 Ko. Favorisez les liens pour les documents plus volumineux.
+        </p>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-           <div className="p-8 border-2 border-dashed border-slate-200 rounded-[32px] bg-slate-50/50 flex flex-col items-center gap-4 text-center group hover:border-orange-400 transition-all">
+           {/* Brochure */}
+           <div className="p-6 md:p-8 border-2 border-dashed border-slate-200 rounded-[32px] bg-slate-50/50 flex flex-col items-center gap-4 text-center group hover:border-orange-400 transition-all">
               <div className="p-4 bg-white rounded-2xl shadow-sm text-orange-600">
                 <FileText className="h-10 w-10" />
               </div>
-              <div>
+              <div className="w-full">
                 <p className="font-extrabold text-slate-900">Brochure Corporate</p>
-                <p className="text-xs text-slate-500 mt-1">Format PDF uniquement (Max 10Mo)</p>
+                {docs.brochureUrl && !docs.brochureUrl.startsWith('http') ? (
+                  <Badge variant="secondary" className="mt-1 bg-green-100 text-green-700">Fichier chargé</Badge>
+                ) : (
+                  <p className="text-xs text-slate-500 mt-1">PDF uniquement (Max 500Ko)</p>
+                )}
               </div>
-              <Button variant="outline" className="rounded-xl border-slate-200 font-bold bg-white w-full">
-                <Upload className="mr-2 h-4 w-4" /> Télécharger
-              </Button>
+              
+              <div className="flex flex-col gap-3 w-full">
+                <Button variant="outline" className="rounded-xl border-slate-200 font-bold bg-white w-full relative">
+                  <Upload className="mr-2 h-4 w-4" /> {docs.brochureUrl ? "Changer le fichier" : "Télécharger PDF"}
+                  <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" accept=".pdf" onChange={(e) => handleFileUpload(e, 'brochureUrl')} />
+                </Button>
+                <div className="relative">
+                  <Globe className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <Input 
+                    placeholder="Ou lien URL (Google Drive...)" 
+                    className="pl-10 h-10 rounded-xl"
+                    value={docs.brochureUrl && docs.brochureUrl.startsWith('http') ? docs.brochureUrl : ''}
+                    onChange={(e) => updateDocs({ brochureUrl: e.target.value })}
+                  />
+                </div>
+              </div>
            </div>
 
-           <div className="p-8 border-2 border-dashed border-slate-200 rounded-[32px] bg-slate-50/50 flex flex-col items-center gap-4 text-center group hover:border-orange-400 transition-all">
+           {/* Presentation */}
+           <div className="p-6 md:p-8 border-2 border-dashed border-slate-200 rounded-[32px] bg-slate-50/50 flex flex-col items-center gap-4 text-center group hover:border-emerald-400 transition-all">
               <div className="p-4 bg-white rounded-2xl shadow-sm text-emerald-600">
                 <ExternalLink className="h-10 w-10" />
               </div>
-              <div>
+              <div className="w-full">
                 <p className="font-extrabold text-slate-900">Présentation PDF</p>
-                <p className="text-xs text-slate-500 mt-1">Keynote ou Pitch Deck entreprise</p>
+                {docs.presentationUrl && !docs.presentationUrl.startsWith('http') ? (
+                  <Badge variant="secondary" className="mt-1 bg-green-100 text-green-700">Fichier chargé</Badge>
+                ) : (
+                  <p className="text-xs text-slate-500 mt-1">Pitch Deck, Keynote...</p>
+                )}
               </div>
-              <Button variant="outline" className="rounded-xl border-slate-200 font-bold bg-white w-full">
-                <Upload className="mr-2 h-4 w-4" /> Télécharger
-              </Button>
+              
+              <div className="flex flex-col gap-3 w-full">
+                <Button variant="outline" className="rounded-xl border-slate-200 font-bold bg-white w-full relative">
+                  <Upload className="mr-2 h-4 w-4" /> {docs.presentationUrl ? "Changer le fichier" : "Télécharger PDF"}
+                  <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" accept=".pdf" onChange={(e) => handleFileUpload(e, 'presentationUrl')} />
+                </Button>
+                <div className="relative">
+                  <Globe className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <Input 
+                    placeholder="Ou lien URL (Dropbox, Site...)" 
+                    className="pl-10 h-10 rounded-xl"
+                    value={docs.presentationUrl && docs.presentationUrl.startsWith('http') ? docs.presentationUrl : ''}
+                    onChange={(e) => updateDocs({ presentationUrl: e.target.value })}
+                  />
+                </div>
+              </div>
            </div>
         </div>
       </div>
