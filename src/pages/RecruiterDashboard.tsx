@@ -41,6 +41,7 @@ import {
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSiteConfig } from '@/contexts/SiteConfigContext';
 import { Link, useNavigate } from 'react-router-dom';
 import { Separator } from '@/components/ui/separator';
 import { 
@@ -62,7 +63,14 @@ import { fr } from 'date-fns/locale';
 
 export default function RecruiterDashboard() {
   const { user } = useAuth();
+  const { config } = useSiteConfig();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (user && user.role === 'recruiter' && user.status !== 'approved') {
+      navigate('/pending-approval');
+    }
+  }, [user, navigate]);
   const [isCreatingJob, setIsCreatingJob] = useState(false);
   const [jobCreated, setJobCreated] = useState(false);
   const [activeTab, setActiveTab] = useState('jobs');
@@ -285,8 +293,9 @@ export default function RecruiterDashboard() {
                 )}
               </div>
               <div className="text-center md:text-left flex-1">
-                <h1 className="text-2xl md:text-4xl lg:text-5xl font-black tracking-tight leading-tight">{user.companyName || user.displayName}</h1>
+                <h1 className="text-2xl md:text-4xl lg:text-5xl font-black tracking-tight leading-tight">{user.companyName || user.tradeName || user.displayName}</h1>
                 <div className="flex flex-wrap justify-center md:justify-start items-center gap-3 md:gap-4 mt-3 text-slate-400 font-bold text-sm md:text-base">
+                  {user.tradeName && <span className="flex items-center gap-1.5"><Building2 className="h-4 w-4 text-orange-500" /> {user.companyName}</span>}
                   <span className="flex items-center gap-1.5 shrink-0"><MapPin className="h-4 w-4 text-orange-500" /> {user.city || 'N/A'}, {user.commune || 'CI'}</span>
                   <span className="flex items-center gap-1.5 shrink-0"><Briefcase className="h-4 w-4 text-orange-500" /> {user.sectorActivity || 'Secteur non défini'}</span>
                   <Badge className={`${user.status === 'approved' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-orange-500/20 text-orange-400'} border-none font-black px-3 text-[10px] tracking-wider`}>
@@ -315,7 +324,7 @@ export default function RecruiterDashboard() {
                   </Link>
                 </Button>
               <Dialog onOpenChange={(open) => { if (!open) setJobCreated(false); }}>
-                <DialogTrigger asChild>
+                <DialogTrigger asChild nativeButton={true}>
                   <Button className="h-11 md:h-12 px-6 md:px-8 rounded-xl md:rounded-2xl bg-orange-600 hover:bg-orange-700 text-white font-black shadow-xl shadow-orange-600/20 border-none flex-1 md:flex-none">
                     <Plus className="mr-2 h-5 w-5" /> Publier Offre
                   </Button>
@@ -372,7 +381,7 @@ export default function RecruiterDashboard() {
                   <CheckCircle2 className="h-12 w-12" />
                 </div>
                 <h3 className="text-2xl font-bold mb-2">Offre publiée avec succès !</h3>
-                <p className="text-muted-foreground mb-8">Votre offre est maintenant visible par tous les candidats d'AfriJob.</p>
+                <p className="text-muted-foreground mb-8">Votre offre est maintenant visible par tous les candidats de {config.siteName || 'AfriJob'}.</p>
                 <Button variant="outline" onClick={() => setJobCreated(false)} className="w-full">Fermer</Button>
               </div>
             )}
@@ -852,7 +861,7 @@ export default function RecruiterDashboard() {
                   className="w-full h-full"
                 />
                 <div className="absolute bottom-4 right-4 z-10">
-                  <Button size="sm" asChild variant="secondary" className="shadow-md" nativeButton={false}>
+                  <Button size="sm" asChild nativeButton={false} variant="secondary" className="shadow-md">
                     <a href={cvBlobUrl} target="_blank" rel="noopener noreferrer">
                       Ouvrir en plein écran
                     </a>

@@ -19,7 +19,8 @@ import {
   orderBy,
   doc,
   updateDoc,
-  increment
+  increment,
+  documentId
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { formatDistanceToNow } from 'date-fns';
@@ -40,14 +41,21 @@ export default function Jobs() {
       try {
         const q = query(
           collection(db, 'jobs'),
-          where('status', '==', 'active'),
-          orderBy('createdAt', 'desc')
+          where('status', '==', 'active')
         );
         const querySnapshot = await getDocs(q);
         const jobsData = querySnapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
         })) as Job[];
+        
+        // Sort in memory to avoid missing index errors
+        jobsData.sort((a: any, b: any) => {
+          const timeA = a.createdAt?.seconds || (a.createdAt instanceof Date ? a.createdAt.getTime() / 1000 : 0);
+          const timeB = b.createdAt?.seconds || (b.createdAt instanceof Date ? b.createdAt.getTime() / 1000 : 0);
+          return timeB - timeA;
+        });
+
         setJobs(jobsData);
 
         // Fetch company names for these jobs to ensure we display the latest ones
@@ -56,17 +64,27 @@ export default function Jobs() {
           const namesMap: Record<string, string> = {};
           
           // Batch fetch recruiters (limit 10 for 'in' query)
-          // For simplicity and since we don't expect hundreds of recruiters in one view
           for (let i = 0; i < recruiterIds.length; i += 10) {
             const batch = recruiterIds.slice(i, i + 10);
-            const recruitersQ = query(collection(db, 'users'), where('uid', 'in', batch));
-            const recruitersSnap = await getDocs(recruitersQ);
-            recruitersSnap.forEach(doc => {
-              const data = doc.data();
-              namesMap[doc.id] = data.companyName || data.displayName || "Entreprise";
-            });
+            try {
+              // Using documentId() to match the doc ID (which is the recruiter's UID)
+              // Added where('role', '==', 'recruiter') to satisfy Firestore security rules for unauthenticated users
+              const recruitersQ = query(
+                collection(db, 'users'), 
+                where(documentId(), 'in', batch),
+                where('role', '==', 'recruiter')
+              );
+              const recruitersSnap = await getDocs(recruitersQ);
+              recruitersSnap.forEach(docSnap => {
+                const data = docSnap.data();
+                // Prioritization: Registered Company Name > Trade/Commercial Name > Display Name
+                namesMap[docSnap.id] = data.companyName || data.tradeName || data.displayName || "Entreprise";
+              });
+            } catch (err) {
+              console.error("Error fetching batch of recruiters:", err);
+            }
           }
-          setCompanyNames(namesMap);
+          setCompanyNames(prev => ({ ...prev, ...namesMap }));
         }
       } catch (error) {
         console.error('Error fetching jobs:', error);

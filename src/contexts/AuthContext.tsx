@@ -19,7 +19,8 @@ import {
   getDoc, 
   setDoc, 
   updateDoc,
-  serverTimestamp 
+  serverTimestamp,
+  onSnapshot 
 } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 
@@ -41,23 +42,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      setLoading(true);
+    let unsubscribeProfile: (() => void) | null = null;
+
+    const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (unsubscribeProfile) {
+        unsubscribeProfile();
+        unsubscribeProfile = null;
+      }
+
       if (firebaseUser) {
-        // Sync with Firestore
-        const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
-        if (userDoc.exists()) {
-          setUser(userDoc.data() as UserProfile);
-        } else {
-          setUser(null);
-        }
+        setLoading(true);
+        // Using onSnapshot for real-time updates (like suspension)
+        unsubscribeProfile = onSnapshot(doc(db, 'users', firebaseUser.uid), (snapshot) => {
+          if (snapshot.exists()) {
+            const profile = snapshot.data() as UserProfile;
+            if (profile.accountStatus === 'suspended') {
+              signOut(auth).then(() => {
+                setUser(null);
+                alert("Votre compte a été suspendu par l'administrateur.");
+              });
+            } else {
+              setUser(profile);
+            }
+          } else {
+            setUser(null);
+          }
+          setLoading(false);
+        }, (error) => {
+          console.error("Profile sync error:", error);
+          setLoading(false);
+        });
       } else {
         setUser(null);
+        setLoading(false);
       }
-      setLoading(false);
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribeAuth();
+      if (unsubscribeProfile) unsubscribeProfile();
+    };
   }, []);
 
   const loginWithGoogle = async (preferredRole: UserRole = 'candidate') => {
@@ -104,7 +128,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         uid: firebaseUser.uid,
         email: email,
         role: userData.role || 'candidate',
-        status: userData.role === 'recruiter' ? 'pending' : 'approved',
+        status: userData.role === 'recruiter' ? 'submitted' : 'approved',
         displayName: userData.displayName || 'Utilisateur',
         photoUrl: null,
         phone: userData.phone,
@@ -112,6 +136,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         companyName: userData.companyName,
         registrationNumber: userData.registrationNumber,
         companyDescription: userData.companyDescription,
+        website: userData.website,
+        sectorActivity: userData.sectorActivity,
+        companySize: userData.companySize,
+        legalDocuments: userData.legalDocuments,
+        profileComplete: userData.role === 'recruiter' ? true : false,
         createdAt: serverTimestamp(),
       };
 

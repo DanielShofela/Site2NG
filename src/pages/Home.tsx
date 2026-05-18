@@ -5,9 +5,11 @@ import { Link } from 'react-router-dom';
 import { Briefcase, Building2, Search, ArrowRight, CheckCircle2, Globe2, LayoutDashboard } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSiteConfig } from '@/contexts/SiteConfigContext';
 
 export default function Home() {
-  const { user, loading } = useAuth();
+  const { user } = useAuth();
+  const { config } = useSiteConfig();
   
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -46,7 +48,7 @@ export default function Home() {
             animate={{ y: 0, opacity: 1 }}
             className="text-4xl md:text-6xl font-extrabold text-slate-900 leading-tight mb-6"
           >
-            L'emploi de demain en Afrique <span className="text-orange-600">commence ici.</span>
+            {config.heroTitle || "Trouvez le talent qui propulsera votre entreprise"}
           </motion.h1>
           <motion.p 
             initial={{ y: 20, opacity: 0 }}
@@ -54,7 +56,7 @@ export default function Home() {
             transition={{ delay: 0.1 }}
             className="text-lg md:text-xl text-slate-500 max-w-2xl mx-auto"
           >
-            La première marketplace de placement de personnel adaptée aux réalités locales, simple, rapide et sécurisée.
+            {config.heroSubtitle || "La plateforme de recrutement nouvelle génération pour l'Afrique."}
           </motion.p>
           
           {user && (
@@ -121,7 +123,7 @@ export default function Home() {
             <p className="text-slate-400 mb-6 text-sm">Accédez à une CVthèque vérifiée, publiez vos offres et gérez vos recrutements avec des outils pro.</p>
             <ul className="space-y-3 mb-8">
               {[
-                "Validation par admin en 24h",
+                "Validation par admin en 72h",
                 "Gestion multi-offres",
                 "Statistiques de performance"
               ].map((text, i) => (
@@ -170,7 +172,7 @@ export default function Home() {
             <span className="text-xs font-bold text-slate-400 flex items-center gap-1.5">
               <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span> Plateforme en ligne
             </span>
-            <span className="text-xs font-medium text-slate-400">© 2026 AfriJob. Tous droits réservés.</span>
+            <span className="text-xs font-medium text-slate-400">© 2026 {config.siteName || 'AfriJob'}. Tous droits réservés.</span>
           </div>
           <div className="flex gap-8 items-center">
             <Link to="/about" className="text-xs font-bold text-slate-500 hover:text-orange-600 uppercase tracking-tight">À Propos</Link>

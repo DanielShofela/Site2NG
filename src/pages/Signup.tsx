@@ -12,6 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Briefcase, Building2, User, Mail, Lock, Phone, MapPin, Upload, ArrowRight } from 'lucide-react';
 import { motion } from 'motion/react';
 import { UserRole, UserProfile } from '@/types';
@@ -36,7 +37,28 @@ export default function Signup() {
     confirmPassword: '',
     companyName: '',
     registrationNumber: '',
-    companyDescription: ''
+    companyDescription: '',
+    website: '',
+    sectorActivity: '',
+    companySize: '',
+    companyType: 'PME',
+    city: '',
+    commune: '',
+    address: '',
+    manager: {
+      firstName: '',
+      lastName: '',
+      role: '',
+      phone: '',
+      email: ''
+    },
+    branding: {
+      mission: '',
+      vision: '',
+      values: [] as string[],
+      perks: [] as string[]
+    },
+    legalDocuments: {} as any
   });
 
   const [error, setError] = useState<string | null>(null);
@@ -44,7 +66,7 @@ export default function Signup() {
   useEffect(() => {
     if (!authLoading && user) {
       if (user.role === 'recruiter') {
-        if (user.status === 'pending') {
+        if (user.status === 'submitted' || user.status === 'pending') {
           navigate('/pending-approval');
         } else {
           navigate('/recruiter');
@@ -63,6 +85,12 @@ export default function Signup() {
       setError("Les mots de passe ne correspondent pas");
       return;
     }
+
+    if (role === 'recruiter' && (!formData.legalDocuments.rccmUrl || !formData.legalDocuments.taxStatusUrl)) {
+      setError("Veuillez charger tous les documents obligatoires (RCCM & Attestation Fiscale)");
+      return;
+    }
+
     setError(null);
     setIsLoading(true);
     
@@ -70,11 +98,26 @@ export default function Signup() {
       const userData: Partial<UserProfile> = {
         role,
         displayName: formData.displayName,
+        firstName: role === 'candidate' ? formData.displayName.split(' ')[0] : formData.manager.firstName,
+        lastName: role === 'candidate' ? formData.displayName.split(' ').slice(1).join(' ') : formData.manager.lastName,
         phone: formData.phone,
         location: formData.location,
+        city: formData.city,
+        commune: formData.commune,
+        address: formData.address,
         companyName: role === 'recruiter' ? formData.displayName : undefined,
         registrationNumber: formData.registrationNumber,
         companyDescription: formData.companyDescription,
+        website: formData.website,
+        sectorActivity: formData.sectorActivity,
+        companySize: formData.companySize,
+        companyType: formData.companyType,
+        manager: role === 'recruiter' ? {
+          ...formData.manager,
+          email: formData.manager.email || formData.email
+        } : undefined,
+        branding: role === 'recruiter' ? formData.branding : undefined,
+        legalDocuments: formData.legalDocuments,
       };
       
       await signupWithEmail(formData.email, formData.password, userData);
@@ -133,8 +176,8 @@ export default function Signup() {
               </CardTitle>
               <CardDescription className="text-slate-500 font-medium text-base mt-2">
                 {role === 'candidate' 
-                  ? "Inscrivez-vous pour postuler et être visible par les recruteurs."
-                  : "Votre compte sera soumis à validation par notre équipe."}
+                  ? "Inscrivez-vous rapidement pour commencer votre recherche. Vous pourrez enrichir votre profil plus tard."
+                  : "Le recrutement de qualité nécessite de la transparence. Préparez vos documents officiels (RCCM, etc.)."}
               </CardDescription>
             </CardHeader>
             <form onSubmit={handleSignup}>
@@ -200,28 +243,233 @@ export default function Signup() {
                   <motion.div 
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: 'auto' }}
-                    className="space-y-8 pt-4"
+                    className="space-y-12 pt-4"
                   >
-                    <div className="p-6 bg-slate-50 border border-slate-100 rounded-[32px] space-y-6">
-                      <div className="space-y-3">
-                        <Label className="text-sm font-bold text-slate-700 ml-1">Registre de commerce (RCCM)</Label>
-                        <Input 
-                          placeholder="N° RCCM CI-ABJ-..." 
-                          className="h-14 rounded-2xl border-slate-200 bg-white" 
-                          value={formData.registrationNumber}
-                          onChange={e => setFormData({...formData, registrationNumber: e.target.value})}
-                          required 
-                        />
+                    {/* Section 1: Identité Professionnelle */}
+                    <div className="space-y-6">
+                      <div className="flex items-center gap-3">
+                        <div className="h-8 w-8 rounded-full bg-orange-100 flex items-center justify-center text-orange-600 font-black text-xs">01</div>
+                        <h3 className="font-black text-slate-800 uppercase tracking-widest text-xs">Identité Professionnelle</h3>
                       </div>
-                      <div className="space-y-3">
-                        <Label className="text-sm font-bold text-slate-700 ml-1">Description de l'entreprise</Label>
-                        <Textarea 
-                          placeholder="Décrivez brièvement votre activité..." 
-                          className="min-h-[120px] rounded-2xl border-slate-200 bg-white resize-none" 
-                          value={formData.companyDescription}
-                          onChange={e => setFormData({...formData, companyDescription: e.target.value})}
-                          required 
-                        />
+                      
+                      <div className="p-6 bg-slate-50 border border-slate-100 rounded-[32px] space-y-6">
+                        <div className="grid sm:grid-cols-2 gap-6">
+                          <div className="space-y-3">
+                            <Label className="text-sm font-bold text-slate-700 ml-1">RCCM (Registre Commerce)</Label>
+                            <Input 
+                              placeholder="N° CI-ABJ-..." 
+                              className="h-14 rounded-2xl border-slate-200 bg-white" 
+                              value={formData.registrationNumber}
+                              onChange={e => setFormData({...formData, registrationNumber: e.target.value})}
+                              required 
+                            />
+                          </div>
+                          <div className="space-y-3">
+                            <Label className="text-sm font-bold text-slate-700 ml-1">Site Web (Optionnel)</Label>
+                            <Input 
+                              placeholder="https://www.entreprise.com" 
+                              className="h-14 rounded-2xl border-slate-200 bg-white" 
+                              value={formData.website || ''}
+                              onChange={e => setFormData({...formData, website: e.target.value})}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid sm:grid-cols-2 gap-6">
+                          <div className="space-y-3">
+                            <Label className="text-sm font-bold text-slate-700 ml-1">Secteur d'Activité</Label>
+                            <Select onValueChange={(v) => setFormData({...formData, sectorActivity: v})} required>
+                              <SelectTrigger className="h-14 rounded-2xl border-slate-200 bg-white">
+                                <SelectValue placeholder="Choisir un secteur" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {["Informatique & Cloud", "Banque & Finance", "Assurance", "BTP & Construction", "Télécommunications", "Agriculture", "Santé", "Éducation", "Logistique", "Autre"].map(s => (
+                                  <SelectItem key={s} value={s}>{s}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-3">
+                            <Label className="text-sm font-bold text-slate-700 ml-1">Type de structure</Label>
+                            <Select onValueChange={(v) => setFormData({...formData, companyType: v})} defaultValue="PME">
+                              <SelectTrigger className="h-14 rounded-2xl border-slate-200 bg-white">
+                                <SelectValue placeholder="Type" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {["TPE", "PME", "Grande Entreprise", "Multinationale", "ONG", "Public"].map(s => (
+                                  <SelectItem key={s} value={s}>{s}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+
+                        <div className="grid sm:grid-cols-2 gap-6">
+                           <div className="space-y-3">
+                            <Label className="text-sm font-bold text-slate-700 ml-1">Commune / Zone</Label>
+                            <Input 
+                              placeholder="ex: Plateau, Cocody..." 
+                              className="h-14 rounded-2xl border-slate-200 bg-white" 
+                              value={formData.commune}
+                              onChange={e => setFormData({...formData, commune: e.target.value})}
+                              required 
+                            />
+                          </div>
+                          <div className="space-y-3">
+                            <Label className="text-sm font-bold text-slate-700 ml-1">Taille Entreprise</Label>
+                            <Select onValueChange={(v) => setFormData({...formData, companySize: v})} required>
+                              <SelectTrigger className="h-14 rounded-2xl border-slate-200 bg-white">
+                                <SelectValue placeholder="Employés" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {["1-10", "11-50", "51-200", "201-500", "500+"].map(s => (
+                                  <SelectItem key={s} value={s + " employés"}>{s} employés</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Section 2: Administrateur / Manager */}
+                    <div className="space-y-6">
+                      <div className="flex items-center gap-3">
+                        <div className="h-8 w-8 rounded-full bg-orange-100 flex items-center justify-center text-orange-600 font-black text-xs">02</div>
+                        <h3 className="font-black text-slate-800 uppercase tracking-widest text-xs">Identité du Responsable</h3>
+                      </div>
+                      <div className="p-6 bg-slate-50 border border-slate-100 rounded-[32px] space-y-6">
+                        <div className="grid sm:grid-cols-2 gap-6">
+                          <div className="space-y-3">
+                            <Label className="text-sm font-bold text-slate-700 ml-1">Prénom du responsable</Label>
+                            <Input 
+                              placeholder="Jean" 
+                              className="h-14 rounded-2xl border-slate-200 bg-white" 
+                              value={formData.manager.firstName}
+                              onChange={e => setFormData({...formData, manager: {...formData.manager, firstName: e.target.value}})}
+                              required 
+                            />
+                          </div>
+                          <div className="space-y-3">
+                            <Label className="text-sm font-bold text-slate-700 ml-1">Nom du responsable</Label>
+                            <Input 
+                              placeholder="Kouassi" 
+                              className="h-14 rounded-2xl border-slate-200 bg-white" 
+                              value={formData.manager.lastName}
+                              onChange={e => setFormData({...formData, manager: {...formData.manager, lastName: e.target.value}})}
+                              required 
+                            />
+                          </div>
+                        </div>
+                        <div className="space-y-3">
+                          <Label className="text-sm font-bold text-slate-700 ml-1">Poste / Fonction</Label>
+                          <Input 
+                            placeholder="ex: DRH, Directeur Général..." 
+                            className="h-14 rounded-2xl border-slate-200 bg-white" 
+                            value={formData.manager.role}
+                            onChange={e => setFormData({...formData, manager: {...formData.manager, role: e.target.value}})}
+                            required 
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Section 3: Documents de Vérification */}
+                    <div className="space-y-6">
+                      <div className="flex items-center gap-3">
+                        <div className="h-8 w-8 rounded-full bg-orange-100 flex items-center justify-center text-orange-600 font-black text-xs">03</div>
+                        <h3 className="font-black text-slate-800 uppercase tracking-widest text-xs">Documents Officiels (Obligatoires)</h3>
+                      </div>
+                      <div className="grid sm:grid-cols-2 gap-4">
+                        <div className="relative border-2 border-dashed border-slate-200 rounded-2xl p-6 text-center hover:border-orange-400 transition-all cursor-pointer bg-white group">
+                          <input 
+                            type="file" 
+                            className="absolute inset-0 opacity-0 cursor-pointer" 
+                            accept=".pdf,image/*" 
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              if (file.size > 1024 * 1024) { alert("Fichier trop lourd (Max 1Mo)"); return; }
+                              const reader = new FileReader();
+                              reader.onloadend = () => {
+                                setFormData({
+                                  ...formData, 
+                                  legalDocuments: { 
+                                    ...(formData.legalDocuments || {}), 
+                                    rccmUrl: reader.result as string,
+                                    rccmName: file.name
+                                  }
+                                });
+                              };
+                              reader.readAsDataURL(file);
+                            }}
+                            required
+                          />
+                          <Upload className="h-6 w-6 text-slate-300 mx-auto mb-2 group-hover:text-orange-500 transition-colors" />
+                          <p className="text-xs font-black text-slate-900">RCCM</p>
+                          <p className="text-[10px] text-slate-400 mt-1">
+                            {formData.legalDocuments?.rccmUrl ? `✓ ${formData.legalDocuments.rccmName}` : "PDF ou Image"}
+                          </p>
+                        </div>
+
+                        <div className="relative border-2 border-dashed border-slate-200 rounded-2xl p-6 text-center hover:border-orange-400 transition-all cursor-pointer bg-white group">
+                          <input 
+                            type="file" 
+                            className="absolute inset-0 opacity-0 cursor-pointer" 
+                            accept=".pdf,image/*" 
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              if (file.size > 1024 * 1024) { alert("Fichier trop lourd (Max 1Mo)"); return; }
+                              const reader = new FileReader();
+                              reader.onloadend = () => {
+                                setFormData({
+                                  ...formData, 
+                                  legalDocuments: { 
+                                    ...(formData.legalDocuments || {}), 
+                                    taxStatusUrl: reader.result as string,
+                                    taxStatusName: file.name
+                                  }
+                                });
+                              };
+                              reader.readAsDataURL(file);
+                            }}
+                            required
+                          />
+                          <Upload className="h-6 w-6 text-slate-300 mx-auto mb-2 group-hover:text-orange-500 transition-colors" />
+                          <p className="text-xs font-black text-slate-900">Attestation Fiscale</p>
+                          <p className="text-[10px] text-slate-400 mt-1">
+                            {formData.legalDocuments?.taxStatusUrl ? `✓ ${formData.legalDocuments.taxStatusName}` : "PDF ou Image"}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-6">
+                      <div className="flex items-center gap-3">
+                        <div className="h-8 w-8 rounded-full bg-orange-100 flex items-center justify-center text-orange-600 font-black text-xs">04</div>
+                        <h3 className="font-black text-slate-800 uppercase tracking-widest text-xs">Description & Présentation</h3>
+                      </div>
+                      <div className="p-6 bg-slate-50 border border-slate-100 rounded-[32px] space-y-6">
+                        <div className="space-y-3">
+                          <Label className="text-sm font-bold text-slate-700 ml-1">Présentation de l'activité</Label>
+                          <Textarea 
+                            placeholder="Décrivez brièvement votre activité, vos services..." 
+                            className="min-h-[120px] rounded-2xl border-slate-200 bg-white resize-none" 
+                            value={formData.companyDescription}
+                            onChange={e => setFormData({...formData, companyDescription: e.target.value})}
+                            required 
+                          />
+                        </div>
+                        <div className="space-y-3">
+                          <Label className="text-sm font-bold text-slate-700 ml-1">Mission de l'entreprise (Optionnel)</Label>
+                          <Textarea 
+                            placeholder="Quelle est votre mission principale ?" 
+                            className="min-h-[80px] rounded-2xl border-slate-200 bg-white resize-none text-sm" 
+                            value={formData.branding.mission}
+                            onChange={e => setFormData({...formData, branding: {...formData.branding, mission: e.target.value}})}
+                          />
+                        </div>
                       </div>
                     </div>
                   </motion.div>

@@ -36,7 +36,8 @@ import {
   query, 
   where, 
   getDocs, 
-  orderBy 
+  orderBy,
+  documentId
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { formatDistanceToNow } from 'date-fns';
@@ -147,11 +148,16 @@ export default function CandidateDashboard() {
           const namesMap: Record<string, string> = {};
           for (let i = 0; i < recruiterIds.length; i += 10) {
             const batch = recruiterIds.slice(i, i + 10);
-            const recruitersQ = query(collection(db, 'users'), where('uid', 'in', batch));
+            const recruitersQ = query(
+              collection(db, 'users'), 
+              where(documentId(), 'in', batch),
+              where('role', '==', 'recruiter')
+            );
             const recruitersSnap = await getDocs(recruitersQ);
             recruitersSnap.forEach(doc => {
               const data = doc.data();
-              namesMap[doc.id] = data.companyName || data.displayName || "Entreprise";
+              // Prioritize companyName, then tradeName, then displayName
+              namesMap[doc.id] = data.companyName || data.tradeName || data.displayName || "Entreprise";
             });
           }
           setCompanyNames(namesMap);
@@ -178,6 +184,25 @@ export default function CandidateDashboard() {
 
   return (
     <div className="min-h-screen bg-slate-50/50 pb-20">
+      {/* Profile completion suggestion banner */}
+      {user && !user.profileComplete && (
+        <motion.div 
+          initial={{ height: 0, opacity: 0 }}
+          animate={{ height: 'auto', opacity: 1 }}
+          className="bg-orange-600 text-white py-3 px-4 text-center overflow-hidden relative z-50 shadow-lg"
+        >
+          <div className="container mx-auto flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4 font-bold text-sm">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 shrink-0" />
+              <span>Votre profil est incomplet ({score}%). Un profil à 100% attire 3x plus de recruteurs.</span>
+            </div>
+            <Link to="/onboarding" className="bg-white text-orange-600 px-4 py-1.5 rounded-full text-[10px] sm:text-xs shadow-md hover:bg-orange-50 transition-all uppercase tracking-widest">
+              Compléter mon profil
+            </Link>
+          </div>
+        </motion.div>
+      )}
+
       {/* Profile Header Banner */}
       <div className="bg-slate-900 h-40 sm:h-56 relative" />
 
@@ -192,7 +217,7 @@ export default function CandidateDashboard() {
           </Avatar>
           <div className="flex-1 text-center md:text-left">
             <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-slate-900 tracking-tight md:text-white md:drop-shadow-lg leading-tight">
-              {user.firstName} {user.lastName}
+              {user.firstName ? `${user.firstName} ${user.lastName}` : user.displayName}
             </h1>
             <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 md:gap-3 mt-2">
               <Badge className="bg-orange-600 text-white border-none px-3 md:px-4 py-1 text-xs md:text-sm font-bold shadow-lg shadow-orange-600/20">

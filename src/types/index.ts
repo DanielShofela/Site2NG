@@ -4,8 +4,8 @@
  */
 
 export type UserRole = 'candidate' | 'recruiter' | 'admin';
-export type ApprovalStatus = 'draft' | 'submitted' | 'verifying' | 'approved' | 'rejected' | 'pending';
-export type JobStatus = 'active' | 'closed';
+export type ApprovalStatus = 'draft' | 'submitted' | 'verifying' | 'approved' | 'rejected' | 'pending' | 'suspended';
+export type JobStatus = 'active' | 'closed' | 'suspended';
 export type ApplicationStatus = 'pending' | 'viewed' | 'shortlisted' | 'rejected';
 
 export interface UserProfile {
@@ -13,6 +13,7 @@ export interface UserProfile {
   email: string;
   role: UserRole;
   status: ApprovalStatus;
+  accountStatus?: 'active' | 'suspended'; // Administrative status
   displayName: string;
   phone?: string;
   phoneSecondary?: string;
@@ -97,6 +98,7 @@ export interface UserProfile {
   profileComplete?: boolean;
   profileViews?: number;
   profileViewsTotal?: number; // Optional alias if needed
+  adminNotes?: string | null;
 
   // Recruiter fields - Extended
   companyName?: string;

@@ -39,7 +39,8 @@ import {
   MessageSquare,
   Briefcase,
   ExternalLink,
-  Phone
+  Phone,
+  AlertCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { UserProfile } from '@/types';
@@ -146,6 +147,15 @@ export default function RecruiterOnboarding() {
             <p className="text-slate-500 text-sm md:text-lg font-medium max-w-2xl">
               Un profil complet et vérifié attire les meilleurs talents.
             </p>
+            {user.adminNotes && (
+              <div className="mt-4 p-4 bg-orange-50 border border-orange-100 rounded-2xl flex gap-3">
+                <AlertCircle className="h-5 w-5 text-orange-600 shrink-0" />
+                <p className="text-xs md:text-sm font-bold text-orange-800">
+                  <span className="uppercase tracking-widest font-black text-[10px] block mb-1">Notes de l'Administrateur :</span>
+                  {user.adminNotes}
+                </p>
+              </div>
+            )}
           </div>
           <div className="bg-white p-4 md:p-6 rounded-2xl md:rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-100 w-full md:w-auto md:min-w-[240px]">
             <div className="flex justify-between items-end mb-3">
@@ -317,12 +327,22 @@ function GeneralStep({ data, onChange }: { data: Partial<UserProfile>, onChange:
         </div>
         <div className="flex-1 space-y-6 w-full">
           <div className="space-y-4">
-            <Label htmlFor="companyName" className="font-bold text-slate-700 ml-1">Nom de l'entreprise *</Label>
+            <Label htmlFor="companyName" className="font-bold text-slate-700 ml-1">Nom Officiel de l'entreprise *</Label>
             <Input 
               id="companyName" 
               value={data.companyName || ''} 
               onChange={e => onChange({ companyName: e.target.value })}
-              placeholder="Ex: AfriCorp Technologies"
+              placeholder="Ex: AfriCorp Technologies SARL"
+              className="h-14 rounded-2xl border-slate-200 focus-visible:ring-orange-600 font-medium"
+            />
+          </div>
+          <div className="space-y-4">
+            <Label htmlFor="tradeName" className="font-bold text-slate-700 ml-1">Enseigne Commerciale / Marque</Label>
+            <Input 
+              id="tradeName" 
+              value={data.tradeName || ''} 
+              onChange={e => onChange({ tradeName: e.target.value })}
+              placeholder="Ex: AfriCorp"
               className="h-14 rounded-2xl border-slate-200 focus-visible:ring-orange-600 font-medium"
             />
           </div>
@@ -380,6 +400,25 @@ function GeneralStep({ data, onChange }: { data: Partial<UserProfile>, onChange:
 
 function LegalStep({ data, onChange }: { data: Partial<UserProfile>, onChange: (d: any) => void }) {
   const legalForms = ["SARL", "SA", "SAS", "SNC", "Entreprise Individuelle", "ONG"];
+  const handleDocUpload = (e: React.ChangeEvent<HTMLInputElement>, field: string) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 500 * 1024) {
+      alert("Fichier trop lourd (Max 500Ko)");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      onChange({ 
+        legalDocuments: { 
+          ...(data.legalDocuments || {}), 
+          [field]: reader.result as string,
+          [`${field}Name`]: file.name 
+        } 
+      });
+    };
+    reader.readAsDataURL(file);
+  };
 
   return (
     <div className="space-y-8">
@@ -439,13 +478,19 @@ function LegalStep({ data, onChange }: { data: Partial<UserProfile>, onChange: (
       <div className="space-y-3">
         <Label className="font-black text-xs text-slate-400 uppercase tracking-widest block ml-1">Documents Vérification (PDF/IMAGE) *</Label>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="border-2 border-dashed border-slate-200 rounded-2xl p-5 text-center hover:border-orange-400 transition-all cursor-pointer group bg-slate-50/50">
+          <div className="relative border-2 border-dashed border-slate-200 rounded-2xl p-5 text-center hover:border-orange-400 transition-all cursor-pointer group bg-slate-50/50">
+            <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" accept=".pdf,image/*" onChange={e => handleDocUpload(e, 'rccmUrl')} />
             <Upload className="h-6 w-6 text-slate-300 mx-auto mb-2 group-hover:text-orange-500 transition-colors" />
-            <p className="text-xs font-bold text-slate-600">Registre du Commerce</p>
+            <p className="text-xs font-bold text-slate-600">
+              {data.legalDocuments?.rccmUrl ? "RCCM Chargé ✓" : "Registre du Commerce"}
+            </p>
           </div>
-          <div className="border-2 border-dashed border-slate-200 rounded-2xl p-5 text-center hover:border-orange-400 transition-all cursor-pointer group bg-slate-50/50">
+          <div className="relative border-2 border-dashed border-slate-200 rounded-2xl p-5 text-center hover:border-orange-400 transition-all cursor-pointer group bg-slate-50/50">
+            <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" accept=".pdf,image/*" onChange={e => handleDocUpload(e, 'taxStatusUrl')} />
             <Upload className="h-6 w-6 text-slate-300 mx-auto mb-2 group-hover:text-orange-500 transition-colors" />
-            <p className="text-xs font-bold text-slate-600">Attestation Fiscale</p>
+            <p className="text-xs font-bold text-slate-600">
+              {data.legalDocuments?.taxStatusUrl ? "Attestation Chargée ✓" : "Attestation Fiscale"}
+            </p>
           </div>
         </div>
       </div>
@@ -975,7 +1020,7 @@ function DocumentsStep({ data, onChange }: { data: Partial<UserProfile>, onChang
         <div className="space-y-1">
           <p className="font-black text-blue-900 text-base md:text-lg tracking-tight">Vérification de sécurité</p>
           <p className="text-blue-700/80 font-medium text-xs md:text-sm leading-relaxed">
-            En soumettant ces documents, vous certifiez leur authenticité. Notre équipe admin examinera votre profil sous 24h ouvrées. Une fois approuvé, vous recevrez le badge <span className="font-black text-blue-900">"Entreprise Vérifiée"</span> visible par tous les candidats.
+            En soumettant ces documents, vous certifiez leur authenticité. Notre équipe admin examinera votre profil sous 72h ouvrées. Une fois approuvé, vous recevrez le badge <span className="font-black text-blue-900">"Entreprise Vérifiée"</span> visible par tous les candidats.
           </p>
         </div>
       </div>

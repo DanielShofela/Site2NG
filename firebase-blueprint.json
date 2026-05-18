@@ -8,14 +8,43 @@
         "uid": { "type": "string" },
         "email": { "type": "string" },
         "role": { "type": "string", "enum": ["candidate", "recruiter", "admin"] },
-        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected", "submitted", "verifying"] },
+        "accountStatus": { "type": "string", "enum": ["active", "suspended"] },
         "displayName": { "type": "string" },
+        "companyName": { "type": "string" },
         "phone": { "type": "string" },
         "photoUrl": { "type": "string" },
         "location": { "type": "string" },
-        "metadata": { "type": "object" }
+        "sectorActivity": { "type": "string" },
+        "city": { "type": "string" }
       },
       "required": ["uid", "email", "role"]
+    },
+    "Log": {
+      "title": "System Log",
+      "description": "Administrative system action logs",
+      "type": "object",
+      "properties": {
+        "action": { "type": "string" },
+        "target": { "type": "string" },
+        "type": { "type": "string" },
+        "user": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["action", "user", "timestamp"]
+    },
+    "SiteConfig": {
+      "title": "Site Configuration",
+      "description": "CMS data for public pages",
+      "type": "object",
+      "properties": {
+        "siteName": { "type": "string" },
+        "logoUrl": { "type": "string" },
+        "iconUrl": { "type": "string" },
+        "heroTitle": { "type": "string" },
+        "heroSubtitle": { "type": "string" },
+        "primaryColor": { "type": "string" }
+      }
     },
     "Job": {
       "title": "Job",
@@ -63,6 +92,14 @@
     "/applications/{applicationId}": {
       "schema": "Application",
       "description": "Job applications"
+    },
+    "/system_logs/{logId}": {
+      "schema": "Log",
+      "description": "Admin activity logs"
+    },
+    "/site_config/{configId}": {
+      "schema": "SiteConfig",
+      "description": "CMS configurations for the homepage and other public sections"
     }
   }
 }

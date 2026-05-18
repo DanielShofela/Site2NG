@@ -4,10 +4,12 @@ import { User, LogOut, Menu, X, ShieldAlert } from 'lucide-react';
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSiteConfig } from '@/contexts/SiteConfigContext';
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const { user, logout } = useAuth();
+  const { config } = useSiteConfig();
   const navigate = useNavigate();
 
   const navLinks = [
@@ -34,11 +36,15 @@ export default function Navbar() {
         <div className="flex h-20 items-center justify-between">
           <div className="flex items-center">
             <Link to="/" className="flex items-center gap-2 group">
-              <div className="w-10 h-10 bg-orange-600 rounded-xl flex items-center justify-center text-white font-bold text-2xl transition-transform group-hover:scale-105">
-                A
-              </div>
+              {config.logoUrl ? (
+                <img src={config.logoUrl} alt={config.siteName} className="h-10 w-auto object-contain transition-transform group-hover:scale-105" />
+              ) : (
+                <div className="w-10 h-10 bg-orange-600 rounded-xl flex items-center justify-center text-white font-bold text-2xl transition-transform group-hover:scale-105">
+                  {config.siteName ? config.siteName[0] : 'A'}
+                </div>
+              )}
               <span className="text-2xl font-extrabold text-slate-800 tracking-tight">
-                AfriJob<span className="text-orange-600 underline underline-offset-4 decoration-2">.</span>
+                {config.siteName || 'AfriJob'}<span className="text-orange-600 underline underline-offset-4 decoration-2">.</span>
               </span>
             </Link>
           </div>
@@ -78,6 +84,11 @@ export default function Navbar() {
                 </div>
               ) : (
                 <div className="flex items-center space-x-4">
+                  <Link to="/login">
+                    <Button variant="ghost" className="px-5 py-2.5 text-sm font-bold text-slate-700 bg-slate-100 rounded-lg hover:bg-slate-200 h-10 border-none shadow-none">
+                      Connexion
+                    </Button>
+                  </Link>
                   <Link to="/signup">
                     <Button className="px-5 py-2.5 text-sm font-bold text-white bg-orange-600 rounded-lg hover:bg-orange-700 shadow-lg shadow-orange-600/20 h-10 border-none">
                       S'inscrire
@@ -132,6 +143,9 @@ export default function Navbar() {
                   </div>
                 ) : (
                   <div className="space-y-3">
+                    <Link to="/login" onClick={() => setIsOpen(false)} className="block w-full">
+                      <Button variant="outline" className="w-full h-12 rounded-xl font-bold bg-slate-50 border-slate-100">Connexion</Button>
+                    </Link>
                     <Link to="/signup" onClick={() => setIsOpen(false)} className="block w-full">
                       <Button className="w-full h-12 rounded-xl font-bold bg-orange-600 hover:bg-orange-700 shadow-lg shadow-orange-600/20">S'inscrire</Button>
                     </Link>

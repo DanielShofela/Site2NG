@@ -1,7 +1,11 @@
 import { Briefcase, ShieldCheck, Globe2, HeartHandshake } from 'lucide-react';
 import { motion } from 'motion/react';
+import { useSiteConfig } from '@/contexts/SiteConfigContext';
 
 export default function About() {
+  const { config } = useSiteConfig();
+  const siteName = config.siteName || 'AfriJob';
+
   return (
     <div className="container py-24 px-6 mx-auto">
       <div className="max-w-3xl mx-auto text-center mb-20">
@@ -9,7 +13,7 @@ export default function About() {
           Redéfinir le recrutement en <span className="text-orange-600 underline underline-offset-8 decoration-4">Afrique</span>
         </h1>
         <p className="text-lg text-slate-500 leading-relaxed font-medium">
-          AfriJob est née d'une mission simple : connecter les talents africains exceptionnels aux opportunités qui leur correspondent vraiment, tout en simplifiant le processus pour les entreprises locales et internationales.
+          {siteName} est née d'une mission simple : connecter les talents africains exceptionnels aux opportunités qui leur correspondent vraiment, tout en simplifiant le processus pour les entreprises locales et internationales.
         </p>
       </div>
 

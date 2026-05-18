@@ -1,7 +1,12 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Utility functions
+    // 1. Global safety net (lowest priority)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // 2. Primitives & Helpers
     function isSignedIn() {
       return request.auth != null;
     }
@@ -9,52 +14,89 @@ service cloud.firestore {
     function isOwner(userId) {
       return isSignedIn() && request.auth.uid == userId;
     }
-    
-    function getUserData() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
     }
     
-    function isRole(role) {
-      return isSignedIn() && getUserData().role == role;
-    }
-    
+    // Improved isAdmin: check the users collection for the admin role
+    // Using exists() + get() for maximum security
     function isAdmin() {
-      return isRole('admin');
+      return request.auth != null && 
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
+    function isRole(role) {
+      return request.auth != null && 
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == role;
+    }
+
+    // 3. User Rules
     match /users/{userId} {
-      allow read: if true;
-      allow create: if isOwner(userId);
-      allow update: if (isOwner(userId) && 
-                        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'uid', 'email']) &&
-                        (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['status']) || request.resource.data.status != 'approved')
-                      ) ||
-                      (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['profileViews'])) ||
-                      isAdmin();
-      allow delete: if isAdmin();
-    }
-
-    match /jobs/{jobId} {
-      allow read: if true;
-      allow create: if isRole('recruiter') || isRole('admin');
-      allow update: if (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['views'])) ||
-                      (resource.data.recruiterId == request.auth.uid) || 
-                      isAdmin();
-      allow delete: if (resource.data.recruiterId == request.auth.uid) || isAdmin();
-    }
-
-    match /applications/{applicationId} {
-      allow read: if isSignedIn() && (
-        resource.data.candidateId == request.auth.uid || 
-        resource.data.recruiterId == request.auth.uid || 
-        isAdmin()
+      allow read: if isSignedIn() || resource.data.role == 'recruiter';
+      allow create: if isOwner(userId) && 
+                      incoming().uid == userId &&
+                      incoming().role in ['candidate', 'recruiter', 'admin'] &&
+                      incoming().status == (incoming().role == 'recruiter' ? 'pending' : 'approved');
+      
+      allow update: if isAdmin() || (
+        isOwner(userId) && 
+        // Prevent owners from escalating their own role or changing critical fields
+        !incoming().diff(existing()).affectedKeys().hasAny(['role', 'uid', 'email']) &&
+        (incoming().status == existing().status || (existing().status == 'pending' && incoming().status == 'submitted'))
       );
-      allow create: if isRole('candidate') && request.resource.data.candidateId == request.auth.uid;
-      allow update: if (isRole('recruiter') && resource.data.recruiterId == request.auth.uid) || 
-                      (isRole('candidate') && resource.data.candidateId == request.auth.uid) ||
-                      isAdmin();
       allow delete: if isAdmin();
+    }
+
+    // 4. Job Rules
+    match /jobs/{jobId} {
+      allow read: if true; // Public listings
+      allow create: if isRole('recruiter') || isAdmin();
+      allow update: if isAdmin() || (
+        isSignedIn() && existing().recruiterId == request.auth.uid &&
+        !incoming().diff(existing()).affectedKeys().hasAny(['recruiterId'])
+      ) || (
+        // Allow anonymous view increments
+        incoming().diff(existing()).affectedKeys().hasOnly(['views'])
+      );
+      allow delete: if isAdmin() || (isSignedIn() && existing().recruiterId == request.auth.uid);
+    }
+
+    // 5. Application Rules
+    match /applications/{applicationId} {
+      allow read: if isAdmin() || (
+        isSignedIn() && (
+          existing().candidateId == request.auth.uid || 
+          existing().recruiterId == request.auth.uid
+        )
+      );
+      allow create: if isRole('candidate') && incoming().candidateId == request.auth.uid;
+      allow update: if isAdmin() || (
+        isSignedIn() && (
+          existing().candidateId == request.auth.uid || 
+          existing().recruiterId == request.auth.uid
+        )
+      );
+      allow delete: if isAdmin();
+    }
+
+    // 6. System Logs Rules (Admin Only)
+    match /system_logs/{logId} {
+      allow read, write: if isAdmin();
+    }
+
+    // 7. Site Config Rules
+    match /site_config/{configId} {
+      allow read: if true; // Anyone can see the homepage config
+      allow write: if isAdmin();
     }
   }
 }
-

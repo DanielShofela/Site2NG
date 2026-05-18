@@ -83,7 +83,7 @@ export default function PendingApproval() {
                 <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100 flex flex-col items-center gap-3">
                   <Mail className="h-8 w-8 text-orange-600" />
                   <p className="text-xs font-black text-slate-900 uppercase tracking-widest">Réponse</p>
-                  <p className="text-[11px] text-slate-500 font-medium">Notification par email sous 24h.</p>
+                  <p className="text-[11px] text-slate-500 font-medium">Notification par email sous 72h.</p>
                 </div>
               </div>
             )}
