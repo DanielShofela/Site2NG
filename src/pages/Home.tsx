@@ -174,7 +174,6 @@ export default function Home() {
           </div>
           <div className="flex gap-8 items-center">
             <Link to="/about" className="text-xs font-bold text-slate-500 hover:text-orange-600 uppercase tracking-tight">À Propos</Link>
-            <Link to="/admin" className="text-xs font-bold text-orange-600 bg-orange-50 px-4 py-2 rounded-full hover:bg-orange-100 transition-colors">Portail Admin</Link>
           </div>
         </div>
       </footer>
