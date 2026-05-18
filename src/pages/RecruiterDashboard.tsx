@@ -167,7 +167,7 @@ export default function RecruiterDashboard() {
     try {
       const jobData = {
         recruiterId: user.uid,
-        companyName: user.companyName || user.displayName,
+        companyName: user.companyName || user.displayName || "Entreprise",
         title: jobTitle,
         description: jobDescription,
         location: jobLocation,

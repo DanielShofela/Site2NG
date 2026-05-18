@@ -56,6 +56,7 @@ export default function CandidateDashboard() {
   const { user, updateProfile } = useAuth();
   const [activeTab, setActiveTab] = useState('profile');
   const [applications, setApplications] = useState<any[]>([]);
+  const [companyNames, setCompanyNames] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [cvBlobUrl, setCvBlobUrl] = useState<string | null>(null);
@@ -139,6 +140,22 @@ export default function CandidateDashboard() {
           ...doc.data()
         }));
         setApplications(apps);
+
+        // Fetch current company names
+        const recruiterIds = Array.from(new Set(apps.map((a: any) => a.recruiterId).filter(Boolean)));
+        if (recruiterIds.length > 0) {
+          const namesMap: Record<string, string> = {};
+          for (let i = 0; i < recruiterIds.length; i += 10) {
+            const batch = recruiterIds.slice(i, i + 10);
+            const recruitersQ = query(collection(db, 'users'), where('uid', 'in', batch));
+            const recruitersSnap = await getDocs(recruitersQ);
+            recruitersSnap.forEach(doc => {
+              const data = doc.data();
+              namesMap[doc.id] = data.companyName || data.displayName || "Entreprise";
+            });
+          }
+          setCompanyNames(namesMap);
+        }
       } catch (error) {
         console.error('Error fetching applications:', error);
       } finally {
@@ -148,6 +165,10 @@ export default function CandidateDashboard() {
 
     fetchApplications();
   }, [user]);
+
+  const getCompanyName = (app: any) => {
+    return companyNames[app.recruiterId] || app.companyName;
+  };
 
   if (!user || user.role !== 'candidate') return null;
 
@@ -396,12 +417,12 @@ export default function CandidateDashboard() {
                       <CardContent className="py-6 flex flex-col sm:flex-row items-center justify-between gap-6 px-8">
                         <div className="flex items-center gap-6">
                           <div className="h-16 w-16 bg-slate-900 rounded-2xl flex items-center justify-center font-black text-white text-xl shadow-lg shadow-slate-900/10 transition-transform group-hover:scale-110">
-                            {app.companyName?.[0] || 'J'}
+                            {getCompanyName(app)?.[0] || 'J'}
                           </div>
                           <div>
                             <h3 className="text-lg font-extrabold text-slate-900">{app.jobTitle}</h3>
                             <div className="flex items-center gap-2">
-                              <p className="text-slate-500 font-medium">{app.companyName}</p>
+                              <p className="text-slate-500 font-medium">{getCompanyName(app)}</p>
                               {app.recruiterId && (
                                 <Link 
                                   to={`/company/${app.recruiterId}`}
@@ -498,12 +519,12 @@ export default function CandidateDashboard() {
               <div className="p-8 space-y-6">
                 <div className="flex items-center gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-100">
                   <div className="h-12 w-12 bg-slate-900 rounded-xl flex items-center justify-center font-black text-white text-lg shrink-0">
-                    {selectedApp.companyName?.[0] || 'J'}
+                    {getCompanyName(selectedApp)?.[0] || 'J'}
                   </div>
                   <div className="min-w-0">
                     <h4 className="font-extrabold text-slate-900 truncate">{selectedApp.jobTitle}</h4>
                     <div className="flex items-center gap-2">
-                      <p className="text-slate-500 text-sm font-medium truncate">{selectedApp.companyName}</p>
+                      <p className="text-slate-500 text-sm font-medium truncate">{getCompanyName(selectedApp)}</p>
                       {selectedApp.recruiterId && (
                         <Link 
                            to={`/company/${selectedApp.recruiterId}`}

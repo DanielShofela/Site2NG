@@ -77,6 +77,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           role: preferredRole,
           status: preferredRole === 'recruiter' ? 'pending' : 'approved',
           displayName: firebaseUser.displayName || 'Utilisateur',
+          companyName: preferredRole === 'recruiter' ? (firebaseUser.displayName || '') : undefined,
           photoUrl: firebaseUser.photoURL || null,
           createdAt: serverTimestamp(),
         };

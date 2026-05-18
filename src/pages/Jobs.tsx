@@ -28,6 +28,7 @@ import { fr } from 'date-fns/locale';
 export default function Jobs() {
   const [searchTerm, setSearchTerm] = useState('');
   const [jobs, setJobs] = useState<Job[]>([]);
+  const [companyNames, setCompanyNames] = useState<Record<string, string>>({});
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [isApplying, setIsApplying] = useState(false);
   const [hasApplied, setHasApplied] = useState(false);
@@ -48,6 +49,25 @@ export default function Jobs() {
           ...doc.data()
         })) as Job[];
         setJobs(jobsData);
+
+        // Fetch company names for these jobs to ensure we display the latest ones
+        const recruiterIds = Array.from(new Set(jobsData.map(j => j.recruiterId).filter(Boolean)));
+        if (recruiterIds.length > 0) {
+          const namesMap: Record<string, string> = {};
+          
+          // Batch fetch recruiters (limit 10 for 'in' query)
+          // For simplicity and since we don't expect hundreds of recruiters in one view
+          for (let i = 0; i < recruiterIds.length; i += 10) {
+            const batch = recruiterIds.slice(i, i + 10);
+            const recruitersQ = query(collection(db, 'users'), where('uid', 'in', batch));
+            const recruitersSnap = await getDocs(recruitersQ);
+            recruitersSnap.forEach(doc => {
+              const data = doc.data();
+              namesMap[doc.id] = data.companyName || data.displayName || "Entreprise";
+            });
+          }
+          setCompanyNames(namesMap);
+        }
       } catch (error) {
         console.error('Error fetching jobs:', error);
       } finally {
@@ -68,7 +88,7 @@ export default function Jobs() {
         candidateId: user.uid,
         recruiterId: selectedJob.recruiterId,
         jobTitle: selectedJob.title,
-        companyName: selectedJob.companyName,
+        companyName: companyNames[selectedJob.recruiterId] || selectedJob.companyName,
         status: 'pending',
         appliedAt: serverTimestamp(),
         candidateProfile: {
@@ -92,9 +112,13 @@ export default function Jobs() {
     }
   };
 
+  const getCompanyName = (job: Job) => {
+    return companyNames[job.recruiterId] || job.companyName;
+  };
+
   const filteredJobs = jobs.filter(job => 
     job.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    job.companyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    getCompanyName(job).toLowerCase().includes(searchTerm.toLowerCase()) ||
     job.location.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -165,11 +189,11 @@ export default function Jobs() {
                                   className="text-slate-900 hover:text-orange-600 transition-colors flex items-center gap-1 group/company relative z-10"
                                   onClick={(e) => e.stopPropagation()}
                                 >
-                                  {job.companyName}
+                                  {getCompanyName(job)}
                                   <ExternalLink className="h-3 w-3 opacity-0 group-hover/company:opacity-100 transition-opacity" />
                                 </Link>
                               ) : (
-                                <span>{job.companyName}</span>
+                                <span>{getCompanyName(job)}</span>
                               )}
                               <span className="mx-2 opacity-30">•</span>
                               <div className="flex items-center">
@@ -230,12 +254,12 @@ export default function Jobs() {
                                 to={`/company/${selectedJob.recruiterId}`}
                                 className="text-white bg-white/10 px-3 py-1 rounded-lg hover:bg-white/20 transition-all flex items-center gap-2"
                               >
-                                {selectedJob.companyName}
+                                {getCompanyName(selectedJob)}
                                 <ExternalLink className="h-3 w-3" />
                               </Link>
                             ) : (
                               <span className="bg-white/5 px-2 py-1 rounded overflow-hidden truncate max-w-[150px]">
-                                {selectedJob.companyName}
+                                {getCompanyName(selectedJob)}
                               </span>
                             )}
                             <span className="opacity-50">•</span>
