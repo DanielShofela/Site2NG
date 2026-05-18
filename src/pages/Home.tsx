@@ -64,11 +64,11 @@ export default function Home() {
               transition={{ delay: 0.4 }}
               className="mt-8"
             >
-              <Link to={getDashboardLink()}>
-                <Button className="h-14 px-8 bg-slate-900 text-white rounded-2xl font-bold shadow-xl flex items-center gap-2 mx-auto">
+              <Button className="h-14 px-8 bg-slate-900 text-white rounded-2xl font-bold shadow-xl flex items-center gap-2 mx-auto" asChild nativeButton={false}>
+                <Link to={getDashboardLink()}>
                   <LayoutDashboard className="h-5 w-5" /> Accéder à mon tableau de bord
-                </Button>
-              </Link>
+                </Link>
+              </Button>
             </motion.div>
           )}
         </div>
@@ -99,11 +99,11 @@ export default function Home() {
                 </li>
               ))}
             </ul>
-            <Link to={user ? "/candidate" : "/signup?role=candidate"}>
-              <Button className="w-full py-7 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-2xl transition-colors text-lg shadow-lg shadow-orange-600/20">
+            <Button className="w-full py-7 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-2xl transition-colors text-lg shadow-lg shadow-orange-600/20" asChild nativeButton={false}>
+              <Link to={user ? "/candidate" : "/signup?role=candidate"}>
                 {user && user.role === 'candidate' ? "Mon Profil Candidat" : "Démarrer mon profil"}
-              </Button>
-            </Link>
+              </Link>
+            </Button>
           </motion.div>
 
           {/* Recruiter Portal */}
@@ -130,11 +130,11 @@ export default function Home() {
                 </li>
               ))}
             </ul>
-            <Link to={user ? "/recruiter" : "/signup?role=recruiter"}>
-              <Button className="w-full py-7 bg-teal-600 hover:bg-teal-500 text-white font-bold rounded-2xl transition-colors text-lg shadow-lg shadow-teal-600/20 border-none">
+            <Button className="w-full py-7 bg-teal-600 hover:bg-teal-500 text-white font-bold rounded-2xl transition-colors text-lg shadow-lg shadow-teal-600/20 border-none" asChild nativeButton={false}>
+              <Link to={user ? "/recruiter" : "/signup?role=recruiter"}>
                 {user && user.role === 'recruiter' ? "Mon Espace Recruteur" : "Publier une offre"}
-              </Button>
-            </Link>
+              </Link>
+            </Button>
           </motion.div>
         </div>
 

@@ -23,20 +23,24 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
-      allow read: if isSignedIn();
-      allow create: if isOwner(userId) && 
-                      (request.resource.data.role in ['candidate', 'recruiter']) &&
-                      (request.resource.data.role == 'recruiter' ? request.resource.data.status == 'pending' : request.resource.data.status == 'approved');
-      allow update: if isOwner(userId) && 
-                      !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'status', 'uid', 'email']) ||
+      allow read: if true;
+      allow create: if isOwner(userId);
+      allow update: if (isOwner(userId) && 
+                        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'uid', 'email']) &&
+                        (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['status']) || request.resource.data.status != 'approved')
+                      ) ||
+                      (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['profileViews'])) ||
                       isAdmin();
       allow delete: if isAdmin();
     }
 
     match /jobs/{jobId} {
       allow read: if true;
-      allow create: if isRole('recruiter') || isAdmin();
-      allow update, delete: if (isRole('recruiter') && resource.data.recruiterId == request.auth.uid) || isAdmin();
+      allow create: if isRole('recruiter') || isRole('admin');
+      allow update: if (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['views'])) ||
+                      (resource.data.recruiterId == request.auth.uid) || 
+                      isAdmin();
+      allow delete: if (resource.data.recruiterId == request.auth.uid) || isAdmin();
     }
 
     match /applications/{applicationId} {

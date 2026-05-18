@@ -304,15 +304,16 @@ export default function RecruiterDashboard() {
               >
                 <Settings className="mr-2 h-4 w-4" /> Modifier Profil
               </Button>
-              <Button 
-                variant="outline" 
-                className="bg-orange-600/10 border-orange-600/20 text-white hover:bg-orange-600/20 h-11 md:h-12 rounded-xl md:rounded-2xl font-bold backdrop-blur-sm flex-1 md:flex-none"
-                asChild
-              >
-                <Link to={`/company/${user.uid}`}>
-                  <Eye className="mr-2 h-4 w-4" /> Voir Page Publique
-                </Link>
-              </Button>
+                <Button 
+                  variant="outline" 
+                  className="bg-white/10 border-white/20 text-white hover:bg-white/20 h-11 md:h-12 rounded-xl md:rounded-2xl font-bold backdrop-blur-sm flex-1 md:flex-none"
+                  asChild
+                  nativeButton={false}
+                >
+                  <Link to={`/company/${user.uid}`}>
+                    <Eye className="mr-2 h-4 w-4" /> Voir Page Publique
+                  </Link>
+                </Button>
               <Dialog onOpenChange={(open) => { if (!open) setJobCreated(false); }}>
                 <DialogTrigger asChild>
                   <Button className="h-11 md:h-12 px-6 md:px-8 rounded-xl md:rounded-2xl bg-orange-600 hover:bg-orange-700 text-white font-black shadow-xl shadow-orange-600/20 border-none flex-1 md:flex-none">
@@ -724,7 +725,7 @@ export default function RecruiterDashboard() {
                           </div>
                        </div>
 
-                       <Button className="w-full h-14 rounded-2xl bg-slate-900 text-white font-black hover:bg-slate-800 shadow-xl shadow-slate-900/10" asChild>
+                       <Button className="w-full h-14 rounded-2xl bg-slate-900 text-white font-black hover:bg-slate-800 shadow-xl shadow-slate-900/10" asChild nativeButton={false}>
                           <Link to={`/company/${user.uid}`}>
                              <Eye className="mr-2 h-5 w-5" /> Voir ma page publique
                           </Link>

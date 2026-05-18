@@ -156,7 +156,7 @@ export default function CompanyProfile() {
                 </Badge>
               )}
               {profile.website && (
-                <Button variant="outline" className="bg-white/10 border-white/20 text-white hover:bg-white/20 rounded-2xl h-11 md:h-12 font-bold backdrop-blur-sm" asChild>
+                  <Button variant="outline" className="bg-white/10 border-white/20 text-white hover:bg-white/20 rounded-2xl h-11 md:h-12 font-bold backdrop-blur-sm" asChild nativeButton={false}>
                   <a href={profile.website} target="_blank" rel="noopener noreferrer">
                     <Globe className="mr-2 h-4 w-4" /> Site Web
                   </a>
@@ -275,9 +275,9 @@ export default function CompanyProfile() {
                             </div>
                           </div>
                         </div>
-                        <Button variant="ghost" className="rounded-full font-black text-orange-600 group-hover:bg-orange-50">
+                        <div className="inline-flex items-center justify-center rounded-2xl font-black text-orange-600 bg-transparent hover:bg-orange-50 px-4 py-2 transition-all">
                           Postuler <ChevronRight className="ml-1 h-4 w-4" />
-                        </Button>
+                        </div>
                       </CardContent>
                     </Card>
                   </Link>
@@ -348,7 +348,7 @@ export default function CompanyProfile() {
                 </div>
 
                 {profile.legalDocuments?.brochureUrl && (
-                  <Button className="w-full h-14 rounded-2xl bg-slate-900 text-white font-black shadow-xl" asChild>
+                  <Button className="w-full h-14 rounded-2xl bg-slate-900 text-white font-black shadow-xl" asChild nativeButton={false}>
                     <a href={profile.legalDocuments.brochureUrl} download>
                       <FileText className="mr-2 h-5 w-5" /> Brochure PDF
                     </a>

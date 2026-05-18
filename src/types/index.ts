@@ -96,6 +96,7 @@ export interface UserProfile {
   completionScore?: number;
   profileComplete?: boolean;
   profileViews?: number;
+  profileViewsTotal?: number; // Optional alias if needed
 
   // Recruiter fields - Extended
   companyName?: string;
@@ -164,6 +165,7 @@ export interface Job {
   field: string;
   salary?: string;
   status: JobStatus;
+  views?: number;
   createdAt: any;
 }
 

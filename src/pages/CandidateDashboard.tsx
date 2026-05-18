@@ -183,11 +183,11 @@ export default function CandidateDashboard() {
             </div>
           </div>
           <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
-            <Link to="/onboarding" className="w-full sm:w-auto">
-              <Button className="w-full h-11 md:h-12 bg-slate-900 text-white md:bg-white md:text-slate-900 border-none hover:bg-slate-800 md:hover:bg-slate-100 font-bold rounded-xl md:rounded-2xl shadow-xl transition-all">
+            <Button className="w-full h-11 md:h-12 bg-slate-900 text-white md:bg-white md:text-slate-900 border-none hover:bg-slate-800 md:hover:bg-slate-100 font-bold rounded-xl md:rounded-2xl shadow-xl transition-all" asChild nativeButton={false}>
+              <Link to="/onboarding">
                 <Settings className="mr-2 h-4 w-4" /> Profil
-              </Button>
-            </Link>
+              </Link>
+            </Button>
             <Button onClick={handleExportCV} variant="outline" className="w-full h-11 md:h-12 sm:w-auto bg-white text-slate-700 border-slate-200 hover:bg-slate-50 rounded-xl md:rounded-2xl font-bold shadow-lg transition-all">
               <Download className="mr-2 h-4 w-4" /> CV PDF
             </Button>
@@ -450,9 +450,9 @@ export default function CandidateDashboard() {
                   </div>
                   <h3 className="text-xl font-bold text-slate-800">Aucune candidature</h3>
                   <p className="text-slate-400 mt-2 max-w-xs mx-auto mb-8">Commencez à explorer les offres pour trouver votre prochain job.</p>
-                  <Link to="/jobs">
-                    <Button className="h-12 px-8 bg-orange-600 text-white rounded-xl font-bold">Parcourir les offres</Button>
-                  </Link>
+                  <Button className="h-12 px-8 bg-orange-600 text-white rounded-xl font-bold" asChild nativeButton={false}>
+                    <Link to="/jobs">Parcourir les offres</Link>
+                  </Button>
                 </div>
               )}
             </TabsContent>
