@@ -40,11 +40,11 @@ export default function Navbar() {
                 <img src={config.logoUrl} alt={config.siteName} className="h-10 w-auto object-contain transition-transform group-hover:scale-105" />
               ) : (
                 <div className="w-10 h-10 bg-orange-600 rounded-xl flex items-center justify-center text-white font-bold text-2xl transition-transform group-hover:scale-105">
-                  {config.siteName ? config.siteName[0] : 'A'}
+                  {config.siteName ? config.siteName[0] : '2'}
                 </div>
               )}
               <span className="text-2xl font-extrabold text-slate-800 tracking-tight">
-                {config.siteName || 'AfriJob'}<span className="text-orange-600 underline underline-offset-4 decoration-2">.</span>
+                {config.siteName || '2NG Groupe Entreprises'}<span className="text-orange-600 underline underline-offset-4 decoration-2">.</span>
               </span>
             </Link>
           </div>

@@ -381,7 +381,7 @@ export default function RecruiterDashboard() {
                   <CheckCircle2 className="h-12 w-12" />
                 </div>
                 <h3 className="text-2xl font-bold mb-2">Offre publiée avec succès !</h3>
-                <p className="text-muted-foreground mb-8">Votre offre est maintenant visible par tous les candidats de {config.siteName || 'AfriJob'}.</p>
+                <p className="text-muted-foreground mb-8">Votre offre est maintenant visible par tous les candidats de {config.siteName || '2NG Groupe Entreprises'}.</p>
                 <Button variant="outline" onClick={() => setJobCreated(false)} className="w-full">Fermer</Button>
               </div>
             )}

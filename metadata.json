@@ -1,6 +1,6 @@
 {
-  "name": "AfriJob Marketplace",
-  "description": "Plateforme de recrutement mobile-first optimisée pour le marché africain, connectant candidats et recruteurs avec un système de validation rigoureux.",
+  "name": "2NG Groupe Entreprises",
+  "description": "Plateforme de recrutement mobile-first, connectant candidats et recruteurs avec un système de validation rigoureux.",
   "requestFramePermissions": [
     "camera",
     "microphone"

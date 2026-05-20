@@ -136,7 +136,7 @@ export default function AdminDashboard() {
 
   // CMS State
   const [cmsData, setCmsData] = useState({
-    siteName: "AfriJob",
+    siteName: "2NG Groupe Entreprises",
     logoUrl: "",
     iconUrl: "",
     heroTitle: "Trouvez le talent qui propulsera votre entreprise",
@@ -356,7 +356,7 @@ export default function AdminDashboard() {
                 )}
               </div>
               <div className="flex flex-col">
-                <span className="font-black text-slate-900 tracking-tighter uppercase whitespace-nowrap text-xs">{cmsData.siteName || "AfriJob"}</span>
+                <span className="font-black text-slate-900 tracking-tighter uppercase whitespace-nowrap text-xs">{cmsData.siteName || "2NG Groupe Entreprises"}</span>
                 <span className="text-[10px] font-black text-orange-600 uppercase tracking-widest leading-none">Admin Portal</span>
               </div>
             </div>
@@ -902,7 +902,7 @@ function UsersModule({ users, onAction, addLog }: { users: UserProfile[], onActi
   );
 }
 
-function RecruiterReviewCard({ r, onAction }: { r: UserProfile, onAction: any }) {
+function RecruiterReviewCard({ r, onAction }: { r: UserProfile, onAction: any, key?: string }) {
     const [isReviewOpen, setIsReviewOpen] = useState(false);
 
     const handleActionWithReason = (action: 'reject' | 'correction') => {
@@ -937,8 +937,16 @@ function RecruiterReviewCard({ r, onAction }: { r: UserProfile, onAction: any })
                                 <Eye className="mr-2 h-4 w-4" /> Examiner
                             </Button>
                         </DialogTrigger>
-                        <DialogContent className="max-w-4xl w-full sm:w-[95vw] rounded-none sm:rounded-[40px] p-0 border-none shadow-2xl overflow-hidden flex flex-col h-full sm:h-[90vh]">
-                             <DialogHeader className="p-5 md:p-10 pb-0 shrink-0">
+                        <DialogContent className="max-w-4xl w-full sm:w-[95vw] rounded-none sm:rounded-[40px] p-0 border-none shadow-2xl overflow-hidden flex flex-col h-full sm:h-[90vh] relative">
+                             <button 
+                                 onClick={() => setIsReviewOpen(false)}
+                                 className="absolute right-4 top-4 md:right-8 md:top-8 rounded-full p-2.5 text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-all z-50 focus:outline-none bg-white border border-slate-200 shadow-sm"
+                                 aria-label="Fermer la page"
+                                 type="button"
+                             >
+                                 <X className="h-5 w-5 stroke-[2.5]" />
+                             </button>
+                             <DialogHeader className="p-5 md:p-10 pb-0 shrink-0 pr-16">
                                  <DialogTitle className="text-xl md:text-3xl font-black text-slate-900">Revue Recruteur</DialogTitle>
                                  <DialogDescription className="font-bold text-xs md:text-base text-slate-500">Vérification approfondie du dossier : {r.companyName}</DialogDescription>
                              </DialogHeader>
@@ -1020,6 +1028,7 @@ function RecruiterReviewCard({ r, onAction }: { r: UserProfile, onAction: any })
                                         )}
                                      </div>
                                  </div>
+                             </div>
 
                                  <div className="space-y-4">
                                      <h4 className="text-xs font-black uppercase tracking-widest flex items-center gap-2">
@@ -1051,7 +1060,6 @@ function RecruiterReviewCard({ r, onAction }: { r: UserProfile, onAction: any })
                                          </div>
                                      </div>
                                  </div>
-                             </div>
 
                              <DialogFooter className="p-4 md:p-8 pt-3 md:pt-4 bg-white border-t border-slate-100 gap-3 flex flex-col sm:flex-row items-stretch sm:items-center shrink-0 mt-auto">
                                  <div className="flex gap-2 flex-1">
@@ -1268,7 +1276,7 @@ function CMSModule({ currentData, onSave }: any) {
                                 <Input 
                                     value={localData.siteName || ""} 
                                     onChange={(e) => setLocalData({...localData, siteName: e.target.value})}
-                                    placeholder="Ex: AfriJob"
+                                    placeholder="Ex: 2NG Groupe Entreprises"
                                     className="h-12 rounded-xl border-slate-100 bg-slate-50 font-black text-base"
                                 />
                             </div>
@@ -1299,49 +1307,76 @@ function CMSModule({ currentData, onSave }: any) {
                     <div className="space-y-6">
                          <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Branding Visual</h4>
                          
-                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div className="space-y-3">
-                                <label className="text-[10px] font-black text-slate-900 ml-1 uppercase">Logo Principal</label>
-                                <div className="relative group aspect-video bg-slate-50 rounded-2xl border-2 border-dashed border-slate-100 flex flex-col items-center justify-center overflow-hidden hover:border-orange-200 transition-all">
+                         <div className="space-y-3">
+                             <label className="text-[10px] font-black text-slate-900 ml-1 uppercase">Logo Principal</label>
+                                <div 
+                                    onClick={() => document.getElementById('logo-upload-input')?.click()}
+                                    className="relative group aspect-video bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center overflow-hidden hover:border-orange-500 hover:bg-slate-50/50 transition-all cursor-pointer p-4"
+                                >
                                     {localData.logoUrl ? (
-                                        <img src={localData.logoUrl} className="h-full w-full object-contain p-2" alt="Logo preview" />
+                                        <img src={localData.logoUrl} className="max-h-full max-w-full object-contain" alt="Logo preview" />
                                     ) : (
-                                        <ImageIcon className="h-8 w-8 text-slate-200" />
+                                        <div className="text-center space-y-2">
+                                            <ImageIcon className="h-8 w-8 text-slate-300 mx-auto" />
+                                            <p className="text-[10px] font-black uppercase text-slate-400">Importer un logo JPEG/PNG</p>
+                                        </div>
                                     )}
                                     <input 
+                                        id="logo-upload-input"
                                         type="file" 
                                         accept="image/*" 
-                                        className="absolute inset-0 opacity-0 cursor-pointer" 
+                                        className="hidden" 
                                         onChange={(e) => handleImageUpload(e, 'logoUrl')}
                                     />
                                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
                                         <span className="text-[10px] font-black text-white uppercase bg-orange-600 px-3 py-1.5 rounded-lg shadow-xl">Changer le logo</span>
                                     </div>
                                 </div>
+                                <Button 
+                                    type="button"
+                                    variant="outline"
+                                    className="w-full h-10 rounded-xl font-bold text-xs"
+                                    onClick={() => document.getElementById('logo-upload-input')?.click()}
+                                >
+                                    Sélectionner un fichier
+                                </Button>
                             </div>
 
                             <div className="space-y-3">
                                 <label className="text-[10px] font-black text-slate-900 ml-1 uppercase">Favicon / Icône</label>
-                                <div className="relative group aspect-square bg-slate-50 rounded-2xl border-2 border-dashed border-slate-100 flex flex-col items-center justify-center overflow-hidden hover:border-orange-200 transition-all">
+                                <div 
+                                    onClick={() => document.getElementById('icon-upload-input')?.click()}
+                                    className="relative group aspect-square bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center overflow-hidden hover:border-orange-500 hover:bg-slate-50/50 transition-all cursor-pointer p-4"
+                                >
                                     {localData.iconUrl ? (
-                                        <img src={localData.iconUrl} className="h-12 w-12 object-contain" alt="Icon preview" />
+                                        <img src={localData.iconUrl} className="h-16 w-16 object-contain" alt="Icon preview" />
                                     ) : (
                                         <div className="h-10 w-10 bg-orange-100 rounded-xl flex items-center justify-center text-orange-600 font-bold text-xl">A</div>
                                     )}
                                     <input 
+                                        id="icon-upload-input"
                                         type="file" 
                                         accept="image/*" 
-                                        className="absolute inset-0 opacity-0 cursor-pointer" 
+                                        className="hidden" 
                                         onChange={(e) => handleImageUpload(e, 'iconUrl')}
                                     />
                                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
                                         <span className="text-[10px] font-black text-white uppercase bg-orange-600 px-2 py-1 rounded-lg">Changer</span>
                                     </div>
                                 </div>
+                                <Button 
+                                    type="button"
+                                    variant="outline"
+                                    className="w-full h-10 rounded-xl font-bold text-xs"
+                                    onClick={() => document.getElementById('icon-upload-input')?.click()}
+                                >
+                                    Sélectionner un fichier
+                                </Button>
                             </div>
-                         </div>
+                        </div>
+                    </div>
 
-                         <div className="flex items-center justify-between p-5 bg-white border border-slate-100 rounded-2xl shadow-sm">
+                    <div className="flex items-center justify-between p-5 bg-white border border-slate-100 rounded-2xl shadow-sm">
                              <div className="space-y-0.5">
                                 <span className="text-[10px] font-black text-slate-900 uppercase tracking-widest">Thème Visuel</span>
                                 <p className="text-[9px] font-bold text-slate-400">Couleur d'accentuation globale</p>
@@ -1351,9 +1386,8 @@ function CMSModule({ currentData, onSave }: any) {
                                  <div className="h-8 w-8 rounded-xl bg-orange-600 shadow-lg shadow-orange-600/20 cursor-pointer border-2 border-white ring-1 ring-slate-100" />
                              </div>
                          </div>
-                    </div>
-                </div>
-                <div className="pt-8 border-t border-slate-50 flex justify-end">
+
+                    <div className="pt-8 border-t border-slate-50 flex justify-end">
                     <Button 
                         disabled={saving}
                         onClick={handleSave}

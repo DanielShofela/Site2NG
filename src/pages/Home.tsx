@@ -172,7 +172,7 @@ export default function Home() {
             <span className="text-xs font-bold text-slate-400 flex items-center gap-1.5">
               <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span> Plateforme en ligne
             </span>
-            <span className="text-xs font-medium text-slate-400">© 2026 {config.siteName || 'AfriJob'}. Tous droits réservés.</span>
+            <span className="text-xs font-medium text-slate-400">© 2026 {config.siteName || '2NG Groupe Entreprises'}. Tous droits réservés.</span>
           </div>
           <div className="flex gap-8 items-center">
             <Link to="/about" className="text-xs font-bold text-slate-500 hover:text-orange-600 uppercase tracking-tight">À Propos</Link>

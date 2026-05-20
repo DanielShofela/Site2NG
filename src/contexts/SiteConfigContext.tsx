@@ -12,7 +12,7 @@ interface SiteConfig {
 }
 
 const defaultContent: SiteConfig = {
-  siteName: "AfriJob",
+  siteName: "2NG Groupe Entreprises",
   logoUrl: "",
   iconUrl: "",
   heroTitle: "Trouvez le talent qui propulsera votre entreprise",

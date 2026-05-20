@@ -4,7 +4,7 @@ import { useSiteConfig } from '@/contexts/SiteConfigContext';
 
 export default function About() {
   const { config } = useSiteConfig();
-  const siteName = config.siteName || 'AfriJob';
+  const siteName = config.siteName || '2NG Groupe Entreprises';
 
   return (
     <div className="container py-24 px-6 mx-auto">
