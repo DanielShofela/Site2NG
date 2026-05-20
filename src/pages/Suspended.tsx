@@ -25,8 +25,20 @@ export default function Suspended() {
   const shadowControls = useAnimation();
   const wallControls = useAnimation();
 
-  // Run the sequence
-  const startSequence = async () => {
+  // Track active animation cycles to avoid concurrent overlapping runs
+  const activeCycleId = React.useRef(0);
+  const timeoutIdsRef = React.useRef<number[]>([]);
+
+  // Function to clear all scheduled timeouts
+  const clearCurrentTimeouts = () => {
+    timeoutIdsRef.current.forEach((id) => clearTimeout(id));
+    timeoutIdsRef.current = [];
+  };
+
+  // Run the sequence with a specific cycle identifier
+  const startSequence = async (cycleId: number) => {
+    if (cycleId !== activeCycleId.current) return;
+
     // Reset state
     setAnimationState('flying');
     setFeathers([]);
@@ -38,6 +50,8 @@ export default function Suspended() {
       owlControls.set({ x: -180, y: -20, rotate: 0, scale: 1 }),
       shadowControls.set({ x: -180, scaleX: 1, opacity: 0.3, filter: 'blur(3px)' })
     ]);
+
+    if (cycleId !== activeCycleId.current) return;
 
     // Flying smoothly to the wall
     await Promise.all([
@@ -56,6 +70,8 @@ export default function Suspended() {
         transition: { duration: 1.8, ease: 'easeInOut' }
       })
     ]);
+
+    if (cycleId !== activeCycleId.current) return;
 
     // Hit event !
     setAnimationState('hit');
@@ -86,6 +102,8 @@ export default function Suspended() {
       })
     ]);
 
+    if (cycleId !== activeCycleId.current) return;
+
     // Restore shape briefly and start rotating as it falls
     await owlControls.start({
       scaleY: 1,
@@ -93,6 +111,8 @@ export default function Suspended() {
       rotate: 150,
       transition: { duration: 0.15 }
     });
+
+    if (cycleId !== activeCycleId.current) return;
 
     // Falling down to ground shadow
     setAnimationState('falling');
@@ -108,6 +128,8 @@ export default function Suspended() {
         transition: { duration: 0.5, ease: 'linear' }
       })
     ]);
+
+    if (cycleId !== activeCycleId.current) return;
 
     // Hit the ground & bounce slightly
     setAnimationState('dizzy');
@@ -125,22 +147,43 @@ export default function Suspended() {
       })
     ]);
 
+    if (cycleId !== activeCycleId.current) return;
+
     // Auto fade impact emoji text after 2 seconds
-    setTimeout(() => {
-      setImpactEmoji(false);
+    const impactTimeout = window.setTimeout(() => {
+      if (cycleId === activeCycleId.current) {
+        setImpactEmoji(false);
+      }
     }, 2000);
+
+    // Stay dizzy on the ground for a short while, then loop to start again!
+    const nextCycleTimeout = window.setTimeout(() => {
+      if (cycleId === activeCycleId.current) {
+        triggerNewCycle();
+      }
+    }, 3500);
+
+    timeoutIdsRef.current.push(impactTimeout, nextCycleTimeout);
+  };
+
+  const triggerNewCycle = () => {
+    clearCurrentTimeouts();
+    activeCycleId.current += 1;
+    startSequence(activeCycleId.current);
   };
 
   useEffect(() => {
-    startSequence();
+    triggerNewCycle();
+    return () => {
+      clearCurrentTimeouts();
+      activeCycleId.current += 1;
+    };
   }, []);
 
   const handleOwlClick = () => {
     setClickCount((prev) => prev + 1);
-    // Revive and fly again
-    if (animationState === 'dizzy') {
-      startSequence();
-    }
+    // Restart flight cycle immediately
+    triggerNewCycle();
   };
 
   return (
