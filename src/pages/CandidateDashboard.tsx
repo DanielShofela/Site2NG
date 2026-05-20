@@ -10,6 +10,8 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Progress } from '@/components/ui/progress';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { 
   Search, 
   FileText, 
@@ -27,7 +29,10 @@ import {
   Globe,
   Mail,
   Phone,
-  Link as LinkIcon
+  Link as LinkIcon,
+  MessageSquare,
+  HelpCircle,
+  Check
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -37,9 +42,14 @@ import {
   where, 
   getDocs, 
   orderBy,
-  documentId
+  documentId,
+  onSnapshot,
+  addDoc,
+  serverTimestamp
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { Textarea } from '@/components/ui/textarea';
+import { SupportTicket } from '@/types';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import {
@@ -66,6 +76,60 @@ export default function CandidateDashboard() {
   const [selectedApp, setSelectedApp] = useState<any>(null);
   const [selectedJob, setSelectedJob] = useState<any>(null);
   const [isLoadingJob, setIsLoadingJob] = useState(false);
+
+  // Support ticket states
+  const [tickets, setTickets] = useState<SupportTicket[]>([]);
+  const [ticketSubject, setTicketSubject] = useState('');
+  const [ticketMessage, setTicketMessage] = useState('');
+  const [isSubmittingTicket, setIsSubmittingTicket] = useState(false);
+  const [ticketSuccess, setTicketSuccess] = useState(false);
+
+  useEffect(() => {
+    if (!user) return;
+    const q = query(
+      collection(db, 'support_tickets'),
+      where('userId', '==', user.uid),
+      orderBy('createdAt', 'desc')
+    );
+    const unsub = onSnapshot(q, (snapshot) => {
+      const list: SupportTicket[] = [];
+      snapshot.forEach((doc) => {
+        list.push({ id: doc.id, ...doc.data() } as SupportTicket);
+      });
+      setTickets(list);
+    }, (error) => {
+      console.warn("Error fetching support tickets real-time:", error);
+    });
+    return unsub;
+  }, [user]);
+
+  const handleCreateTicket = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user || !ticketSubject.trim() || !ticketMessage.trim()) return;
+    setIsSubmittingTicket(true);
+    setTicketSuccess(false);
+    try {
+      await addDoc(collection(db, 'support_tickets'), {
+        userId: user.uid,
+        userEmail: user.email,
+        userName: user.displayName || `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Candidat Anonyme',
+        userRole: 'candidate',
+        subject: ticketSubject,
+        message: ticketMessage,
+        createdAt: serverTimestamp(),
+        status: 'open',
+        response: null
+      });
+      setTicketSubject('');
+      setTicketMessage('');
+      setTicketSuccess(true);
+      setTimeout(() => setTicketSuccess(false), 5000);
+    } catch (err) {
+      console.error("Error creating support ticket:", err);
+    } finally {
+      setIsSubmittingTicket(false);
+    }
+  };
 
   const handleViewDetails = async (app: any) => {
     setSelectedApp(app);
@@ -321,6 +385,9 @@ export default function CandidateDashboard() {
                   Candidatures 
                   {applications.length > 0 && <Badge className="ml-2 bg-orange-600 text-white border-none px-1.5 py-0 h-5 min-w-[20px]">{applications.length}</Badge>}
                 </TabsTrigger>
+                <TabsTrigger value="support" className="rounded-xl font-bold py-2 px-4 md:px-6 data-[state=active]:bg-slate-900 data-[state=active]:text-white transition-all whitespace-nowrap">
+                  Support & Aide
+                </TabsTrigger>
               </TabsList>
             </div>
 
@@ -501,6 +568,137 @@ export default function CandidateDashboard() {
                   </Button>
                 </div>
               )}
+            </TabsContent>
+
+            <TabsContent value="support" className="space-y-6 outline-none animate-in fade-in duration-300">
+              <div className="bg-slate-900 rounded-3xl p-8 text-white relative overflow-hidden shadow-xl shadow-slate-900/10">
+                <div className="relative z-10 max-w-xl font-sans">
+                  <Badge className="bg-orange-500 hover:bg-orange-600 text-white border-none font-black text-[10px] uppercase px-3 py-1 rounded-full mb-4">CANAL D'ASSISTANCE DIRECT</Badge>
+                  <h3 className="text-2xl font-black tracking-tight mb-2">Des difficultés avec l'application ?</h3>
+                  <p className="text-slate-300 font-medium text-xs leading-relaxed">
+                    Notre équipe d’administration est disponible pour vous aider dans vos démarches de recherche d'emploi, de validation de profil, ou pour toute question technique. Envoyez un message et nous vous répondrons directement ici.
+                  </p>
+                </div>
+                <div className="absolute right-0 bottom-0 opacity-10 transform translate-x-10 translate-y-10">
+                  <HelpCircle className="h-48 w-48 text-white" />
+                </div>
+              </div>
+
+              {ticketSuccess && (
+                <motion.div 
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-2xl font-bold text-xs flex items-center justify-between"
+                >
+                  <span>✨ Votre message d'assistance a été envoyé avec succès ! Un administrateur va l'examiner rapidement.</span>
+                </motion.div>
+              )}
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Form to submit support message */}
+                <Card className="border-none shadow-xl shadow-slate-200/40 bg-white rounded-3xl p-6">
+                  <CardHeader className="p-0 mb-6">
+                    <CardTitle className="text-lg font-black text-slate-900 flex items-center gap-2">
+                      <MessageSquare className="h-5 w-5 text-orange-600" />
+                      Nouveau Message de Support
+                    </CardTitle>
+                    <CardDescription className="text-xs font-bold text-slate-400">Renseignez votre demande d'assistance.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    <form onSubmit={handleCreateTicket} className="space-y-4">
+                      <div className="space-y-1">
+                        <Label htmlFor="ticketSubject" className="font-black text-slate-700 uppercase text-xs tracking-wider">Objet / Thème de la demande</Label>
+                        <Input 
+                          id="ticketSubject"
+                          type="text"
+                          placeholder="Ex: Problème d'export de mon CV en PDF"
+                          className="h-11 rounded-xl border-slate-200 font-bold focus-visible:ring-orange-600 text-xs text-slate-800"
+                          value={ticketSubject}
+                          onChange={(e) => setTicketSubject(e.target.value)}
+                          required
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label htmlFor="ticketMessage" className="font-black text-slate-700 uppercase text-xs tracking-wider">Message détaillé</Label>
+                        <Textarea 
+                          id="ticketMessage"
+                          placeholder="Décrivez précisément les difficultés rencontrées ou votre suggestion..."
+                          className="min-h-[140px] rounded-xl border-slate-200 font-bold text-xs focus-visible:ring-orange-600 text-slate-800"
+                          value={ticketMessage}
+                          onChange={(e) => setTicketMessage(e.target.value)}
+                          required
+                        />
+                      </div>
+                      <Button 
+                        type="submit" 
+                        disabled={isSubmittingTicket}
+                        className="w-full h-11 bg-orange-600 hover:bg-orange-700 text-white rounded-xl font-black text-xs uppercase tracking-wider border-none"
+                      >
+                        {isSubmittingTicket ? "Envoi en cours..." : "Envoyer mon message"}
+                      </Button>
+                    </form>
+                  </CardContent>
+                </Card>
+
+                {/* Past support tickets list */}
+                <Card className="border-none shadow-xl shadow-slate-200/40 bg-white rounded-3xl p-6 flex flex-col">
+                  <CardHeader className="p-0 mb-6">
+                    <CardTitle className="text-lg font-black text-slate-900 flex items-center gap-2">
+                      <Clock className="h-5 w-5 text-orange-600" />
+                      Historique des Échanges
+                    </CardTitle>
+                    <CardDescription className="text-xs font-bold text-slate-400">Suivi en direct de vos demandes de support.</CardDescription>
+                  </CardHeader>
+                  
+                  <CardContent className="p-0 flex-1 overflow-y-auto max-h-[380px] pr-1 space-y-4 scrollbar-hide">
+                    {tickets.length === 0 ? (
+                      <div className="text-center py-12 text-slate-400 font-bold flex flex-col items-center justify-center h-full">
+                        <MessageSquare className="h-10 w-10 text-slate-200 mb-2" />
+                        <p className="text-xs font-bold text-slate-400">Vous n'avez pas encore envoyé de message.</p>
+                      </div>
+                    ) : (
+                      tickets.map(ticket => (
+                        <div key={ticket.id} className="p-4 rounded-2xl border border-slate-100 bg-slate-50/55 hover:bg-white hover:shadow-md transition-all space-y-3">
+                          <div className="flex justify-between items-start gap-2">
+                            <div>
+                              <h5 className="font-extrabold text-slate-900 text-sm leading-tight">{ticket.subject}</h5>
+                              <p className="text-[10px] text-slate-450 font-bold uppercase mt-0.5">
+                                Envoyé le {ticket.createdAt ? new Date(ticket.createdAt.seconds ? ticket.createdAt.seconds * 1000 : ticket.createdAt).toLocaleDateString('fr-FR') : 'Date inconnue'}
+                              </p>
+                            </div>
+                            <Badge className={`text-[8px] font-black uppercase border-none px-2 rounded-full ${ticket.status === 'open' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                              {ticket.status === 'open' ? 'En attente' : 'Répondu'}
+                            </Badge>
+                          </div>
+                          
+                          <p className="text-xs text-slate-600 font-semibold bg-white p-2.5 rounded-xl border border-slate-50 overflow-hidden text-ellipsis whitespace-pre-wrap leading-relaxed">
+                            "{ticket.message}"
+                          </p>
+
+                          {ticket.response ? (
+                            <div className="p-3 bg-emerald-55/40 border border-emerald-100 rounded-xl space-y-1">
+                              <p className="text-[9px] font-black uppercase text-emerald-800 tracking-wider flex items-center gap-1">
+                                <Check className="h-3 w-3" /> Réponse de l'administration :
+                              </p>
+                              <p className="text-xs text-slate-700 font-semibold italic whitespace-pre-wrap">"{ticket.response}"</p>
+                              {ticket.repliedAt && (
+                                <p className="text-[8px] font-bold text-slate-400 text-right mt-1">
+                                  Le {new Date(ticket.repliedAt.seconds ? ticket.repliedAt.seconds * 1000 : ticket.repliedAt).toLocaleDateString('fr-FR')}
+                                </p>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="text-[9px] text-slate-400 font-bold flex items-center gap-1.5 pl-1 italic">
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                              Un administrateur examine votre demande.
+                            </div>
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
             </TabsContent>
           </Tabs>
         </div>

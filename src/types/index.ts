@@ -5,7 +5,7 @@
 
 export type UserRole = 'candidate' | 'recruiter' | 'admin';
 export type ApprovalStatus = 'draft' | 'submitted' | 'verifying' | 'approved' | 'rejected' | 'pending' | 'suspended';
-export type JobStatus = 'active' | 'closed' | 'suspended';
+export type JobStatus = 'active' | 'closed' | 'suspended' | 'pending_validation';
 export type ApplicationStatus = 'pending' | 'viewed' | 'shortlisted' | 'rejected';
 
 export interface UserProfile {
@@ -165,10 +165,13 @@ export interface Job {
   location: string;
   type: string;
   field: string;
+  category?: string;
   salary?: string;
   status: JobStatus;
   views?: number;
   createdAt: any;
+  suspendedAt?: any;
+  suspensionReason?: string | null;
 }
 
 export interface Application {
@@ -180,4 +183,18 @@ export interface Application {
   status: ApplicationStatus;
   appliedAt: any;
   candidateProfile: Partial<UserProfile>;
+}
+
+export interface SupportTicket {
+  id: string;
+  userId: string;
+  userEmail: string;
+  userName: string;
+  userRole: UserRole;
+  subject: string;
+  message: string;
+  createdAt: any;
+  status: 'open' | 'closed';
+  response?: string | null;
+  repliedAt?: any;
 }

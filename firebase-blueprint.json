@@ -78,6 +78,25 @@
         "appliedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["jobId", "candidateId", "recruiterId"]
+    },
+    "SupportTicket": {
+      "title": "Support Ticket",
+      "description": "User feedback or support request",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "userName": { "type": "string" },
+        "userRole": { "type": "string", "enum": ["candidate", "recruiter", "admin"] },
+        "subject": { "type": "string" },
+        "message": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["open", "closed"] },
+        "response": { "type": "string" },
+        "repliedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "userEmail", "userName", "userRole", "subject", "message", "status"]
     }
   },
   "firestore": {
@@ -100,6 +119,10 @@
     "/site_config/{configId}": {
       "schema": "SiteConfig",
       "description": "CMS configurations for the homepage and other public sections"
+    },
+    "/support_tickets/{ticketId}": {
+      "schema": "SupportTicket",
+      "description": "User support tickets"
     }
   }
 }

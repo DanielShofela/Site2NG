@@ -4,6 +4,8 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { SupportTicket } from '@/types';
 import { 
   ShieldCheck, 
   UserCheck, 
@@ -35,7 +37,9 @@ import {
   Menu,
   Database,
   ExternalLink,
-  AlertCircle
+  AlertCircle,
+  Target,
+  HelpCircle
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import React, { useState, useEffect, useMemo, ChangeEvent, FormEvent } from 'react';
@@ -111,7 +115,7 @@ import {
 } from 'recharts';
 import { motion, AnimatePresence } from 'motion/react';
 
-type AdminModule = 'overview' | 'users' | 'approvals' | 'jobs' | 'applications' | 'cms' | 'support' | 'analytics' | 'settings' | 'logs';
+type AdminModule = 'overview' | 'users' | 'approvals' | 'jobs' | 'applications' | 'cms' | 'support' | 'analytics' | 'settings' | 'logs' | 'goals';
 
 export default function AdminDashboard() {
   const { user, logout } = useAuth();
@@ -143,6 +147,13 @@ export default function AdminDashboard() {
     heroTitle: "Trouvez le talent qui propulsera votre entreprise",
     heroSubtitle: "La plateforme de recrutement nouvelle génération pour l'Afrique.",
     primaryColor: "#ea580c"
+  });
+
+  // Goals State
+  const [goals, setGoals] = useState({
+    subscribersTarget: 100,
+    applicationsTarget: 50,
+    viewsTarget: 500
   });
 
   // Adjust sidebar state based on window size on mount
@@ -236,6 +247,20 @@ export default function AdminDashboard() {
       }
     });
 
+    // Fetch Goals Config
+    const goalsUnsub = onSnapshot(doc(db, 'settings', 'goals'), (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.data();
+        setGoals({
+          subscribersTarget: data.subscribersTarget || 100,
+          applicationsTarget: data.applicationsTarget || 50,
+          viewsTarget: data.viewsTarget || 500
+        });
+      }
+    }, (error) => {
+      console.warn("Could not retrieve goals settings document, using default values:", error);
+    });
+
     setLoading(false);
 
     return () => {
@@ -244,6 +269,7 @@ export default function AdminDashboard() {
       appsUnsub();
       logsUnsub();
       cmsUnsub();
+      goalsUnsub();
     };
   }, [user]);
 
@@ -258,7 +284,8 @@ export default function AdminDashboard() {
         await updateDoc(userRef, { 
           status: 'approved', 
           accountStatus: 'active',
-          adminNotes: null
+          adminNotes: null,
+          approvedAt: serverTimestamp()
         });
         await addLog("Approbation recruteur", `UID: ${uid}`, "success");
       } else if (action === 'reject') {
@@ -276,7 +303,8 @@ export default function AdminDashboard() {
       } else {
         await updateDoc(userRef, {
           accountStatus: action === 'suspend' ? 'suspended' : 'active',
-          status: action === 'suspend' ? 'suspended' : 'approved'
+          status: action === 'suspend' ? 'suspended' : 'approved',
+          approvedAt: action === 'suspend' ? null : serverTimestamp()
         });
         await addLog(action === 'suspend' ? "Suspension" : "Activation", `UID: ${uid}`, "warning");
       }
@@ -285,14 +313,27 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleJobAction = async (jobId: string, action: 'suspend' | 'delete') => {
+  const handleJobAction = async (jobId: string, action: 'approve' | 'suspend' | 'delete', reason?: string) => {
       const path = 'jobs';
       try {
           const jobRef = doc(db, path, jobId);
           if (action === 'delete') {
               await deleteDoc(jobRef);
-          } else {
-              await updateDoc(jobRef, { status: 'suspended' });
+              await addLog("Suppression offre", `Offre ID: ${jobId}`, "danger");
+          } else if (action === 'approve') {
+              await updateDoc(jobRef, { 
+                status: 'active',
+                approvedAt: serverTimestamp(),
+                suspensionReason: null
+              });
+              await addLog("Approbation offre", `Offre ID: ${jobId}`, "success");
+          } else if (action === 'suspend') {
+              await updateDoc(jobRef, { 
+                status: 'suspended', 
+                suspensionReason: reason || "Aucune raison fournie par l'administrateur.",
+                suspendedAt: serverTimestamp()
+              });
+              await addLog("Suspension offre", `Offre ID: ${jobId}. Motif: ${reason}`, "warning");
           }
       } catch (e) {
           handleFirestoreError(e, OperationType.WRITE, `${path}/${jobId}`);
@@ -316,6 +357,7 @@ export default function AdminDashboard() {
     { id: 'jobs', label: 'Offres d\'emploi', icon: Briefcase },
     { id: 'cms', label: 'Gestion du Site', icon: ImageIcon },
     { id: 'analytics', label: 'Statistiques', icon: TrendingUp },
+    { id: 'goals', label: 'Objectifs Mensuels', icon: Target },
     { id: 'support', label: 'Support & Tickets', icon: MessageSquare },
     { id: 'settings', label: 'Paramètres', icon: Settings },
     { id: 'logs', label: 'Journaux d\'accès', icon: Clock },
@@ -484,10 +526,34 @@ export default function AdminDashboard() {
               {activeModule === 'approvals' && <ApprovalsModule pending={pendingRecruiters} onAction={handleUserAction} />}
               {activeModule === 'jobs' && <JobsModule jobs={allJobs} onAction={handleJobAction} recruiterNames={recruiterNames} />}
               {activeModule === 'cms' && <CMSModule currentData={cmsData} onSave={setCmsData} />}
-              {activeModule === 'analytics' && <AnalyticsModule stats={stats} jobs={allJobs} users={allUsers} />}
-              {activeModule === 'support' && <SupportModule />}
+              {activeModule === 'analytics' && <AnalyticsModule stats={stats} jobs={allJobs} users={allUsers} applications={allApplications} goals={goals} />}
+              {activeModule === 'support' && <SupportModule addLog={addLog} />}
               {activeModule === 'settings' && <SettingsModule />}
               {activeModule === 'logs' && <LogsModule logs={logs} />}
+              {activeModule === 'goals' && (
+                <GoalsModule 
+                  users={allUsers} 
+                  jobs={allJobs} 
+                  applications={allApplications} 
+                  goals={goals} 
+                  onSave={async (newGoals: any) => {
+                    try {
+                      await setDoc(doc(db, 'settings', 'goals'), {
+                        ...newGoals,
+                        updatedAt: serverTimestamp()
+                      });
+                      await addLog(
+                        "Mise à jour des objectifs", 
+                        `Abonnés: ${newGoals.subscribersTarget}, Candidatures: ${newGoals.applicationsTarget}, Vues: ${newGoals.viewsTarget}`, 
+                        "success"
+                      );
+                    } catch (e) {
+                      console.error("Error setting goals:", e);
+                      throw e;
+                    }
+                  }}
+                />
+              )}
             </motion.div>
           </AnimatePresence>
         </main>
@@ -612,17 +678,9 @@ function OverviewModule({ stats, jobs, users, applications }: { stats: any, jobs
       counts[field] = (counts[field] || 0) + 1;
     });
 
-    const defaultSectors = [
-      { name: 'Informatique', value: 12 },
-      { name: 'Génie Civil / BTP', value: 8 },
-      { name: 'Santé / Médical', value: 5 },
-      { name: 'Commerce', value: 7 },
-      { name: 'Finance', value: 4 }
-    ];
-
     const fields = Object.keys(counts);
     if (fields.length === 0) {
-      return defaultSectors;
+      return [];
     }
 
     const mapped = fields.map(field => ({
@@ -630,15 +688,7 @@ function OverviewModule({ stats, jobs, users, applications }: { stats: any, jobs
       value: counts[field]
     })).sort((a, b) => b.value - a.value);
 
-    if (mapped.length < 3) {
-      defaultSectors.forEach(def => {
-        if (!counts[def.name]) {
-          mapped.push(def);
-        }
-      });
-    }
-
-    return mapped.slice(0, 5); 
+    return mapped; 
   }, [jobs]);
 
   const SECTOR_COLORS = ["#ea580c", "#4f46e5", "#06b6d4", "#10b981", "#f59e0b", "#6366f1", "#8b5cf6"];
@@ -698,39 +748,48 @@ function OverviewModule({ stats, jobs, users, applications }: { stats: any, jobs
 
         <Card className="border-none shadow-sm rounded-[32px] p-6 bg-white overflow-hidden">
           <h3 className="font-black text-slate-900 text-sm md:text-base mb-6">Secteurs Porteurs</h3>
-          <div className="h-[200px] md:h-[250px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={sectorsData}
-                  innerRadius={50}
-                  outerRadius={70}
-                  paddingAngle={5}
-                  dataKey="value"
-                >
-                  {sectorsData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={SECTOR_COLORS[index % SECTOR_COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="space-y-3 mt-4">
-             {sectorsData.map((sect, idx) => {
-                 const total = sectorsData.reduce((acc, curr) => acc + curr.value, 0);
-                 const pct = total > 0 ? Math.round((sect.value / total) * 100) : 0;
-                 return (
-                     <div key={sect.name} className="flex justify-between items-center text-xs">
-                         <div className="flex items-center gap-2">
-                             <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: SECTOR_COLORS[idx % SECTOR_COLORS.length] }} />
-                             <span className="font-bold text-slate-500 truncate max-w-[150px]">{sect.name}</span>
+          {sectorsData.length === 0 ? (
+            <div className="h-[250px] flex flex-col items-center justify-center text-slate-400 gap-2">
+              <span className="text-xs font-black uppercase tracking-widest text-slate-400">Aucune offre d'emploi</span>
+              <span className="text-[10px] font-bold text-slate-400 text-center px-4">Utilisez le bouton de recrutement pour publier et comptabiliser des offres.</span>
+            </div>
+          ) : (
+            <>
+              <div className="h-[200px] md:h-[250px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={sectorsData}
+                      innerRadius={50}
+                      outerRadius={70}
+                      paddingAngle={5}
+                      dataKey="value"
+                    >
+                      {sectorsData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={SECTOR_COLORS[index % SECTOR_COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="space-y-3 mt-4">
+                 {sectorsData.map((sect, idx) => {
+                     const total = sectorsData.reduce((acc, curr) => acc + curr.value, 0);
+                     const pct = total > 0 ? Math.round((sect.value / total) * 100) : 0;
+                     return (
+                         <div key={sect.name} className="flex justify-between items-center text-xs">
+                             <div className="flex items-center gap-2">
+                                 <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: SECTOR_COLORS[idx % SECTOR_COLORS.length] }} />
+                                 <span className="font-bold text-slate-500 truncate max-w-[150px]">{sect.name}</span>
+                             </div>
+                             <span className="font-black text-slate-900">{sect.value} offre{sect.value > 1 ? 's' : ''} ({pct}%)</span>
                          </div>
-                         <span className="font-black text-slate-900">{sect.value} offre{sect.value > 1 ? 's' : ''} ({pct}%)</span>
-                     </div>
-                 );
-             })}
-          </div>
+                     );
+                 })}
+              </div>
+            </>
+          )}
         </Card>
       </div>
     </div>
@@ -1245,6 +1304,50 @@ function ApprovalsModule({ pending, onAction }: { pending: UserProfile[], onActi
 function JobsModule({ jobs, onAction, recruiterNames }: { jobs: Job[], onAction: any, recruiterNames: Record<string, string> }) {
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [isViewOpen, setIsViewOpen] = useState(false);
+  
+  // Suspension modal state
+  const [isSuspendOpen, setIsSuspendOpen] = useState(false);
+  const [jobToSuspend, setJobToSuspend] = useState<Job | null>(null);
+  const [suspensionReason, setSuspensionReason] = useState("");
+
+  const getJobStatusBadge = (status?: string) => {
+    switch (status) {
+      case 'active':
+        return <Badge variant="outline" className="border-emerald-100 text-emerald-600 bg-emerald-50 text-[10px] font-black uppercase px-2 py-0.5">Actif</Badge>;
+      case 'suspended':
+        return <Badge variant="outline" className="border-red-100 text-red-600 bg-red-50 text-[10px] font-black uppercase px-2 py-0.5">Suspendu</Badge>;
+      case 'pending_validation':
+      default:
+        return <Badge variant="outline" className="border-amber-100 text-amber-600 bg-amber-50 text-[10px] font-black uppercase px-2 py-0.5">En validation</Badge>;
+    }
+  };
+
+  const checkDeletionEligibility = (job: Job) => {
+    if (job.status !== 'suspended') return { eligible: false, hoursLeft: 0 };
+    if (!job.suspendedAt) return { eligible: true, hoursLeft: 0 }; // If timestamp was somehow missing
+    
+    const suspendedTime = job.suspendedAt.seconds 
+      ? job.suspendedAt.seconds * 1000 
+      : new Date(job.suspendedAt).getTime();
+      
+    const elapsedMs = Date.now() - suspendedTime;
+    const elapsedHours = elapsedMs / (3600 * 1000);
+    const hoursLeft = 72 - elapsedHours;
+    
+    return {
+      eligible: hoursLeft <= 0,
+      hoursLeft: Math.ceil(hoursLeft)
+    };
+  };
+
+  const handleConfirmSuspension = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!jobToSuspend || !suspensionReason.trim()) return;
+    await onAction(jobToSuspend.id!, 'suspend', suspensionReason.trim());
+    setIsSuspendOpen(false);
+    setJobToSuspend(null);
+    setSuspensionReason("");
+  };
 
   return (
     <>
@@ -1264,46 +1367,154 @@ function JobsModule({ jobs, onAction, recruiterNames }: { jobs: Job[], onAction:
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50">
-            {jobs.map((j) => (
-              <tr key={j.id} className="hover:bg-slate-50/30 transition-colors group">
-                <td className="px-6 py-4">
-                  <div className="min-w-[180px]">
-                    <p className="text-sm font-black text-slate-900 leading-tight mb-1">{j.title}</p>
-                    <div className="flex items-center gap-3 text-[9px] font-bold text-slate-400">
-                        <span className="flex items-center gap-1 shrink-0"><MapPin className="h-3 w-3" /> {j.location}</span>
-                        <span className="flex items-center gap-1 capitalize shrink-0"><Clock className="h-3 w-3" /> {j.type}</span>
+            {jobs.map((j) => {
+              const eligibleRes = checkDeletionEligibility(j);
+              return (
+                <tr key={j.id} className="hover:bg-slate-50/30 transition-colors group">
+                  <td className="px-6 py-4">
+                    <div className="min-w-[180px]">
+                      <p className="text-sm font-black text-slate-900 leading-tight mb-1">{j.title}</p>
+                      <div className="flex items-center gap-3 text-[9px] font-bold text-slate-400">
+                          <span className="flex items-center gap-1 shrink-0"><MapPin className="h-3 w-3" /> {j.location}</span>
+                          <span className="flex items-center gap-1 capitalize shrink-0"><Clock className="h-3 w-3" /> {j.type}</span>
+                      </div>
                     </div>
-                  </div>
-                </td>
-                <td className="px-6 py-4 text-xs font-bold text-slate-600 whitespace-nowrap">
-                  {recruiterNames[j.recruiterId] || j.companyName}
-                </td>
-                <td className="px-6 py-4">
-                  <Badge variant="outline" className={`text-[9px] font-black uppercase px-2 py-0.5 ${j.status === 'suspended' ? 'border-orange-100 text-orange-600 bg-orange-50' : 'border-emerald-100 text-emerald-600 bg-emerald-50'}`}>
-                    {j.status}
-                  </Badge>
-                </td>
-                <td className="px-6 py-4 text-right shrink-0 whitespace-nowrap">
-                   <div className="flex justify-end gap-1 text-slate-400">
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="h-8 w-8 rounded-lg hover:text-slate-900"
-                          onClick={() => { setSelectedJob(j); setIsViewOpen(true); }}
-                        >
-                             <Eye className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-red-500 hover:bg-red-50" onClick={() => onAction(j.id!, 'delete')}>
-                             <Trash2 className="h-4 w-4" />
-                        </Button>
-                   </div>
-                </td>
-              </tr>
-            ))}
+                  </td>
+                  <td className="px-6 py-4 text-xs font-bold text-slate-600 whitespace-nowrap">
+                    {recruiterNames[j.recruiterId] || j.companyName}
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex flex-col gap-1 items-start">
+                      {getJobStatusBadge(j.status)}
+                      {j.status === 'suspended' && j.suspensionReason && (
+                        <p className="text-[9px] text-red-500 font-bold max-w-[200px] truncate" title={j.suspensionReason}>
+                          Motif: {j.suspensionReason}
+                        </p>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 text-right shrink-0 whitespace-nowrap">
+                     <div className="flex justify-end items-center gap-1 text-slate-400">
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-8 w-8 rounded-lg hover:text-slate-900"
+                            onClick={() => { setSelectedJob(j); setIsViewOpen(true); }}
+                          >
+                               <Eye className="h-4 w-4" />
+                          </Button>
+
+                          {j.status === 'pending_validation' && (
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-8 w-8 rounded-lg text-emerald-600 hover:bg-emerald-50"
+                              onClick={() => {
+                                if (confirm("Voulez-vous approuver et publier cette offre ?")) {
+                                  onAction(j.id!, 'approve');
+                                }
+                              }}
+                              title="Valider et Publier l'offre"
+                            >
+                                 <Check className="h-4 w-4 font-bold" />
+                            </Button>
+                          )}
+
+                          {j.status === 'active' && (
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-8 w-8 rounded-lg text-orange-600 hover:bg-orange-50"
+                              onClick={() => {
+                                setJobToSuspend(j);
+                                setIsSuspendOpen(true);
+                              }}
+                              title="Suspendre l'offre"
+                            >
+                                 <AlertCircle className="h-4 w-4" />
+                            </Button>
+                          )}
+
+                          {j.status === 'suspended' && (
+                            <>
+                              {eligibleRes.eligible ? (
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  className="h-8 w-8 rounded-lg text-red-500 hover:bg-red-50" 
+                                  onClick={() => {
+                                    if (confirm("Voulez-vous supprimer définitivement cette offre d'emploi suspendue depuis plus de 72h ?")) {
+                                      onAction(j.id!, 'delete');
+                                    }
+                                  }}
+                                  title="Supprimer définitivement"
+                                >
+                                     <Trash2 className="h-4 w-4" />
+                                </Button>
+                              ) : (
+                                <div 
+                                  className="flex items-center gap-1 px-2 py-1 bg-slate-100 rounded-lg text-[9px] font-black text-slate-500 cursor-help"
+                                  title="La suppression définitive sera disponible après 72h de suspension sans modification"
+                                >
+                                  <Lock className="h-3 w-3 text-slate-400" />
+                                  <span>{eligibleRes.hoursLeft}h rest.</span>
+                                </div>
+                              )}
+                            </>
+                          )}
+                     </div>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
     </Card>
+
+    {/* Manual Suspension Dialog with Reason */}
+    <Dialog open={isSuspendOpen} onOpenChange={(open) => { if (!open) { setIsSuspendOpen(false); setJobToSuspend(null); setSuspensionReason(""); } }}>
+      <DialogContent className="max-w-md rounded-[32px] p-8 border-none shadow-2xl">
+        <DialogHeader>
+          <DialogTitle className="text-xl font-black text-slate-950 flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5 text-orange-500" />
+            Suspendre l'offre
+          </DialogTitle>
+          <DialogDescription className="text-slate-500 font-bold">
+            Fournissez une raison explicite pour justifier la suspension de l'offre "{jobToSuspend?.title}". L'entreprise en sera immédiatement notifiée dans son dashboard.
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleConfirmSuspension} className="mt-4 space-y-4">
+          <div className="space-y-1">
+            <label className="text-[10px] font-black uppercase text-slate-500 tracking-wider">Motif de la suspension *</label>
+            <textarea
+              required
+              rows={4}
+              placeholder="Ex: Le descriptif de l'offre ne correspond pas à nos règles de sécurité ou d'éthique."
+              className="w-full rounded-2xl border border-slate-100 bg-slate-50 p-4 font-medium text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+              value={suspensionReason}
+              onChange={(e) => setSuspensionReason(e.target.value)}
+            />
+          </div>
+          <DialogFooter className="pt-2 flex gap-2">
+            <Button 
+              type="button" 
+              variant="outline"
+              className="rounded-xl font-black uppercase text-xs h-12 flex-1"
+              onClick={() => { setIsSuspendOpen(false); setJobToSuspend(null); setSuspensionReason(""); }}
+            >
+              Annuler
+            </Button>
+            <Button 
+              type="submit"
+              className="rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-black uppercase text-xs h-12 flex-1"
+            >
+              Suspendre l'offre
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
 
     <Dialog open={isViewOpen} onOpenChange={setIsViewOpen}>
       <DialogContent className="max-w-2xl rounded-[32px] p-8 border-none shadow-2xl">
@@ -1318,9 +1529,22 @@ function JobsModule({ jobs, onAction, recruiterNames }: { jobs: Job[], onAction:
                 <h3 className="text-xl font-black text-slate-900">{selectedJob.title}</h3>
                 <p className="text-slate-500 font-bold">{recruiterNames[selectedJob.recruiterId] || selectedJob.companyName} • {selectedJob.location}</p>
               </div>
-              <Badge variant="outline" className="font-black uppercase">{selectedJob.type}</Badge>
+              <div className="flex flex-col items-end gap-1">
+                <Badge variant="outline" className="font-black uppercase">{selectedJob.type}</Badge>
+                {getJobStatusBadge(selectedJob.status)}
+              </div>
             </div>
             
+            {selectedJob.status === 'suspended' && selectedJob.suspensionReason && (
+              <div className="p-4 bg-red-50 text-red-700 border border-red-100 rounded-2xl text-xs">
+                <p className="font-black uppercase mb-1 flex items-center gap-1.5">
+                  <AlertTriangle className="h-4 w-4 text-red-500 animate-pulse" />
+                  Offre Suspendue par la Modération
+                </p>
+                <p className="font-medium">{selectedJob.suspensionReason}</p>
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-4">
                <div className="p-4 bg-slate-50 rounded-2xl">
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Salaire</p>
@@ -1343,8 +1567,31 @@ function JobsModule({ jobs, onAction, recruiterNames }: { jobs: Job[], onAction:
             </div>
           </div>
         )}
-        <DialogFooter className="mt-6">
-           <Button className="w-full rounded-xl bg-orange-600 hover:bg-orange-700 font-black uppercase text-xs h-12" onClick={() => setIsViewOpen(false)}>Fermer l'aperçu</Button>
+        <DialogFooter className="mt-6 flex flex-col sm:flex-row gap-2">
+           {selectedJob && selectedJob.status === 'pending_validation' && (
+             <Button
+               className="flex-1 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase text-xs h-12"
+               onClick={() => {
+                 onAction(selectedJob.id!, 'approve');
+                 setIsViewOpen(false);
+               }}
+             >
+               Approuver & Publier l'offre
+             </Button>
+           )}
+           {selectedJob && selectedJob.status === 'active' && (
+             <Button
+               className="flex-1 rounded-xl bg-red-500 hover:bg-red-600 text-white font-black uppercase text-xs h-12"
+               onClick={() => {
+                 setIsViewOpen(false);
+                 setJobToSuspend(selectedJob);
+                 setIsSuspendOpen(true);
+               }}
+             >
+               Suspendre l'offre
+             </Button>
+           )}
+           <Button className="flex-1 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-black uppercase text-xs h-12" onClick={() => setIsViewOpen(false)}>Fermer l'aperçu</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -1521,13 +1768,15 @@ function CMSModule({ currentData, onSave }: any) {
                     >
                          {saving ? "PUBLICATION..." : "Enregistrer les modifications"}
                     </Button>
-                </div>
+                    </div>
             </CardContent>
         </Card>
     );
 }
 
-function AnalyticsModule({ stats, jobs, users }: { stats: any, jobs: any[], users: any[] }) {
+function AnalyticsModule({ stats, jobs, users, applications = [], goals }: { stats: any, jobs: any[], users: any[], applications?: any[], goals?: any }) {
+    const goalsConfig = goals || { subscribersTarget: 100, applicationsTarget: 50, viewsTarget: 500 };
+
     const cityData = useMemo(() => {
         const counts: { [key: string]: number } = {};
         let totalCount = 0;
@@ -1553,32 +1802,15 @@ function AnalyticsModule({ stats, jobs, users }: { stats: any, jobs: any[], user
             }
         });
         
-        const defaultCities = [
-            { city: 'Abidjan', count: 70, color: 'bg-orange-600' },
-            { city: 'Bouaké', count: 15, color: 'bg-indigo-600' },
-            { city: 'Yamoussoukro', count: 10, color: 'bg-emerald-600' },
-            { city: 'San Pedro', count: 5, color: 'bg-slate-300' },
-        ];
-        
         const keys = Object.keys(counts);
         if (keys.length === 0) {
-            return defaultCities;
+            return [];
         }
         
         let sorted = keys.map(city => ({
             city,
             count: counts[city]
         })).sort((a, b) => b.count - a.count);
-        
-        if (sorted.length < 4) {
-            const present = new Set(sorted.map(s => s.city.toLowerCase()));
-            defaultCities.forEach(def => {
-                if (!present.has(def.city.toLowerCase())) {
-                    sorted.push({ city: def.city, count: Math.max(1, Math.round(totalCount * def.count / 100)) });
-                }
-            });
-            sorted = sorted.sort((a, b) => b.count - a.count);
-        }
         
         const top4 = sorted.slice(0, 4);
         const top4Total = top4.reduce((sum, curr) => sum + curr.count, 0);
@@ -1587,17 +1819,20 @@ function AnalyticsModule({ stats, jobs, users }: { stats: any, jobs: any[], user
         
         return top4.map((item, idx) => ({
             city: item.city,
-            count: top4Total > 0 ? Math.round((item.count / top4Total) * 100) : 25,
+            count: top4Total > 0 ? Math.round((item.count / top4Total) * 100) : 0,
             color: colors[idx % colors.length]
         }));
     }, [jobs, users]);
 
-    const monthlyGoalProgress = useMemo(() => {
-        const target = 50; 
-        const current = (users.length + jobs.length);
-        const pct = Math.min(100, Math.round((current / target) * 100));
-        return pct > 0 ? pct : 12; 
-    }, [users, jobs]);
+    const currentSubscribers = users.length;
+    const currentApplications = applications.length;
+    const currentViews = jobs.reduce((acc, curr) => acc + (curr.views || 0), 0);
+
+    const subscribersPct = Math.min(100, Math.round((currentSubscribers / goalsConfig.subscribersTarget) * 100)) || 0;
+    const applicationsPct = Math.min(100, Math.round((currentApplications / goalsConfig.applicationsTarget) * 100)) || 0;
+    const viewsPct = Math.min(100, Math.round((currentViews / goalsConfig.viewsTarget) * 100)) || 0;
+
+    const monthlyGoalProgress = Math.round((subscribersPct + applicationsPct + viewsPct) / 3);
 
     return (
         <div className="space-y-6">
@@ -1605,37 +1840,78 @@ function AnalyticsModule({ stats, jobs, users }: { stats: any, jobs: any[], user
                 <Card className="border-none shadow-sm rounded-3xl p-8 bg-white">
                      <h3 className="font-black text-slate-900 mb-6">Répartition par Villes Actives</h3>
                      <div className="space-y-5">
-                        {cityData.map(c => (
-                            <div key={c.city} className="space-y-2">
-                                <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-slate-400">
-                                    <span>{c.city}</span>
-                                    <span className="text-slate-900">{c.count}%</span>
-                                </div>
-                                <div className="h-2.5 w-full bg-slate-50 rounded-full overflow-hidden">
-                                     <motion.div 
-                                        initial={{ width: 0 }}
-                                        animate={{ width: `${c.count}%` }}
-                                        transition={{ duration: 1 }}
-                                        className={`h-full ${c.color}`} 
-                                     />
-                                </div>
+                        {cityData.length === 0 ? (
+                            <div className="text-center py-10 text-slate-400 font-bold text-xs uppercase tracking-wider">
+                                Aucune ville active enregistrée
                             </div>
-                        ))}
+                        ) : (
+                            cityData.map(c => (
+                                <div key={c.city} className="space-y-2">
+                                    <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-slate-400">
+                                        <span>{c.city}</span>
+                                        <span className="text-slate-900">{c.count}%</span>
+                                    </div>
+                                    <div className="h-2.5 w-full bg-slate-50 rounded-full overflow-hidden">
+                                         <motion.div 
+                                             initial={{ width: 0 }}
+                                             animate={{ width: `${c.count}%` }}
+                                             transition={{ duration: 1 }}
+                                             className={`h-full ${c.color}`} 
+                                         />
+                                    </div>
+                                </div>
+                            ))
+                        )}
                      </div>
                 </Card>
-                <Card className="border-none shadow-sm rounded-3xl p-8 bg-white">
-                     <h3 className="font-black text-slate-900 mb-6">Objectifs Mensuels</h3>
-                     <div className="flex justify-center items-center h-full pb-8">
-                         <div className="relative h-48 w-48 flex items-center justify-center">
-                             <svg className="h-full w-full rotate-[-90deg]">
-                                 <circle cx="96" cy="96" r="80" stroke="currentColor" strokeWidth="16" fill="transparent" className="text-slate-50" />
-                                 <circle cx="96" cy="96" r="80" stroke="currentColor" strokeWidth="16" fill="transparent" strokeDasharray="502" strokeDashoffset={502 * (1 - monthlyGoalProgress / 100)} className="text-orange-600 transition-all duration-1000" />
-                             </svg>
-                             <div className="absolute inset-0 flex flex-col items-center justify-center">
-                                 <span className="text-4xl font-black text-slate-900">{monthlyGoalProgress}%</span>
-                                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Taux Réalisation</span>
+                <Card className="border-none shadow-sm rounded-3xl p-8 bg-white flex flex-col md:flex-row gap-6 items-center">
+                     <div className="flex-1 space-y-4 w-full">
+                         <h3 className="font-black text-slate-900 text-lg">Objectifs Mensuels</h3>
+                         <p className="text-slate-400 text-xs font-bold uppercase tracking-wider">Indicateurs de Performance en temps réel</p>
+                         
+                         <div className="space-y-3 pt-2">
+                             <div className="space-y-1">
+                                 <div className="flex justify-between text-[10px] font-black uppercase tracking-wider text-slate-400">
+                                     <span>Abonnés: {currentSubscribers}/{goalsConfig.subscribersTarget}</span>
+                                     <span className="text-orange-600">{subscribersPct}%</span>
+                                 </div>
+                                 <div className="h-2 w-full bg-slate-50 rounded-full overflow-hidden">
+                                     <div className="h-full bg-orange-600 rounded-full" style={{ width: `${subscribersPct}%` }} />
+                                 </div>
+                             </div>
+
+                             <div className="space-y-1">
+                                 <div className="flex justify-between text-[10px] font-black uppercase tracking-wider text-slate-400">
+                                     <span>Candidatures: {currentApplications}/{goalsConfig.applicationsTarget}</span>
+                                     <span className="text-indigo-600">{applicationsPct}%</span>
+                                 </div>
+                                 <div className="h-2 w-full bg-slate-50 rounded-full overflow-hidden">
+                                     <div className="h-full bg-indigo-600 rounded-full" style={{ width: `${applicationsPct}%` }} />
+                                 </div>
+                             </div>
+
+                             <div className="space-y-1">
+                                 <div className="flex justify-between text-[10px] font-black uppercase tracking-wider text-slate-400">
+                                     <span>Consultations: {currentViews}/{goalsConfig.viewsTarget}</span>
+                                     <span className="text-emerald-600">{viewsPct}%</span>
+                                 </div>
+                                 <div className="h-2 w-full bg-slate-50 rounded-full overflow-hidden">
+                                     <div className="h-full bg-emerald-600 rounded-full" style={{ width: `${viewsPct}%` }} />
+                                 </div>
                              </div>
                          </div>
+                     </div>
+                     <div className="flex justify-center items-center w-full md:w-auto p-4 shrink-0">
+                          <div className="relative h-44 w-44 flex items-center justify-center">
+                              <svg className="h-full w-full rotate-[-90deg]">
+                                  <circle cx="88" cy="88" r="70" stroke="currentColor" strokeWidth="12" fill="transparent" className="text-slate-50" />
+                                  <circle cx="88" cy="88" r="70" stroke="currentColor" strokeWidth="12" fill="transparent" strokeDasharray="440" strokeDashoffset={440 * (1 - monthlyGoalProgress / 100)} className="text-orange-600 transition-all duration-1000" />
+                              </svg>
+                              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                                  <span className="text-3xl font-black text-slate-900">{monthlyGoalProgress}%</span>
+                                  <span className="text-[9px] font-black text-slate-450 uppercase tracking-widest">Global atteint</span>
+                              </div>
+                          </div>
                      </div>
                 </Card>
             </div>
@@ -1643,42 +1919,190 @@ function AnalyticsModule({ stats, jobs, users }: { stats: any, jobs: any[], user
     );
 }
 
-function SupportModule() {
-    const tickets = [
-        { id: '#TK-1025', user: "Moussa Sylla", subject: "Impossible de valider mon KYC", time: "Il y a 1h", status: "open" },
-        { id: '#TK-0985', user: "Sarah Lamine", subject: "Modification de mon RIB", time: "Il y a 4h", status: "closed" },
-        { id: '#TK-0842', user: "John DOE", subject: "Signalement offre frauduleuse", time: "Hier", status: "open" },
-    ];
+function SupportModule({ addLog }: { addLog: (action: string, details: string, type: 'info' | 'success' | 'warning' | 'error') => Promise<void> }) {
+  const [tickets, setTickets] = useState<SupportTicket[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedTicket, setSelectedTicket] = useState<SupportTicket | null>(null);
+  const [replyText, setReplyText] = useState('');
+  const [isReplying, setIsReplying] = useState(false);
 
-    return (
-        <Card className="border-none shadow-sm rounded-3xl overflow-hidden bg-white">
-            <CardHeader className="p-8 border-b border-slate-50">
-                <CardTitle className="text-xl font-black">Tickets & Support Technique</CardTitle>
-                <CardDescription>Répondez aux problématiques des utilisateurs de la plateforme.</CardDescription>
-            </CardHeader>
-            <div className="p-8 space-y-4">
-                {tickets.map(t => (
-                    <div key={t.id} className="flex flex-col md:flex-row items-center justify-between p-6 border border-slate-100 rounded-[28px] bg-white hover:border-orange-500 hover:shadow-lg transition-all gap-4 cursor-pointer group">
-                        <div className="flex items-center gap-4">
-                            <div className={`p-4 rounded-2xl ${t.status === 'open' ? 'bg-orange-50 text-orange-600' : 'bg-slate-100 text-slate-300'}`}>
-                                <MessageSquare className="h-6 w-6" />
-                            </div>
-                            <div>
-                                <h5 className="font-black text-slate-900 text-lg group-hover:text-orange-600 transition-colors">{t.subject}</h5>
-                                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Émis par <span className="text-slate-900">{t.user}</span> • {t.id} • {t.time}</p>
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-4">
-                            <Badge className={`px-4 h-7 rounded-full font-black text-[10px] uppercase ${t.status === 'open' ? 'bg-orange-100 text-orange-600' : 'bg-slate-100 text-slate-400'}`}>
-                                {t.status}
-                            </Badge>
-                            <Button className="rounded-xl font-black text-[10px] px-6 h-10 uppercase tracking-widest bg-slate-900">RÉPONDRE</Button>
-                        </div>
-                    </div>
-                ))}
-            </div>
-        </Card>
+  useEffect(() => {
+    const unsub = onSnapshot(
+      query(collection(db, 'support_tickets'), orderBy('createdAt', 'desc')),
+      (snapshot) => {
+        const list: SupportTicket[] = [];
+        snapshot.forEach((doc) => {
+          list.push({ id: doc.id, ...doc.data() } as SupportTicket);
+        });
+        setTickets(list);
+        setLoading(false);
+      },
+      (error) => {
+        console.error("Error loading support tickets:", error);
+        setLoading(false);
+      }
     );
+    return unsub;
+  }, []);
+
+  const handleSendReply = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedTicket || !replyText.trim()) return;
+    setIsReplying(true);
+    try {
+      const ticketRef = doc(db, 'support_tickets', selectedTicket.id);
+      await updateDoc(ticketRef, {
+        response: replyText,
+        repliedAt: serverTimestamp(),
+        status: 'closed'
+      });
+      await addLog(
+        "Réponse au support",
+        `Réponse envoyée à ${selectedTicket.userEmail} pour le sujet : "${selectedTicket.subject}"`,
+        "success"
+      );
+      setSelectedTicket(null);
+      setReplyText('');
+    } catch (err) {
+      console.error("Error updating support ticket:", err);
+    } finally {
+      setIsReplying(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <Card className="border-none shadow-sm rounded-3xl overflow-hidden bg-white">
+        <CardHeader className="p-8 border-b border-slate-50">
+          <CardTitle className="text-xl font-black">Tickets & Support Technique</CardTitle>
+          <CardDescription>Consultez et répondez en temps réel aux messages d'assistance des candidats et recruteurs d'Afrique.</CardDescription>
+        </CardHeader>
+        
+        <div className="p-8 space-y-4">
+          {loading ? (
+            <div className="text-center py-10 font-bold text-slate-400">Chargement de la file d'assistance...</div>
+          ) : tickets.length === 0 ? (
+            <div className="text-center py-12 border-2 border-dashed border-slate-100 rounded-3xl">
+              <MessageSquare className="h-10 w-10 text-slate-300 mx-auto mb-3" />
+              <p className="font-bold text-slate-500">Aucun ticket d'assistance pour le moment</p>
+              <p className="text-slate-400 text-xs mt-1">Les messages de détresse de vos utilisateurs apparaîtront ici.</p>
+            </div>
+          ) : (
+            tickets.map(t => (
+              <div key={t.id} className="flex flex-col md:flex-row items-start md:items-center justify-between p-6 border border-slate-100 rounded-[28px] bg-white hover:border-orange-500 hover:shadow-lg transition-all gap-4 group animate-in fade-in duration-300">
+                <div className="flex items-start gap-4 flex-1">
+                  <div className={`p-4 rounded-2xl shrink-0 ${t.status === 'open' ? 'bg-orange-50 text-orange-600' : 'bg-slate-50 text-slate-400'}`}>
+                    <MessageSquare className="h-6 w-6" />
+                  </div>
+                  <div className="space-y-1 my-1 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h5 className="font-black text-slate-900 text-lg group-hover:text-orange-600 transition-colors leading-tight">{t.subject}</h5>
+                      <Badge variant="outline" className={`text-[9px] font-black uppercase rounded-full ${t.userRole === 'recruiter' ? 'border-indigo-200 text-indigo-700 bg-indigo-50' : 'border-emerald-200 text-emerald-700 bg-emerald-50'}`}>
+                        {t.userRole === 'recruiter' ? 'Recruteur' : 'Candidat'}
+                      </Badge>
+                    </div>
+                    
+                    <p className="text-sm text-slate-600 font-medium leading-relaxed bg-slate-50/50 p-3 rounded-xl border border-slate-50 mt-1 max-w-2xl whitespace-pre-wrap">
+                      "{t.message}"
+                    </p>
+
+                    {t.response && (
+                      <div className="p-3 bg-emerald-50/40 border border-emerald-100 rounded-xl max-w-2xl mt-2 space-y-1">
+                        <p className="text-[10px] font-black uppercase text-emerald-700 tracking-wide flex items-center gap-1">
+                          <Check className="h-3 w-3" /> Votre Réponse :
+                        </p>
+                        <p className="text-xs text-slate-705 font-bold whitespace-pre-wrap">"{t.response}"</p>
+                        {t.repliedAt && (
+                          <p className="text-[9px] font-bold text-slate-400">
+                            Répondu le {new Date(t.repliedAt.seconds ? t.repliedAt.seconds * 1000 : t.repliedAt).toLocaleString('fr-FR')}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                    
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest pt-1">
+                      Émis par <span className="text-slate-900 font-extrabold">{t.userName} ({t.userEmail})</span> • ID: #{t.id.slice(0, 8)} • {t.createdAt ? new Date(t.createdAt.seconds ? t.createdAt.seconds * 1000 : t.createdAt).toLocaleString('fr-FR') : 'Date inconnue'}
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-3 shrink-0 self-stretch md:self-auto justify-end">
+                  <Badge className={`px-4 h-7 rounded-full font-black text-[10px] uppercase ${t.status === 'open' ? 'bg-orange-100 text-orange-600' : 'bg-slate-100 text-slate-400'}`}>
+                    {t.status === 'open' ? 'En attente' : 'Traité'}
+                  </Badge>
+                  <Button 
+                    className={`rounded-xl font-black text-[10px] px-5 h-10 uppercase tracking-widest ${t.status === 'open' ? 'bg-slate-900 hover:bg-slate-800 text-white' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}`} 
+                    onClick={() => {
+                      setSelectedTicket(t);
+                      setReplyText(t.response || '');
+                    }}
+                  >
+                    {t.status === 'open' ? 'Répondre' : 'Modifier Réponse'}
+                  </Button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </Card>
+
+      {/* Reply Dialog */}
+      <Dialog open={selectedTicket !== null} onOpenChange={(open) => { if (!open) setSelectedTicket(null); }}>
+        <DialogContent className="max-w-lg rounded-[32px] p-8 border-none shadow-2xl bg-white">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-black text-slate-950">
+              {selectedTicket?.status === 'open' ? "Répondre au ticket d'assistance" : "Modifier la réponse"}
+            </DialogTitle>
+            <DialogDescription className="text-slate-500 font-bold text-sm">
+              La réponse sera immédiatement disponible pour l'utilisateur sur son espace d'assistance.
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedTicket && (
+            <form onSubmit={handleSendReply} className="space-y-4 pt-4">
+              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Message de {selectedTicket.userName} :</span>
+                  <Badge className="bg-slate-200 text-slate-700 border-none text-[8px] font-black">{selectedTicket.userRole === 'recruiter' ? 'Recruteur' : 'Candidat'}</Badge>
+                </div>
+                <p className="text-xs font-bold text-slate-700 whitespace-pre-wrap leading-relaxed">"{selectedTicket.message}"</p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="replyContent" className="font-black text-slate-700 uppercase text-xs tracking-wider">Votre Message de Réponse</Label>
+                <Textarea
+                  id="replyContent"
+                  placeholder="Rédigez votre réponse ici..."
+                  className="min-h-[140px] rounded-2xl border-slate-200 font-bold text-sm focus-visible:ring-emerald-600"
+                  value={replyText}
+                  onChange={(e) => setReplyText(e.target.value)}
+                  required
+                />
+              </div>
+
+              <DialogFooter className="pt-2 flex gap-3">
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  className="rounded-xl font-bold text-xs h-12 uppercase" 
+                  onClick={() => setSelectedTicket(null)}
+                >
+                  Annuler
+                </Button>
+                <Button 
+                  type="submit" 
+                  className="rounded-xl font-black text-xs px-6 h-12 uppercase tracking-widest bg-emerald-600 hover:bg-emerald-700 text-white border-none"
+                  disabled={isReplying}
+                >
+                  {isReplying ? "Traitement..." : "Envoyer & Clôturer"}
+                </Button>
+              </DialogFooter>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
 }
 
 function SettingsModule() {
@@ -1721,6 +2145,256 @@ function SettingsModule() {
                 </div>
             </div>
         </Card>
+    </div>
+  );
+}
+
+function GoalsModule({ 
+  users, 
+  jobs, 
+  applications, 
+  goals, 
+  onSave 
+}: { 
+  users: any[], 
+  jobs: any[], 
+  applications: any[], 
+  goals: any, 
+  onSave: (newGoals: any) => Promise<void> 
+}) {
+  const [subTarget, setSubTarget] = useState(goals?.subscribersTarget || 100);
+  const [appTarget, setAppTarget] = useState(goals?.applicationsTarget || 50);
+  const [viewTarget, setViewTarget] = useState(goals?.viewsTarget || 500);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+
+  useEffect(() => {
+    if (goals) {
+      setSubTarget(goals.subscribersTarget);
+      setAppTarget(goals.applicationsTarget);
+      setViewTarget(goals.viewsTarget);
+    }
+  }, [goals]);
+
+  const currentSubscribers = users.length;
+  const currentApplications = applications.length;
+  const currentViews = jobs.reduce((acc, curr) => acc + (curr.views || 0), 0);
+
+  const subPct = Math.min(100, Math.round((currentSubscribers / subTarget) * 100)) || 0;
+  const appPct = Math.min(100, Math.round((currentApplications / appTarget) * 100)) || 0;
+  const viewPct = Math.min(100, Math.round((currentViews / viewTarget) * 100)) || 0;
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSaving(true);
+    setSaveSuccess(false);
+    try {
+      await onSave({
+        subscribersTarget: Number(subTarget),
+        applicationsTarget: Number(appTarget),
+        viewsTarget: Number(viewTarget)
+      });
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 4000);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="bg-slate-900 rounded-[32px] p-8 text-white relative overflow-hidden shadow-xl">
+        <div className="relative z-10 max-w-xl">
+          <Badge className="bg-orange-500 hover:bg-orange-600 text-white border-none font-black text-[10px] uppercase px-3 py-1 rounded-full mb-4">MODULATEUR D'OBJECTIFS</Badge>
+          <h2 className="text-3xl font-black tracking-tight mb-2 font-sans">Configurez vos indicateurs de performance</h2>
+          <p className="text-slate-300 font-medium text-sm leading-relaxed">
+            Suivez en temps réel le taux de croissance et d'activité de la plateforme en Afrique. Définissez des objectifs mensuels précis à plusieurs niveaux afin d'évaluer concrètement l'impact et la visibilité de vos offres d'emploi.
+          </p>
+        </div>
+        <div className="absolute right-0 bottom-0 opacity-10 transform translate-x-10 translate-y-10">
+          <Target className="h-64 w-64 text-white" />
+        </div>
+      </div>
+
+      {saveSuccess && (
+        <motion.div 
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="p-5 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-3xl font-bold text-sm flex items-center justify-between"
+        >
+          <span>✨ Les objectifs de performance ont été enregistrés avec succès et sont synchronisés !</span>
+          <button onClick={() => setSaveSuccess(false)} className="text-emerald-500 hover:text-emerald-700 ml-4">Fermer</button>
+        </motion.div>
+      )}
+
+      <div className="grid md:grid-cols-3 gap-6">
+        {/* Subscriber/Subscriber Target Card */}
+        <Card className="border-none shadow-sm rounded-3xl p-6 bg-white space-y-4">
+          <div className="flex justify-between items-start">
+            <div className="p-3 bg-orange-50 text-orange-600 rounded-2xl">
+              <Users className="h-6 w-6" />
+            </div>
+            <Badge variant="outline" className="text-[10px] font-black uppercase text-orange-600 border-orange-100 bg-orange-50 px-2 py-0.5">{subPct}% atteint</Badge>
+          </div>
+          <div>
+            <h4 className="font-extrabold text-slate-805 text-xs uppercase tracking-wider">Abonnés & Inscriptions</h4>
+            <div className="flex items-baseline gap-2 mt-2">
+              <span className="text-3xl font-black text-slate-900">{currentSubscribers}</span>
+              <span className="text-slate-400 font-bold text-xs">/ {subTarget} inscrits</span>
+            </div>
+          </div>
+          <div className="h-2 w-full bg-slate-50 rounded-full overflow-hidden">
+            <motion.div initial={{ width: 0 }} animate={{ width: `${subPct}%` }} className="h-full bg-orange-500 rounded-full" />
+          </div>
+        </Card>
+
+        {/* Application Target Card */}
+        <Card className="border-none shadow-sm rounded-3xl p-6 bg-white space-y-4">
+          <div className="flex justify-between items-start">
+            <div className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl">
+              <FileText className="h-6 w-6" />
+            </div>
+            <Badge variant="outline" className="text-[10px] font-black uppercase text-indigo-600 border-indigo-100 bg-indigo-50 px-2 py-0.5">{appPct}% atteint</Badge>
+          </div>
+          <div>
+            <h4 className="font-extrabold text-slate-805 text-xs uppercase tracking-wider">Candidatures Envoyées</h4>
+            <div className="flex items-baseline gap-2 mt-2">
+              <span className="text-3xl font-black text-slate-900">{currentApplications}</span>
+              <span className="text-slate-400 font-bold text-xs">/ {appTarget} soumissions</span>
+            </div>
+          </div>
+          <div className="h-2 w-full bg-slate-50 rounded-full overflow-hidden">
+            <motion.div initial={{ width: 0 }} animate={{ width: `${appPct}%` }} className="h-full bg-indigo-600 rounded-full" />
+          </div>
+        </Card>
+
+        {/* Views Target Card */}
+        <Card className="border-none shadow-sm rounded-3xl p-6 bg-white space-y-4">
+          <div className="flex justify-between items-start">
+            <div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl">
+              <Eye className="h-6 w-6" />
+            </div>
+            <Badge variant="outline" className="text-[10px] font-black uppercase text-emerald-600 border-emerald-100 bg-emerald-50 px-2 py-0.5">{viewPct}% atteint</Badge>
+          </div>
+          <div>
+            <h4 className="font-extrabold text-slate-805 text-xs uppercase tracking-wider">Vues de la plateforme</h4>
+            <div className="flex items-baseline gap-2 mt-2">
+              <span className="text-3xl font-black text-slate-900">{currentViews}</span>
+              <span className="text-slate-400 font-bold text-xs">/ {viewTarget} consultations</span>
+            </div>
+          </div>
+          <div className="h-2 w-full bg-slate-50 rounded-full overflow-hidden">
+            <motion.div initial={{ width: 0 }} animate={{ width: `${viewPct}%` }} className="h-full bg-emerald-600 rounded-full" />
+          </div>
+        </Card>
+      </div>
+
+      <div className="grid md:grid-cols-3 gap-6">
+        <Card className="md:col-span-2 border-none shadow-sm rounded-[32px] bg-white p-8">
+          <h3 className="font-black text-slate-950 text-base mb-6 flex items-center gap-2 uppercase tracking-wide">
+            <Settings className="h-5 w-5 text-orange-600" />
+            Ajuster vos Objectifs Mensuels
+          </h3>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="grid sm:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <Label htmlFor="subTargetInput" className="font-black text-slate-700 uppercase text-xs tracking-wider">Objectif Mensuel d'Abonnés</Label>
+                <div className="relative">
+                  <Input 
+                    id="subTargetInput"
+                    type="number"
+                    min="1"
+                    className="h-12 pl-4 pr-16 rounded-xl border-slate-200 font-bold focus-visible:ring-orange-600 text-sm"
+                    value={subTarget}
+                    onChange={(e) => setSubTarget(Number(e.target.value))}
+                    required
+                  />
+                  <span className="absolute right-4 top-1/2 transform -translate-y-1/2 text-[10px] font-black uppercase text-slate-400 pointer-events-none">inscrits</span>
+                </div>
+                <p className="text-[10px] text-slate-400 font-bold leading-normal">Inscriptions cumulées (Candidats et Recruteurs).</p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="appTargetInput" className="font-black text-slate-700 uppercase text-xs tracking-wider">Objectif Mensuel de Candidatures</Label>
+                <div className="relative">
+                  <Input 
+                    id="appTargetInput"
+                    type="number"
+                    min="1"
+                    className="h-12 pl-4 pr-16 rounded-xl border-slate-200 font-bold focus-visible:ring-orange-600 text-sm"
+                    value={appTarget}
+                    onChange={(e) => setAppTarget(Number(e.target.value))}
+                    required
+                  />
+                  <span className="absolute right-4 top-1/2 transform -translate-y-1/2 text-[10px] font-black uppercase text-slate-400 pointer-events-none">dossiers</span>
+                </div>
+                <p className="text-[10px] text-slate-400 font-bold leading-normal">Nombre total de Cv/Candidatures envoyés par les candidats.</p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="viewTargetInput" className="font-black text-slate-700 uppercase text-xs tracking-wider">Objectif Mensuel de consultations / vues</Label>
+                <div className="relative">
+                  <Input 
+                    id="viewTargetInput"
+                    type="number"
+                    min="1"
+                    className="h-12 pl-4 pr-16 rounded-xl border-slate-200 font-bold focus-visible:ring-orange-600 text-sm"
+                    value={viewTarget}
+                    onChange={(e) => setViewTarget(Number(e.target.value))}
+                    required
+                  />
+                  <span className="absolute right-4 top-1/2 transform -translate-y-1/2 text-[10px] font-black uppercase text-slate-400 pointer-events-none">clics</span>
+                </div>
+                <p className="text-[10px] text-slate-400 font-bold leading-normal">Vues générées sur l'ensemble de vos offres d'emploi publiques d'Afrique.</p>
+              </div>
+            </div>
+
+            <hr className="border-slate-100 my-4" />
+
+            <div className="flex justify-end">
+              <Button 
+                type="submit" 
+                className="rounded-xl h-12 px-8 bg-orange-600 hover:bg-orange-700 text-white font-black uppercase text-xs tracking-wider"
+                disabled={isSaving}
+              >
+                {isSaving ? "Enregistrement..." : "Enregistrer les Objectifs"}
+              </Button>
+            </div>
+          </form>
+        </Card>
+
+        <Card className="border-none shadow-sm rounded-[32px] bg-[#FCFDFF] border border-slate-100 p-8 space-y-6">
+          <h4 className="font-black text-slate-900 text-base uppercase tracking-wider flex items-center gap-2 font-sans">
+            <HelpCircle className="h-5 w-5 text-orange-600" />
+            Explications
+          </h4>
+          <div className="space-y-4 text-xs font-bold text-slate-500 leading-relaxed">
+            <div>
+              <p className="text-slate-900 font-black uppercase mb-1 flex items-center gap-1">
+                <span className="w-1.5 h-1.5 bg-orange-500 rounded-full" />
+                Abonnés (Inscriptions)
+              </p>
+              <p>Comptabilise la croissance brute de l'audience de la plateforme : à la fois les chercheurs d'emploi et les entreprises recruteuses.</p>
+            </div>
+            <div>
+              <p className="text-slate-900 font-black uppercase mb-1 flex items-center gap-1">
+                <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full" />
+                Candidatures Soumises
+              </p>
+              <p>Reflète le niveau de conversion et d'intérêt : l'interaction concrète de postulation aux opportunités.</p>
+            </div>
+            <div>
+              <p className="text-slate-900 font-black uppercase mb-1 flex items-center gap-1">
+                <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
+                Consultations (Vues)
+              </p>
+              <p>Mesure l'activité d'exposition : la portée totale du trafic et l'attention captée par toutes les annonces.</p>
+            </div>
+          </div>
+        </Card>
+      </div>
     </div>
   );
 }

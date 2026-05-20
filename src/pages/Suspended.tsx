@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, useAnimation, AnimatePresence } from 'motion/react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { LogOut, Send, AlertTriangle, ShieldCheck } from 'lucide-react';
@@ -15,10 +16,12 @@ interface Feather {
 
 export default function Suspended() {
   const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const [animationState, setAnimationState] = useState<'idle' | 'flying' | 'hit' | 'falling' | 'dizzy'>('flying');
   const [feathers, setFeathers] = useState<Feather[]>([]);
   const [impactEmoji, setImpactEmoji] = useState(false);
   const [clickCount, setClickCount] = useState(0);
+  const [launchCount, setLaunchCount] = useState(0);
 
   // Controls for animated sub-elements
   const owlControls = useAnimation();
@@ -39,10 +42,11 @@ export default function Suspended() {
   const startSequence = async (cycleId: number) => {
     if (cycleId !== activeCycleId.current) return;
 
-    // Reset state
+    // Reset state & increment flight launch count
     setAnimationState('flying');
     setFeathers([]);
     setImpactEmoji(false);
+    setLaunchCount((prev) => prev + 1);
 
     // Coordinate maps
     // Start of trajectory (off-screen left inside container)
@@ -209,6 +213,15 @@ export default function Suspended() {
         {/* Animated Owlstacle Stage */}
         <div className="relative w-full h-52 bg-slate-50 rounded-[28px] border border-slate-100/60 overflow-hidden mb-8 flex items-center justify-center">
           
+          {/* Real-time Launch Counter Badge */}
+          <div id="launch-counter-badge" className="absolute top-4 right-4 z-30 flex items-center gap-1.5 px-3 py-1 bg-white/80 backdrop-blur-xs rounded-full border border-slate-200/60 shadow-[0_2px_8px_rgba(0,0,0,0.02)] text-[10px] font-black text-slate-600 select-none tracking-wider uppercase">
+            <div className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-500 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-orange-600"></span>
+            </div>
+            Vol en cours : {launchCount}
+          </div>
+
           {/* Subtle clouds in background */}
           <div className="absolute top-6 left-12 opacity-25 flex gap-1.5 items-center">
             <div className="w-8 h-3.5 bg-slate-300 rounded-full" />
@@ -386,7 +399,7 @@ export default function Suspended() {
         </h1>
         
         <p className="text-sm font-medium text-slate-500 max-w-md leading-relaxed mb-8">
-          Votre compte (<strong>{user?.email}</strong>) a été temporairement suspendu par notre équipe de modération. Cela est généralement dû à l'un des facteurs suivants : un profil non conforme aux règles communautaires, des informations de validation faussées ou une activité inhabituelle.
+          Accès interrompu, votre compte (<strong>{user?.email || 'adresse e-mail'}</strong>) a été temporairement suspendu par notre équipe de modération. Cela est généralement dû à l'un des facteurs suivants : un profil non conforme aux règles communautaires, des informations de validation faussées ou une activité inhabituelle.
         </p>
 
         {/* Action button container */}
@@ -406,7 +419,10 @@ export default function Suspended() {
 
           <Button 
             variant="outline"
-            onClick={logout}
+            onClick={async () => {
+              await logout();
+              navigate('/', { replace: true });
+            }}
             className="bg-transparent hover:bg-slate-50 text-slate-800 border-2 border-slate-150 rounded-2xl h-12 font-black text-[12px] uppercase tracking-wider transition-transform hover:-translate-y-0.5 active:translate-y-0"
           >
             <LogOut className="h-4 w-4 mr-2 text-slate-500" />
@@ -415,15 +431,15 @@ export default function Suspended() {
         </div>
 
         {/* Small fun feedback footer */}
-        {clickCount > 2 && (
-          <motion.p 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 0.7 }}
-            className="text-[10px] text-slate-400 font-bold mt-6 select-none"
-          >
-            Nombre de lancements : {clickCount} 🦉 Prêt pour le décollage !
-          </motion.p>
-        )}
+        <div id="launch-statistics" className="flex flex-col sm:flex-row gap-2 sm:gap-6 justify-center items-center text-[10px] text-slate-400 font-bold mt-6 select-none uppercase tracking-wider">
+          <span className="flex items-center gap-1.5">
+            🚀 Décollages : <strong className="text-slate-600 font-black">{launchCount}</strong>
+          </span>
+          <span className="hidden sm:inline text-slate-200">|</span>
+          <span className="flex items-center gap-1.5">
+            🎯 Lancements manuels : <strong className="text-slate-600 font-black">{clickCount}</strong>
+          </span>
+        </div>
       </motion.div>
     </div>
   );

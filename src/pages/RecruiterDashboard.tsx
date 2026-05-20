@@ -37,7 +37,10 @@ import {
   LayoutDashboard,
   Settings,
   MessageSquare,
-  Palette
+  Palette,
+  AlertTriangle,
+  HelpCircle,
+  Check
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -54,10 +57,11 @@ import {
   orderBy,
   doc,
   updateDoc,
-  increment
+  increment,
+  onSnapshot
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { Job, Application } from '@/types';
+import { Job, Application, SupportTicket } from '@/types';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
@@ -75,13 +79,23 @@ export default function RecruiterDashboard() {
   const [jobCreated, setJobCreated] = useState(false);
   const [activeTab, setActiveTab] = useState('jobs');
   
-  // Form state
+  // Creation form state
   const [jobTitle, setJobTitle] = useState('');
   const [jobType, setJobType] = useState('CDI');
   const [jobLocation, setJobLocation] = useState('');
   const [jobDescription, setJobDescription] = useState('');
   const [jobField, setJobField] = useState('Informatique');
   const [jobSalary, setJobSalary] = useState('');
+
+  // Edit form state
+  const [editingJob, setEditingJob] = useState<Job | null>(null);
+  const [isEditingJobOpen, setIsEditingJobOpen] = useState(false);
+  const [editTitle, setEditTitle] = useState('');
+  const [editType, setEditType] = useState('CDI');
+  const [editLocation, setEditLocation] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [editField, setEditField] = useState('Informatique');
+  const [editSalary, setEditSalary] = useState('');
 
   // Data state
   const [myJobs, setMyJobs] = useState<Job[]>([]);
@@ -91,6 +105,60 @@ export default function RecruiterDashboard() {
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [cvBlobUrl, setCvBlobUrl] = useState<string | null>(null);
+
+  // Support ticket states
+  const [tickets, setTickets] = useState<SupportTicket[]>([]);
+  const [ticketSubject, setTicketSubject] = useState('');
+  const [ticketMessage, setTicketMessage] = useState('');
+  const [isSubmittingTicket, setIsSubmittingTicket] = useState(false);
+  const [ticketSuccess, setTicketSuccess] = useState(false);
+
+  useEffect(() => {
+    if (!user) return;
+    const q = query(
+      collection(db, 'support_tickets'),
+      where('userId', '==', user.uid),
+      orderBy('createdAt', 'desc')
+    );
+    const unsub = onSnapshot(q, (snapshot) => {
+      const list: SupportTicket[] = [];
+      snapshot.forEach((doc) => {
+        list.push({ id: doc.id, ...doc.data() } as SupportTicket);
+      });
+      setTickets(list);
+    }, (error) => {
+      console.warn("Error fetching support tickets real-time:", error);
+    });
+    return unsub;
+  }, [user]);
+
+  const handleCreateTicket = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user || !ticketSubject.trim() || !ticketMessage.trim()) return;
+    setIsSubmittingTicket(true);
+    setTicketSuccess(false);
+    try {
+      await addDoc(collection(db, 'support_tickets'), {
+        userId: user.uid,
+        userEmail: user.email ?? '',
+        userName: user.companyName || user.displayName || 'Recruteur',
+        userRole: 'recruiter',
+        subject: ticketSubject,
+        message: ticketMessage,
+        createdAt: serverTimestamp(),
+        status: 'open',
+        response: null
+      });
+      setTicketSubject('');
+      setTicketMessage('');
+      setTicketSuccess(true);
+      setTimeout(() => setTicketSuccess(false), 5000);
+    } catch (err) {
+      console.error("Error creating support ticket:", err);
+    } finally {
+      setIsSubmittingTicket(false);
+    }
+  };
 
   useEffect(() => {
     let url: string | null = null;
@@ -167,9 +235,96 @@ export default function RecruiterDashboard() {
     fetchData();
   }, [user]);
 
+  const getValidationWaitingState = () => {
+    if (!user || user.role !== 'recruiter') return { canPost: false, isApproved: false, hoursLeft: 0 };
+    
+    if (user.status !== 'approved') {
+      return { canPost: false, isApproved: false, hoursLeft: 72 };
+    }
+    
+    let approvalTime = 0;
+    if (user.approvedAt) {
+      approvalTime = user.approvedAt.seconds 
+        ? user.approvedAt.seconds * 1000 
+        : new Date(user.approvedAt).getTime();
+    } else if (user.createdAt) {
+      approvalTime = user.createdAt.seconds 
+        ? user.createdAt.seconds * 1000 
+        : new Date(user.createdAt).getTime();
+    } else {
+      return { canPost: true, isApproved: true, hoursLeft: 0 };
+    }
+    
+    const elapsedMs = Date.now() - approvalTime;
+    const elapsedHours = elapsedMs / (3600 * 1000);
+    const hoursLeft = 72 - elapsedHours;
+    
+    return {
+      canPost: hoursLeft <= 0,
+      isApproved: true,
+      hoursLeft: Math.min(72, Math.max(0, Math.ceil(hoursLeft)))
+    };
+  };
+
+  const handleOpenEdit = (job: Job) => {
+    setEditingJob(job);
+    setEditTitle(job.title || '');
+    setEditType(job.type || 'CDI');
+    setEditLocation(job.location || '');
+    setEditDescription(job.description || '');
+    setEditField(job.field || 'Informatique');
+    setEditSalary(job.salary || '');
+    setIsEditingJobOpen(true);
+  };
+
+  const handleUpdateJob = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingJob || !user) return;
+    
+    try {
+      const jobRef = doc(db, 'jobs', editingJob.id!);
+      await updateDoc(jobRef, {
+        title: editTitle,
+        type: editType,
+        location: editLocation,
+        description: editDescription,
+        field: editField,
+        category: editField,
+        salary: editSalary,
+        status: 'pending_validation', // Go back to pending validation upon modification
+        updatedAt: serverTimestamp()
+      });
+      
+      // Update local state
+      setMyJobs(prev => prev.map(j => j.id === editingJob.id ? {
+        ...j,
+        title: editTitle,
+        type: editType,
+        location: editLocation,
+        description: editDescription,
+        field: editField,
+        category: editField,
+        salary: editSalary,
+        status: 'pending_validation'
+      } : j));
+      
+      setIsEditingJobOpen(false);
+      setEditingJob(null);
+      alert("Votre offre d'emploi a été mise à jour avec succès et est en attente de validation par l'administrateur.");
+    } catch (err) {
+      console.error("Error updating job:", err);
+    }
+  };
+
   const handleCreateJob = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
+
+    const waitStatus = getValidationWaitingState();
+    if (!waitStatus.canPost) {
+      alert("Vous devez attendre la fin du délai de validation de 72 heures après approbation de votre compte.");
+      return;
+    }
 
     setIsCreatingJob(true);
     try {
@@ -181,8 +336,9 @@ export default function RecruiterDashboard() {
         location: jobLocation,
         type: jobType,
         field: jobField,
+        category: jobField,
         salary: jobSalary,
-        status: 'active',
+        status: 'pending_validation', // Default is en attente de validation
         createdAt: serverTimestamp(),
       };
 
@@ -330,7 +486,6 @@ export default function RecruiterDashboard() {
                   </Button>
                 </DialogTrigger>
                 <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto rounded-[40px] border-none shadow-2xl">
-                  {/* ... contents same ... */}
             {!jobCreated ? (
               <>
                 <DialogHeader className="bg-slate-900 text-white p-8 rounded-t-[40px]">
@@ -339,50 +494,100 @@ export default function RecruiterDashboard() {
                     Attirez les meilleurs talents africains.
                   </DialogDescription>
                 </DialogHeader>
-                <form onSubmit={handleCreateJob} className="p-8 space-y-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="title" className="font-black text-slate-700 ml-1 uppercase text-xs tracking-widest">Intitulé du poste *</Label>
-                    <Input id="title" placeholder="Ex: Senior Marketing Manager" className="h-14 rounded-2xl border-slate-200 focus-visible:ring-orange-600 font-bold" value={jobTitle} onChange={e => setJobTitle(e.target.value)} required />
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="type" className="font-black text-slate-700 ml-1 uppercase text-xs tracking-widest">Contrat</Label>
-                      <Select value={jobType} onValueChange={setJobType}>
-                        <SelectTrigger className="h-14 rounded-2xl border-slate-200 font-bold">
-                          <SelectValue placeholder="Choisir..." />
-                        </SelectTrigger>
-                        <SelectContent className="rounded-2xl">
-                          <SelectItem value="CDI">CDI</SelectItem>
-                          <SelectItem value="CDD">CDD</SelectItem>
-                          <SelectItem value="Stage">Stage</SelectItem>
-                          <SelectItem value="Freelance">Freelance</SelectItem>
-                        </SelectContent>
-                      </Select>
+                {!getValidationWaitingState().canPost ? (
+                  <div className="p-8 text-center space-y-6">
+                    <div className="inline-flex items-center justify-center p-4 bg-orange-50 text-orange-600 rounded-full mt-4">
+                      <Clock className="h-12 w-12 animate-pulse" />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="location" className="font-black text-slate-700 ml-1 uppercase text-xs tracking-widest">Ville *</Label>
-                      <Input id="location" placeholder="Abidjan, Dakar..." className="h-14 rounded-2xl border-slate-200 focus-visible:ring-orange-600 font-bold" value={jobLocation} onChange={e => setJobLocation(e.target.value)} required />
+                      <h3 className="text-xl font-black text-slate-900">Période de Validation Requise (72h)</h3>
+                      <p className="text-slate-500 font-bold text-sm max-w-sm mx-auto leading-relaxed">
+                        Conformément à nos règles de sécurité, les nouvelles entreprises doivent attendre un délai de validation obligatoire de 72h après approbation de leur profil avant de pouvoir publier des offres d'emploi d'Afrique.
+                      </p>
                     </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="description" className="font-black text-slate-700 ml-1 uppercase text-xs tracking-widest">Descriptif & Missions *</Label>
-                    <Textarea id="description" className="min-h-[150px] rounded-3xl border-slate-200 focus-visible:ring-orange-600 font-medium p-6" placeholder="Qu'attendez-vous du candidat idéal ?" value={jobDescription} onChange={e => setJobDescription(e.target.value)} required />
-                  </div>
-                  <DialogFooter>
-                    <Button type="submit" className="w-full h-16 rounded-2xl bg-orange-600 hover:bg-orange-700 text-white font-black shadow-xl shadow-orange-600/20 border-none transition-all" disabled={isCreatingJob}>
-                      {isCreatingJob ? "PUBLICATION..." : "PUBLIER L'OFFRE"}
+                    <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 max-w-xs mx-auto">
+                      <p className="text-[10px] uppercase font-black tracking-widest text-slate-450">Temps d'attente restant</p>
+                      <p className="text-2xl font-black text-orange-600 mt-1 animate-pulse">
+                        {getValidationWaitingState().hoursLeft} heures
+                      </p>
+                    </div>
+                    <Button 
+                      onClick={() => navigate('/recruiter-onboarding')}
+                      className="w-full h-12 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-black uppercase text-xs"
+                    >
+                      Vérifier mes informations juridiques
                     </Button>
-                  </DialogFooter>
-                </form>
+                  </div>
+                ) : (
+                  <form onSubmit={handleCreateJob} className="p-8 space-y-6">
+                    <div className="space-y-2">
+                      <Label htmlFor="title" className="font-black text-slate-700 ml-1 uppercase text-xs tracking-widest">Intitulé du poste *</Label>
+                      <Input id="title" placeholder="Ex: Senior Marketing Manager" className="h-14 rounded-2xl border-slate-200 focus-visible:ring-orange-600 font-bold" value={jobTitle} onChange={e => setJobTitle(e.target.value)} required />
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="type" className="font-black text-slate-700 ml-1 uppercase text-xs tracking-widest">Contrat</Label>
+                        <Select value={jobType} onValueChange={setJobType}>
+                          <SelectTrigger className="h-14 rounded-2xl border-slate-200 font-bold">
+                            <SelectValue placeholder="Choisir..." />
+                          </SelectTrigger>
+                          <SelectContent className="rounded-2xl">
+                            <SelectItem value="CDI">CDI</SelectItem>
+                            <SelectItem value="CDD">CDD</SelectItem>
+                            <SelectItem value="Stage">Stage</SelectItem>
+                            <SelectItem value="Freelance">Freelance</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="location" className="font-black text-slate-700 ml-1 uppercase text-xs tracking-widest">Ville *</Label>
+                        <Input id="location" placeholder="Abidjan, Dakar..." className="h-14 rounded-2xl border-slate-200 focus-visible:ring-orange-600 font-bold" value={jobLocation} onChange={e => setJobLocation(e.target.value)} required />
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="category" className="font-black text-slate-700 ml-1 uppercase text-xs tracking-widest">Secteur d'activité *</Label>
+                        <Select value={jobField} onValueChange={setJobField}>
+                          <SelectTrigger className="h-14 rounded-2xl border-slate-200 font-bold">
+                            <SelectValue placeholder="Secteur..." />
+                          </SelectTrigger>
+                          <SelectContent className="rounded-2xl">
+                            <SelectItem value="Civil Engineering">Génie Civil / BTP</SelectItem>
+                            <SelectItem value="Medical Health">Santé / Médical</SelectItem>
+                            <SelectItem value="Commerce">Commerce / Vente</SelectItem>
+                            <SelectItem value="Finance">Finance / Gestion</SelectItem>
+                            <SelectItem value="Informatique">Technologies / IT</SelectItem>
+                            <SelectItem value="Autre">Autre</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="salary" className="font-black text-slate-700 ml-1 uppercase text-xs tracking-widest">Salaire (CFA) *</Label>
+                        <Input id="salary" placeholder="Ex: 500 000 CFA / mois" className="h-14 rounded-2xl border-slate-200 focus-visible:ring-orange-600 font-bold" value={jobSalary} onChange={e => setJobSalary(e.target.value)} required />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="description" className="font-black text-slate-700 ml-1 uppercase text-xs tracking-widest">Descriptif & Missions *</Label>
+                      <Textarea id="description" className="min-h-[120px] rounded-3xl border-slate-200 focus-visible:ring-orange-600 font-medium p-6" placeholder="Qu'attendez-vous du candidat idéal ?" value={jobDescription} onChange={e => setJobDescription(e.target.value)} required />
+                    </div>
+                    <DialogFooter>
+                      <Button type="submit" className="w-full h-16 rounded-2xl bg-orange-600 hover:bg-orange-700 text-white font-black shadow-xl shadow-orange-600/20 border-none transition-all" disabled={isCreatingJob}>
+                        {isCreatingJob ? "ENVOI EN VALIDATION..." : "SOUMETTRE À LA VALIDATION"}
+                      </Button>
+                    </DialogFooter>
+                  </form>
+                )}
               </>
             ) : (
-              <div className="py-12 text-center">
+              <div className="py-12 text-center p-8">
                 <div className="inline-flex items-center justify-center p-4 bg-green-100 text-green-700 rounded-full mb-6">
                   <CheckCircle2 className="h-12 w-12" />
                 </div>
-                <h3 className="text-2xl font-bold mb-2">Offre publiée avec succès !</h3>
-                <p className="text-muted-foreground mb-8">Votre offre est maintenant visible par tous les candidats de {config.siteName || '2NG Groupe Entreprises'}.</p>
-                <Button variant="outline" onClick={() => setJobCreated(false)} className="w-full">Fermer</Button>
+                <h3 className="text-2xl font-bold mb-2">Offre soumise avec succès !</h3>
+                <p className="text-muted-foreground mb-8">Votre offre est maintenant en cours de révision par l'administrateur et sera publiée automatiquement après validation.</p>
+                <Button variant="outline" onClick={() => setJobCreated(false)} className="w-full rounded-xl">Fermer</Button>
               </div>
             )}
           </DialogContent>
@@ -425,6 +630,9 @@ export default function RecruiterDashboard() {
               <TabsTrigger value="profile" className="rounded-xl px-4 md:px-8 font-black data-[state=active]:bg-slate-900 data-[state=active]:text-white whitespace-nowrap">
                 <Building2 className="mr-2 h-4 w-4" /> Profil
               </TabsTrigger>
+              <TabsTrigger value="support" className="rounded-xl px-4 md:px-8 font-black data-[state=active]:bg-slate-900 data-[state=active]:text-white whitespace-nowrap">
+                <HelpCircle className="mr-2 h-4 w-4" /> Support & Aide
+              </TabsTrigger>
             </TabsList>
           </div>
 
@@ -437,18 +645,18 @@ export default function RecruiterDashboard() {
             </div>
             {myJobs.length > 0 ? (
               myJobs.map((job) => (
-                <Card key={job.id} className="border-none shadow-lg shadow-slate-200/50 rounded-[32px] overflow-hidden group hover:shadow-2xl transition-all">
-                  <CardHeader className="flex flex-col sm:flex-row items-center justify-between p-8 bg-white gap-6">
+                <Card key={job.id} className="border-none shadow-lg shadow-slate-200/50 rounded-[32px] overflow-hidden group hover:shadow-2xl transition-all bg-white mb-6">
+                  <CardHeader className="flex flex-col sm:flex-row items-center justify-between p-8 pb-4 bg-white gap-6">
                     <div className="flex items-center gap-5 w-full sm:w-auto">
-                      <div className="h-14 w-14 bg-slate-50 flex items-center justify-center rounded-2xl group-hover:bg-orange-50 group-hover:text-orange-600 transition-colors">
+                      <div className="h-14 w-14 bg-slate-50 flex items-center justify-center rounded-2xl group-hover:bg-orange-50 group-hover:text-orange-600 transition-colors shrink-0">
                         <Briefcase className="h-7 w-7" />
                       </div>
                       <div>
                         <CardTitle className="text-xl font-black text-slate-900 group-hover:text-orange-600 transition-colors">{job.title}</CardTitle>
-                        <CardDescription className="font-bold flex items-center gap-2 mt-1">
-                          <MapPin className="h-3.5 w-3.5 text-orange-500" /> {job.location}
-                          <span className="opacity-30 mx-1">•</span>
-                          <Clock className="h-3.5 w-3.5" />
+                        <CardDescription className="font-bold flex flex-wrap items-center gap-2 mt-1">
+                          <span className="flex items-center gap-1"><MapPin className="h-3.5 w-3.5 text-orange-500" /> {job.location}</span>
+                          <span className="opacity-30">•</span>
+                          <span className="flex items-center gap-1"><Clock className="h-3.5 w-3.5" />
                           {(() => {
                             try {
                               if (!job.createdAt) return "À l'instant";
@@ -459,28 +667,80 @@ export default function RecruiterDashboard() {
                             } catch (e) {
                               return "À l'instant";
                             }
-                          })()}
+                          })()}</span>
+                          {job.salary && (
+                            <>
+                              <span className="opacity-30">•</span>
+                              <span className="text-orange-600 font-extrabold">{job.salary}</span>
+                            </>
+                          )}
                         </CardDescription>
                       </div>
                     </div>
-                    <div className="flex items-center gap-6 w-full sm:w-auto">
+                    <div className="flex flex-wrap items-center gap-4 sm:gap-6 w-full sm:w-auto justify-between sm:justify-end">
                       <div className="text-right hidden md:block">
                         <p className="text-xl font-black text-slate-900">{(job.views || 0) + (Math.floor(Math.random() * 20))}</p>
                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-0.5">Vues réelles</p>
                       </div>
                       <div className="h-10 w-[1px] bg-slate-100 hidden md:block"></div>
-                      <div className="text-right hidden sm:block">
+                      <div className="text-right">
                         <p className="text-xl font-black text-orange-600">{myApplications.filter(a => a.jobId === job.id).length}</p>
                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-0.5">Candidats</p>
                       </div>
-                      <Badge className={`${job.status === 'active' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-slate-50 text-slate-400'} border-2 px-4 py-1 font-black rounded-full`}>
-                        {job.status === 'active' ? 'ACTIF' : 'CLOS'}
-                      </Badge>
-                      <Button variant="ghost" size="icon" className="rounded-full hover:bg-slate-900 hover:text-white h-12 w-12 transition-all">
-                        <ChevronRight className="h-6 w-6" />
-                      </Button>
+                      
+                      <div className="flex flex-col items-end gap-1 shrink-0">
+                        {job.status === 'active' ? (
+                          <Badge className="bg-emerald-50 text-emerald-600 border-emerald-100 border-2 px-3 py-1 font-black rounded-full text-xs">
+                            ACTIF
+                          </Badge>
+                        ) : job.status === 'pending_validation' ? (
+                          <Badge className="bg-amber-50 text-amber-600 border-amber-100 border-2 px-3 py-1 font-black rounded-full text-xs animate-pulse">
+                            EN VALIDATION
+                          </Badge>
+                        ) : (
+                          <Badge className="bg-red-50 text-red-600 border-red-100 border-2 px-3 py-1 font-black rounded-full text-xs">
+                            SUSPENDU
+                          </Badge>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        {job.status === 'suspended' ? (
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            disabled 
+                            className="rounded-xl border-slate-100 bg-slate-50 text-slate-350 font-bold opacity-60 cursor-not-allowed text-xs h-10 px-4"
+                            title="Cette offre a été suspendue par la modération et ne peut plus être modifiée."
+                          >
+                            Modifier Bloqué
+                          </Button>
+                        ) : (
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="rounded-xl border-slate-200 h-10 px-4 font-black text-xs text-slate-705 hover:bg-slate-50 hover:text-orange-600 transition-colors"
+                            onClick={() => handleOpenEdit(job)}
+                          >
+                            Modifier
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   </CardHeader>
+                  
+                  {job.status === 'suspended' && job.suspensionReason && (
+                    <div className="mx-8 mb-8 p-5 bg-red-50/70 border border-red-100 rounded-2xl">
+                      <div className="flex gap-2 text-red-800">
+                        <AlertTriangle className="h-5 w-5 shrink-0 text-red-500 animate-pulse mt-0.5" />
+                        <div>
+                          <p className="font-black text-sm uppercase tracking-wide">Offre Suspendue par la Modération</p>
+                          <p className="font-bold text-xs text-red-600 mt-1">Motif fourni par l'administrateur : {job.suspensionReason}</p>
+                          <p className="text-[10px] text-slate-500 mt-1 font-medium">Vous ne pouvez pas modifier de publications suspendues. Prenez contact avec le support si nécessaire.</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </Card>
               ))
             ) : (
@@ -757,6 +1017,136 @@ export default function RecruiterDashboard() {
               </div>
            </div>
         </TabsContent>
+
+        <TabsContent value="support" className="space-y-6 outline-none animate-in fade-in duration-300">
+          <div className="bg-slate-900 rounded-3xl p-8 text-white relative overflow-hidden shadow-xl shadow-slate-900/10">
+            <div className="relative z-10 max-w-xl font-sans">
+              <Badge className="bg-orange-500 hover:bg-orange-600 text-white border-none font-black text-[10px] uppercase px-3 py-1 rounded-full mb-4">ESPACE ASSISTANCE EN LIGNE</Badge>
+              <h3 className="text-2xl font-black tracking-tight mb-2">Difficultés techniques ou besoin d'assistance ?</h3>
+              <p className="text-slate-300 font-medium text-xs leading-relaxed mt-2 leading-relaxed">
+                Nos administrateurs sont à votre entière disposition pour répondre à toutes vos interrogations : validation de compte entreprise, publication d'offres de recrutement ou dysfonctionnement de l'espace recruteur.
+              </p>
+            </div>
+            <div className="absolute right-0 bottom-0 opacity-10 transform translate-x-10 translate-y-10">
+              <HelpCircle className="h-48 w-48 text-white" />
+            </div>
+          </div>
+
+          {ticketSuccess && (
+            <motion.div 
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-2xl font-bold text-xs flex items-center justify-between animate-in fade-in"
+            >
+              <span>✨ Message envoyé avec succès ! Nos équipes de support vont se pencher sur votre problème.</span>
+            </motion.div>
+          )}
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Ticket Submission Form */}
+            <Card className="border-none shadow-xl shadow-slate-200/40 bg-white rounded-3xl p-6">
+              <CardHeader className="p-0 mb-6 font-sans">
+                <CardTitle className="text-lg font-black text-slate-900 flex items-center gap-2">
+                  <MessageSquare className="h-5 w-5 text-orange-600" />
+                  Nouveau Ticket Recruteur
+                </CardTitle>
+                <CardDescription className="text-xs font-bold text-slate-400">Indiquez l'objet et le détail de vos difficultés.</CardDescription>
+              </CardHeader>
+              <CardContent className="p-0">
+                <form onSubmit={handleCreateTicket} className="space-y-4">
+                  <div className="space-y-1">
+                    <Label htmlFor="recruiterTicketSubject" className="font-bold text-slate-700 uppercase text-xs tracking-wider">Objet du Message</Label>
+                    <Input 
+                      id="recruiterTicketSubject"
+                      type="text"
+                      placeholder="Ex: Validation de mon profil entreprise bloquée"
+                      className="h-11 rounded-xl border-slate-200 font-bold focus-visible:ring-indigo-600 text-xs text-slate-800"
+                      value={ticketSubject}
+                      onChange={(e) => setTicketSubject(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="recruiterTicketMessage" className="font-black text-slate-700 uppercase text-xs tracking-wider font-sans">Message détaillé</Label>
+                    <Textarea 
+                      id="recruiterTicketMessage"
+                      placeholder="Expliquez en détail votre situation..."
+                      className="min-h-[140px] rounded-xl border-slate-200 font-bold text-xs focus-visible:ring-indigo-650 text-slate-800"
+                      value={ticketMessage}
+                      onChange={(e) => setTicketMessage(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <Button 
+                    type="submit" 
+                    disabled={isSubmittingTicket}
+                    className="w-full h-11 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold text-xs uppercase tracking-wider border-none"
+                  >
+                    {isSubmittingTicket ? "Envoi..." : "Envoyer mon message de détresse"}
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+
+            {/* Recruiter Tickets list */}
+            <Card className="border-none shadow-xl shadow-slate-200/40 bg-white rounded-3xl p-6 flex flex-col">
+              <CardHeader className="p-0 mb-6 font-sans">
+                <CardTitle className="text-lg font-black text-slate-900 flex items-center gap-2">
+                  <Clock className="h-5 w-5 text-orange-600" />
+                  Courriers & Retours Admin
+                </CardTitle>
+                <CardDescription className="text-xs font-bold text-slate-400">Historique complet de vos demandes d'assistance.</CardDescription>
+              </CardHeader>
+              <CardContent className="p-0 flex-1 overflow-y-auto max-h-[380px] pr-1 space-y-4 scrollbar-hide">
+                {tickets.length === 0 ? (
+                  <div className="text-center py-12 text-slate-400 font-bold flex flex-col items-center justify-center h-full">
+                    <MessageSquare className="h-10 w-10 text-slate-200 mb-2" />
+                    <p className="text-xs font-bold text-slate-450">Aucune demande envoyée pour le moment.</p>
+                  </div>
+                ) : (
+                  tickets.map(ticket => (
+                    <div key={ticket.id} className="p-4 rounded-2xl border border-slate-100 bg-slate-50/50 hover:bg-white hover:shadow-md transition-all space-y-3 animate-in fade-in duration-300">
+                      <div className="flex justify-between items-start gap-2">
+                        <div>
+                          <h5 className="font-extrabold text-slate-900 text-sm leading-tight">{ticket.subject}</h5>
+                          <p className="text-[10px] text-slate-400 font-bold uppercase mt-0.5">
+                            Posté le {ticket.createdAt ? new Date(ticket.createdAt.seconds ? ticket.createdAt.seconds * 1000 : ticket.createdAt).toLocaleDateString('fr-FR') : 'Date inconnue'}
+                          </p>
+                        </div>
+                        <Badge className={`text-[8px] font-black uppercase border-none px-2 rounded-full ${ticket.status === 'open' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                          {ticket.status === 'open' ? 'En attente' : 'Répondu'}
+                        </Badge>
+                      </div>
+                      
+                      <p className="text-xs text-slate-600 font-semibold bg-white p-2.5 rounded-xl border border-slate-50 overflow-hidden text-ellipsis whitespace-pre-wrap leading-relaxed font-sans">
+                        "${ticket.message}"
+                      </p>
+
+                      {ticket.response ? (
+                        <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-100/50 space-y-1">
+                          <p className="text-[9px] font-black uppercase text-emerald-800 tracking-wider flex items-center gap-1">
+                            <Check className="h-3 w-3" /> Réponse de l'administration :
+                          </p>
+                          <p className="text-xs text-slate-700 font-semibold italic whitespace-pre-wrap">"${ticket.response}"</p>
+                          {ticket.repliedAt && (
+                            <p className="text-[8px] font-bold text-slate-400 text-right mt-1 font-sans">
+                              Le {new Date(ticket.repliedAt.seconds ? ticket.repliedAt.seconds * 1000 : ticket.repliedAt).toLocaleDateString('fr-FR')}
+                            </p>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="text-[9px] text-slate-450 font-bold flex items-center gap-1.5 pl-1 italic font-sans animate-pulse">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                          Un administrateur examine votre dossier d'assistance.
+                        </div>
+                      )}
+                    </div>
+                  ))
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
       </Tabs>
     </div>
 
@@ -890,6 +1280,88 @@ export default function RecruiterDashboard() {
               </div>
             )}
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modification Offre Dialog */}
+      <Dialog open={isEditingJobOpen} onOpenChange={setIsEditingJobOpen}>
+        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto rounded-[40px] border-none shadow-2xl">
+          <DialogHeader className="bg-slate-900 text-white p-8 rounded-t-[40px]">
+            <DialogTitle className="text-2xl font-black">Modifier l'offre d'emploi</DialogTitle>
+            <DialogDescription className="text-slate-400 font-bold">
+              Modifiez votre annonce. Toute modification nécessite une nouvelle validation par un administrateur.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleUpdateJob} className="p-8 space-y-6">
+            <div className="space-y-2">
+              <Label htmlFor="edit-title" className="font-black text-slate-700 ml-1 uppercase text-xs tracking-widest">Intitulé du poste *</Label>
+              <Input id="edit-title" placeholder="Ex: Senior Marketing Manager" className="h-14 rounded-2xl border-slate-200 focus-visible:ring-orange-600 font-bold" value={editTitle} onChange={e => setEditTitle(e.target.value)} required />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-type" className="font-black text-slate-700 ml-1 uppercase text-xs tracking-widest">Contrat</Label>
+                <Select value={editType} onValueChange={setEditType}>
+                  <SelectTrigger className="h-14 rounded-2xl border-slate-200 font-bold">
+                    <SelectValue placeholder="Choisir..." />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-2xl">
+                    <SelectItem value="CDI">CDI</SelectItem>
+                    <SelectItem value="CDD">CDD</SelectItem>
+                    <SelectItem value="Stage">Stage</SelectItem>
+                    <SelectItem value="Freelance">Freelance</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-location" className="font-black text-slate-700 ml-1 uppercase text-xs tracking-widest">Ville *</Label>
+                <Input id="edit-location" placeholder="Abidjan, Dakar..." className="h-14 rounded-2xl border-slate-200 focus-visible:ring-orange-600 font-bold" value={editLocation} onChange={e => setEditLocation(e.target.value)} required />
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-category" className="font-black text-slate-700 ml-1 uppercase text-xs tracking-widest">Secteur d'activité *</Label>
+                <Select value={editField} onValueChange={setEditField}>
+                  <SelectTrigger className="h-14 rounded-2xl border-slate-200 font-bold">
+                    <SelectValue placeholder="Secteur..." />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-2xl">
+                    <SelectItem value="Civil Engineering">Génie Civil / BTP</SelectItem>
+                    <SelectItem value="Medical Health">Santé / Médical</SelectItem>
+                    <SelectItem value="Commerce">Commerce / Vente</SelectItem>
+                    <SelectItem value="Finance">Finance / Gestion</SelectItem>
+                    <SelectItem value="Informatique">Technologies / IT</SelectItem>
+                    <SelectItem value="Autre">Autre</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-salary" className="font-black text-slate-700 ml-1 uppercase text-xs tracking-widest">Salaire (CFA) *</Label>
+                <Input id="edit-salary" placeholder="Ex: 500 000 CFA" className="h-14 rounded-2xl border-slate-200 focus-visible:ring-orange-600 font-bold" value={editSalary} onChange={e => setEditSalary(e.target.value)} required />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-description" className="font-black text-slate-700 ml-1 uppercase text-xs tracking-widest">Descriptif & Missions *</Label>
+              <Textarea id="edit-description" className="min-h-[120px] rounded-3xl border-slate-200 focus-visible:ring-orange-650 font-medium p-6" value={editDescription} onChange={e => setEditDescription(e.target.value)} required />
+            </div>
+            <DialogFooter className="flex gap-2">
+              <Button 
+                type="button" 
+                variant="outline"
+                className="rounded-xl font-bold h-12 flex-1"
+                onClick={() => { setIsEditingJobOpen(false); setEditingJob(null); }}
+              >
+                Annuler
+              </Button>
+              <Button 
+                type="submit" 
+                className="bg-orange-600 hover:bg-orange-700 text-white font-black h-12 rounded-xl flex-1 uppercase text-xs"
+              >
+                Enregistrer & Soumettre
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
     </div>

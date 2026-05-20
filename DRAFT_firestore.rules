@@ -93,5 +93,29 @@ service cloud.firestore {
       ) && isValidApplication(incoming());
       allow delete: if isSignedIn() && isOwner(existing().candidateId);
     }
+
+    // Support Tickets Rules
+    match /support_tickets/{ticketId} {
+      allow read: if isSignedIn() && (
+                    get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+                    resource.data.userId == request.auth.uid
+                  );
+      allow create: if isSignedIn() &&
+                    isValidId(ticketId) &&
+                    incoming().userId == request.auth.uid &&
+                    incoming().userRole in ['candidate', 'recruiter', 'admin'] &&
+                    incoming().subject is string && incoming().subject.size() <= 300 &&
+                    incoming().message is string && incoming().message.size() <= 10000 &&
+                    incoming().status == 'open' &&
+                    incoming().createdAt == request.time;
+      allow update: if isSignedIn() && (
+                    get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' || (
+                      resource.data.userId == request.auth.uid &&
+                      incoming().diff(existing()).affectedKeys().hasOnly(['status']) &&
+                      incoming().status == 'closed'
+                    )
+                  );
+      allow delete: if isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
   }
 }
