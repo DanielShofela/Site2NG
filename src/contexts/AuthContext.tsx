@@ -56,14 +56,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         unsubscribeProfile = onSnapshot(doc(db, 'users', firebaseUser.uid), (snapshot) => {
           if (snapshot.exists()) {
             const profile = snapshot.data() as UserProfile;
-            if (profile.accountStatus === 'suspended') {
-              signOut(auth).then(() => {
-                setUser(null);
-                alert("Votre compte a été suspendu par l'administrateur.");
-              });
-            } else {
-              setUser(profile);
-            }
+            setUser(profile);
           } else {
             setUser(null);
           }

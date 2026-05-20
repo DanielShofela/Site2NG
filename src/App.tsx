@@ -18,6 +18,7 @@ import PendingApproval from './pages/PendingApproval';
 import ForgotPassword from './pages/ForgotPassword';
 import RecruiterOnboarding from './pages/RecruiterOnboarding';
 import CompanyProfile from './pages/CompanyProfile';
+import Suspended from './pages/Suspended';
 import Navbar from './components/layout/Navbar';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { SiteConfigProvider } from './contexts/SiteConfigContext';
@@ -59,10 +60,24 @@ export default function App() {
 }
 
 function AppLayout() {
+  const { user, loading } = useAuth();
   const location = useLocation();
   const isDashboardPage = location.pathname.startsWith('/admin') || 
                           location.pathname.startsWith('/recruiter') || 
-                          location.pathname.startsWith('/candidate');
+                          location.pathname.startsWith('/candidate') ||
+                          location.pathname === '/suspended';
+
+  if (loading) {
+    return (
+      <div className="h-screen w-full flex items-center justify-center bg-slate-50">
+        <div className="w-10 h-10 border-4 border-orange-600 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  if (user && (user.accountStatus === 'suspended' || user.status === 'suspended') && location.pathname !== '/suspended') {
+    return <Navigate to="/suspended" replace />;
+  }
 
   return (
     <div className="min-h-screen bg-background font-sans antialiased overflow-x-hidden">
@@ -83,6 +98,7 @@ function AppLayout() {
           <Route path="/pending-approval" element={<PendingApproval />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/company/:id" element={<CompanyProfile />} />
+          <Route path="/suspended" element={<Suspended />} />
         </Routes>
       </main>
     </div>

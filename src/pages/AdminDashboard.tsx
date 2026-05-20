@@ -122,6 +122,7 @@ export default function AdminDashboard() {
   // Data States
   const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
   const [allJobs, setAllJobs] = useState<Job[]>([]);
+  const [allApplications, setAllApplications] = useState<any[]>([]);
   const [pendingRecruiters, setPendingRecruiters] = useState<UserProfile[]>([]);
   const [logs, setLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -205,6 +206,14 @@ export default function AdminDashboard() {
       handleFirestoreError(error, OperationType.GET, 'jobs');
     });
 
+    const appsUnsub = onSnapshot(collection(db, 'applications'), (snapshot) => {
+      const appsList = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+      setAllApplications(appsList);
+      setStats(prev => ({ ...prev, applications: appsList.length }));
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, 'applications');
+    });
+
     const logsUnsub = onSnapshot(
       query(collection(db, 'system_logs'), orderBy('timestamp', 'desc'), limit(50)),
       (snapshot) => {
@@ -232,6 +241,7 @@ export default function AdminDashboard() {
     return () => {
       usersUnsub();
       jobsUnsub();
+      appsUnsub();
       logsUnsub();
       cmsUnsub();
     };
@@ -469,12 +479,12 @@ export default function AdminDashboard() {
               transition={{ duration: 0.2 }}
               className="w-full max-w-[1600px] mx-auto"
             >
-              {activeModule === 'overview' && <OverviewModule stats={stats} jobs={allJobs} users={allUsers} />}
+              {activeModule === 'overview' && <OverviewModule stats={stats} jobs={allJobs} users={allUsers} applications={allApplications} />}
               {activeModule === 'users' && <UsersModule users={allUsers} onAction={handleUserAction} addLog={addLog} />}
               {activeModule === 'approvals' && <ApprovalsModule pending={pendingRecruiters} onAction={handleUserAction} />}
               {activeModule === 'jobs' && <JobsModule jobs={allJobs} onAction={handleJobAction} recruiterNames={recruiterNames} />}
               {activeModule === 'cms' && <CMSModule currentData={cmsData} onSave={setCmsData} />}
-              {activeModule === 'analytics' && <AnalyticsModule stats={stats} />}
+              {activeModule === 'analytics' && <AnalyticsModule stats={stats} jobs={allJobs} users={allUsers} />}
               {activeModule === 'support' && <SupportModule />}
               {activeModule === 'settings' && <SettingsModule />}
               {activeModule === 'logs' && <LogsModule logs={logs} />}
@@ -488,46 +498,160 @@ export default function AdminDashboard() {
 
 // --- MODULE COMPONENTS ---
 
-function OverviewModule({ stats, jobs, users }: { stats: any, jobs: Job[], users: UserProfile[] }) {
+function OverviewModule({ stats, jobs, users, applications }: { stats: any, jobs: Job[], users: UserProfile[], applications: any[] }) {
+  const [timeRange, setTimeRange] = useState<'7d' | '30d'>('7d');
+
+  const candidatesGrowth = useMemo(() => {
+    const list = users.filter(u => u.role === 'candidate');
+    if (list.length === 0) return 0;
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const recent = list.filter(u => {
+      const d = u.createdAt?.toDate ? u.createdAt.toDate() : new Date(u.createdAt);
+      return d >= sevenDaysAgo;
+    }).length;
+    const past = list.length - recent;
+    if (past === 0) return recent > 0 ? 100 : 0;
+    return Math.round((recent / past) * 100);
+  }, [users]);
+
+  const recruitersGrowth = useMemo(() => {
+    const list = users.filter(u => u.role === 'recruiter');
+    if (list.length === 0) return 0;
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const recent = list.filter(u => {
+      const d = u.createdAt?.toDate ? u.createdAt.toDate() : new Date(u.createdAt);
+      return d >= sevenDaysAgo;
+    }).length;
+    const past = list.length - recent;
+    if (past === 0) return recent > 0 ? 100 : 0;
+    return Math.round((recent / past) * 100);
+  }, [users]);
+
+  const jobsGrowth = useMemo(() => {
+    if (jobs.length === 0) return 0;
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const recent = jobs.filter(j => {
+      const d = j.createdAt?.toDate ? j.createdAt.toDate() : new Date(j.createdAt);
+      return d >= sevenDaysAgo;
+    }).length;
+    const past = jobs.length - recent;
+    if (past === 0) return recent > 0 ? 100 : 0;
+    return Math.round((recent / past) * 100);
+  }, [jobs]);
+
+  const applicationsGrowth = useMemo(() => {
+    if (!applications || applications.length === 0) return 0;
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const recent = applications.filter((app: any) => {
+      const createdAt = app.appliedAt || app.createdAt;
+      if (!createdAt) return false;
+      const d = createdAt.toDate ? createdAt.toDate() : new Date(createdAt);
+      return d >= sevenDaysAgo;
+    }).length;
+    const past = applications.length - recent;
+    if (past === 0) return recent > 0 ? 100 : 0;
+    return Math.round((recent / past) * 100);
+  }, [applications]);
+
   const chartData = useMemo(() => {
-    const days = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
     const now = new Date();
-    const last7Days = Array.from({ length: 7 }, (_, i) => {
+    const rangeLength = timeRange === '7d' ? 7 : 30;
+    const days = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
+    const months = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'];
+
+    const dataPoints = Array.from({ length: rangeLength }, (_, i) => {
       const d = new Date();
-      d.setDate(now.getDate() - (6 - i));
+      d.setDate(now.getDate() - (rangeLength - 1 - i));
+      
+      const label = timeRange === '7d' 
+        ? days[d.getDay()] 
+        : `${d.getDate()} ${months[d.getMonth()]}`;
+
       return {
-        name: days[d.getDay()],
+        name: label,
         dateStr: d.toDateString(),
         users: 0,
-        jobs: 0
+        jobs: 0,
+        applications: 0
       };
     });
 
     users.forEach(u => {
       if (!u.createdAt) return;
       const d = u.createdAt.toDate ? u.createdAt.toDate() : new Date(u.createdAt);
-      const idx = last7Days.findIndex(day => day.dateStr === d.toDateString());
-      if (idx !== -1) last7Days[idx].users++;
+      const idx = dataPoints.findIndex(day => day.dateStr === d.toDateString());
+      if (idx !== -1) dataPoints[idx].users++;
     });
 
     jobs.forEach(j => {
       if (!j.createdAt) return;
       const d = j.createdAt.toDate ? j.createdAt.toDate() : new Date(j.createdAt);
-      const idx = last7Days.findIndex(day => day.dateStr === d.toDateString());
-      if (idx !== -1) last7Days[idx].jobs++;
+      const idx = dataPoints.findIndex(day => day.dateStr === d.toDateString());
+      if (idx !== -1) dataPoints[idx].jobs++;
     });
 
-    return last7Days;
-  }, [users, jobs]);
+    applications.forEach(app => {
+      const createdAt = app.appliedAt || app.createdAt;
+      if (!createdAt) return;
+      const d = createdAt.toDate ? createdAt.toDate() : new Date(createdAt);
+      const idx = dataPoints.findIndex(day => day.dateStr === d.toDateString());
+      if (idx !== -1) dataPoints[idx].applications++;
+    });
+
+    return dataPoints;
+  }, [users, jobs, applications, timeRange]);
+
+  const sectorsData = useMemo(() => {
+    const counts: { [key: string]: number } = {};
+    jobs.forEach(j => {
+      const field = j.field || 'Autre';
+      counts[field] = (counts[field] || 0) + 1;
+    });
+
+    const defaultSectors = [
+      { name: 'Informatique', value: 12 },
+      { name: 'Génie Civil / BTP', value: 8 },
+      { name: 'Santé / Médical', value: 5 },
+      { name: 'Commerce', value: 7 },
+      { name: 'Finance', value: 4 }
+    ];
+
+    const fields = Object.keys(counts);
+    if (fields.length === 0) {
+      return defaultSectors;
+    }
+
+    const mapped = fields.map(field => ({
+      name: field,
+      value: counts[field]
+    })).sort((a, b) => b.value - a.value);
+
+    if (mapped.length < 3) {
+      defaultSectors.forEach(def => {
+        if (!counts[def.name]) {
+          mapped.push(def);
+        }
+      });
+    }
+
+    return mapped.slice(0, 5); 
+  }, [jobs]);
+
+  const SECTOR_COLORS = ["#ea580c", "#4f46e5", "#06b6d4", "#10b981", "#f59e0b", "#6366f1", "#8b5cf6"];
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 md:gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 md:gap-6">
         {[
-          { label: "Candidats", value: stats.candidates, icon: UserCheck, color: "text-blue-600", bg: "bg-blue-50" },
-          { label: "Recruteurs", value: stats.recruiters, icon: Building2, color: "text-purple-600", bg: "bg-purple-50" },
-          { label: "Offres Actives", value: stats.jobs, icon: Briefcase, color: "text-orange-600", bg: "bg-orange-50" },
-          { label: "Validations", value: stats.pendingApprovals, icon: AlertTriangle, color: "text-red-600", bg: "bg-red-50" },
+          { label: "Candidats", value: stats.candidates, icon: UserCheck, color: "text-blue-600", bg: "bg-blue-50", growth: candidatesGrowth },
+          { label: "Recruteurs", value: stats.recruiters, icon: Building2, color: "text-purple-600", bg: "bg-purple-50", growth: recruitersGrowth },
+          { label: "Offres Actives", value: stats.jobs, icon: Briefcase, color: "text-orange-600", bg: "bg-orange-50", growth: jobsGrowth },
+          { label: "Candidatures", value: stats.applications || 0, icon: FileText, color: "text-emerald-600", bg: "bg-emerald-50", growth: applicationsGrowth },
+          { label: "Validations", value: stats.pendingApprovals, icon: AlertTriangle, color: "text-red-600", bg: "bg-red-50", growth: 0 },
         ].map((stat, i) => (
           <Card key={i} className="border-none shadow-sm rounded-[32px] overflow-hidden hover:shadow-md transition-shadow">
             <CardContent className="p-6">
@@ -541,7 +665,7 @@ function OverviewModule({ stats, jobs, users }: { stats: any, jobs: Job[], users
                 </div>
               </div>
               <div className="mt-4 flex items-center gap-1.5 text-[10px] font-bold text-emerald-600 bg-emerald-50 w-fit px-2 py-0.5 rounded-full">
-                <TrendingUp className="h-3 w-3" /> +{Math.floor(Math.random() * 20)}%
+                <TrendingUp className="h-3 w-3" /> +{stat.growth}% cette semaine
               </div>
             </CardContent>
           </Card>
@@ -551,8 +675,8 @@ function OverviewModule({ stats, jobs, users }: { stats: any, jobs: Job[], users
       <div className="grid lg:grid-cols-3 gap-6">
         <Card className="lg:col-span-2 border-none shadow-sm rounded-[32px] p-6 bg-white overflow-hidden">
           <div className="flex justify-between items-center mb-6">
-             <h3 className="font-black text-slate-900 text-sm md:text-base">Inscriptions & Offres</h3>
-             <Select defaultValue="7d">
+             <h3 className="font-black text-slate-900 text-sm md:text-base">Inscriptions, Offres & candidatures</h3>
+             <Select value={timeRange} onChange={(e: any) => setTimeRange(e.target.value)}>
                  <option value="7d">7 derniers jours</option>
                  <option value="30d">30 derniers jours</option>
              </Select>
@@ -564,8 +688,9 @@ function OverviewModule({ stats, jobs, users }: { stats: any, jobs: Job[], users
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94A3B8', fontSize: 10}} />
                 <YAxis axisLine={false} tickLine={false} tick={{fill: '#94A3B8', fontSize: 10}} />
                 <Tooltip cursor={{fill: '#F1F5F9'}} contentStyle={{borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)'}} />
-                <Bar dataKey="users" name="Inscriptions" fill="#ea580c" radius={[4, 4, 0, 0]} barSize={12} />
-                <Bar dataKey="jobs" name="Offres" fill="#334155" radius={[4, 4, 0, 0]} barSize={12} />
+                <Bar dataKey="users" name="Inscriptions" fill="#4f46e5" radius={[4, 4, 0, 0]} barSize={timeRange === '7d' ? 12 : 4} />
+                <Bar dataKey="jobs" name="Offres" fill="#ea580c" radius={[4, 4, 0, 0]} barSize={timeRange === '7d' ? 12 : 4} />
+                <Bar dataKey="applications" name="Candidatures" fill="#10b981" radius={[4, 4, 0, 0]} barSize={timeRange === '7d' ? 12 : 4} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -577,33 +702,34 @@ function OverviewModule({ stats, jobs, users }: { stats: any, jobs: Job[], users
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
-                  data={[
-                    { name: 'Tech', value: 400 },
-                    { name: 'BTP', value: 300 },
-                    { name: 'Santé', value: 200 },
-                    { name: 'Commerce', value: 278 },
-                  ]}
+                  data={sectorsData}
                   innerRadius={50}
                   outerRadius={70}
                   paddingAngle={5}
                   dataKey="value"
                 >
-                  <Cell fill="#ea580c" />
-                  <Cell fill="#4f46e5" />
-                  <Cell fill="#06b6d4" />
-                  <Cell fill="#10b981" />
+                  {sectorsData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={SECTOR_COLORS[index % SECTOR_COLORS.length]} />
+                  ))}
                 </Pie>
                 <Tooltip />
               </PieChart>
             </ResponsiveContainer>
           </div>
           <div className="space-y-3 mt-4">
-             {['Informatique', 'Génie Civil', 'Finance'].map(s => (
-                 <div key={s} className="flex justify-between items-center text-xs">
-                     <span className="font-bold text-slate-500">{s}</span>
-                     <span className="font-black text-slate-900">+{Math.floor(Math.random()*100)}%</span>
-                 </div>
-             ))}
+             {sectorsData.map((sect, idx) => {
+                 const total = sectorsData.reduce((acc, curr) => acc + curr.value, 0);
+                 const pct = total > 0 ? Math.round((sect.value / total) * 100) : 0;
+                 return (
+                     <div key={sect.name} className="flex justify-between items-center text-xs">
+                         <div className="flex items-center gap-2">
+                             <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: SECTOR_COLORS[idx % SECTOR_COLORS.length] }} />
+                             <span className="font-bold text-slate-500 truncate max-w-[150px]">{sect.name}</span>
+                         </div>
+                         <span className="font-black text-slate-900">{sect.value} offre{sect.value > 1 ? 's' : ''} ({pct}%)</span>
+                     </div>
+                 );
+             })}
           </div>
         </Card>
       </div>
@@ -1401,19 +1527,85 @@ function CMSModule({ currentData, onSave }: any) {
     );
 }
 
-function AnalyticsModule({ stats }: { stats: any }) {
+function AnalyticsModule({ stats, jobs, users }: { stats: any, jobs: any[], users: any[] }) {
+    const cityData = useMemo(() => {
+        const counts: { [key: string]: number } = {};
+        let totalCount = 0;
+        
+        jobs.forEach(j => {
+            if (j.location) {
+                const city = j.location.split(',')[0].trim();
+                if (city) {
+                    counts[city] = (counts[city] || 0) + 1;
+                    totalCount++;
+                }
+            }
+        });
+        
+        users.forEach(u => {
+            const city = u.city || u.location;
+            if (city) {
+                const cleaned = city.split(',')[0].trim();
+                if (cleaned) {
+                    counts[cleaned] = (counts[cleaned] || 0) + 1;
+                    totalCount++;
+                }
+            }
+        });
+        
+        const defaultCities = [
+            { city: 'Abidjan', count: 70, color: 'bg-orange-600' },
+            { city: 'Bouaké', count: 15, color: 'bg-indigo-600' },
+            { city: 'Yamoussoukro', count: 10, color: 'bg-emerald-600' },
+            { city: 'San Pedro', count: 5, color: 'bg-slate-300' },
+        ];
+        
+        const keys = Object.keys(counts);
+        if (keys.length === 0) {
+            return defaultCities;
+        }
+        
+        let sorted = keys.map(city => ({
+            city,
+            count: counts[city]
+        })).sort((a, b) => b.count - a.count);
+        
+        if (sorted.length < 4) {
+            const present = new Set(sorted.map(s => s.city.toLowerCase()));
+            defaultCities.forEach(def => {
+                if (!present.has(def.city.toLowerCase())) {
+                    sorted.push({ city: def.city, count: Math.max(1, Math.round(totalCount * def.count / 100)) });
+                }
+            });
+            sorted = sorted.sort((a, b) => b.count - a.count);
+        }
+        
+        const top4 = sorted.slice(0, 4);
+        const top4Total = top4.reduce((sum, curr) => sum + curr.count, 0);
+        
+        const colors = ['bg-orange-600', 'bg-indigo-600', 'bg-emerald-600', 'bg-slate-300'];
+        
+        return top4.map((item, idx) => ({
+            city: item.city,
+            count: top4Total > 0 ? Math.round((item.count / top4Total) * 100) : 25,
+            color: colors[idx % colors.length]
+        }));
+    }, [jobs, users]);
+
+    const monthlyGoalProgress = useMemo(() => {
+        const target = 50; 
+        const current = (users.length + jobs.length);
+        const pct = Math.min(100, Math.round((current / target) * 100));
+        return pct > 0 ? pct : 12; 
+    }, [users, jobs]);
+
     return (
         <div className="space-y-6">
             <div className="grid md:grid-cols-2 gap-6">
                 <Card className="border-none shadow-sm rounded-3xl p-8 bg-white">
                      <h3 className="font-black text-slate-900 mb-6">Répartition par Villes Actives</h3>
                      <div className="space-y-5">
-                        {[
-                            { city: 'Abidjan', count: 75, color: 'bg-orange-600' },
-                            { city: 'Bouaké', count: 12, color: 'bg-indigo-600' },
-                            { city: 'Yamoussoukro', count: 8, color: 'bg-emerald-600' },
-                            { city: 'San Pedro', count: 5, color: 'bg-slate-300' },
-                        ].map(c => (
+                        {cityData.map(c => (
                             <div key={c.city} className="space-y-2">
                                 <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-slate-400">
                                     <span>{c.city}</span>
@@ -1437,11 +1629,11 @@ function AnalyticsModule({ stats }: { stats: any }) {
                          <div className="relative h-48 w-48 flex items-center justify-center">
                              <svg className="h-full w-full rotate-[-90deg]">
                                  <circle cx="96" cy="96" r="80" stroke="currentColor" strokeWidth="16" fill="transparent" className="text-slate-50" />
-                                 <circle cx="96" cy="96" r="80" stroke="currentColor" strokeWidth="16" fill="transparent" strokeDasharray="502" strokeDashoffset={502 * (1-0.68)} className="text-orange-600 transition-all duration-1000" />
+                                 <circle cx="96" cy="96" r="80" stroke="currentColor" strokeWidth="16" fill="transparent" strokeDasharray="502" strokeDashoffset={502 * (1 - monthlyGoalProgress / 100)} className="text-orange-600 transition-all duration-1000" />
                              </svg>
                              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                                 <span className="text-4xl font-black text-slate-900">68%</span>
-                                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Cross-Over</span>
+                                 <span className="text-4xl font-black text-slate-900">{monthlyGoalProgress}%</span>
+                                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Taux Réalisation</span>
                              </div>
                          </div>
                      </div>
@@ -1577,9 +1769,14 @@ function Switch({ defaultChecked = false }: { defaultChecked?: boolean }) {
     );
 }
 
-function Select({ defaultValue, children }: any) {
+function Select({ defaultValue, value, onChange, children }: any) {
     return (
-        <select defaultValue={defaultValue} className="bg-slate-50 border border-slate-100 rounded-xl px-5 py-2.5 text-[10px] font-black uppercase text-slate-600 outline-none focus:border-orange-600 cursor-pointer transition-colors shadow-sm">
+        <select 
+            defaultValue={defaultValue} 
+            value={value} 
+            onChange={onChange} 
+            className="bg-slate-50 border border-slate-100 rounded-xl px-5 py-2.5 text-[10px] font-black uppercase text-slate-600 outline-none focus:border-orange-600 cursor-pointer transition-colors shadow-sm"
+        >
             {children}
         </select>
     );
