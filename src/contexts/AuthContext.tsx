@@ -45,6 +45,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let unsubscribeProfile: (() => void) | null = null;
+    let isRedirectChecking = true;
 
     // Handle standard Google login redirect results (necessary for mobile/Safari compatibility under custom domains)
     const handleRedirectResult = async () => {
@@ -75,6 +76,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       } catch (error) {
         console.error("Error retrieving redirect login result:", error);
+      } finally {
+        isRedirectChecking = false;
+        // If there's no currentUser loaded, nobody is logged in, so safe to stop loading
+        if (!auth.currentUser) {
+          setLoading(false);
+        }
       }
     };
 
@@ -103,7 +110,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         });
       } else {
         setUser(null);
-        setLoading(false);
+        // Only set loading to false if we are not currently processing a Google Auth Redirect
+        if (!isRedirectChecking) {
+          setLoading(false);
+        }
       }
     });
 
@@ -121,17 +131,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Store preferred role in localStorage in case we need it after redirect
       localStorage.setItem('google_preferred_role', preferredRole);
 
-      // Detect Safari / iOS / Mobile to prefer redirect for a better UX on restricted devices
-      const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-      const isMobile = /Android|webOS|iPhone|iPad|Macintosh|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-      
-      if (isSafari || isMobile) {
-        console.log("Safari/Mobile detected, utilizing redirect flow for Google Login...");
-        await signInWithRedirect(auth, provider);
-        return;
-      }
-
       try {
+        console.log("Attempting Google login via Popup flow...");
         const result = await signInWithPopup(auth, provider);
         const firebaseUser = result.user;
 
@@ -154,21 +155,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } else {
           setUser(userDoc.data() as UserProfile);
         }
+        setLoading(false);
       } catch (popupError: any) {
-        console.warn("Popup blocked or failed, falling back to redirect...", popupError);
-        if (popupError.code === 'auth/popup-blocked' || 
-            popupError.code === 'auth/operation-not-supported-in-this-environment' ||
-            popupError.code === 'auth/web-storage-unsupported') {
-          await signInWithRedirect(auth, provider);
-        } else {
-          throw popupError;
-        }
+        console.warn("Popup blocked or failed, falling back to secure redirect...", popupError);
+        await signInWithRedirect(auth, provider);
+        // Skip setting loading to false since the browser is redirecting
+        return;
       }
     } catch (error) {
       console.error('Login error:', error);
-      throw error;
-    } finally {
       setLoading(false);
+      throw error;
     }
   };
 
