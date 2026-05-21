@@ -17,6 +17,9 @@ async function startServer() {
   app.use('/__/auth', createProxyMiddleware({
     target: 'https://ngsite-d9cdc.firebaseapp.com',
     changeOrigin: true,
+    pathRewrite: (path) => {
+      return '/__/auth' + path;
+    },
   }));
 
   // Simple API or health routes can go here
