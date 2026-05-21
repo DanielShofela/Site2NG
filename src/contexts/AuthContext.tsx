@@ -8,8 +8,6 @@ import { UserProfile, UserRole, ApprovalStatus } from '@/types';
 import { 
   onAuthStateChanged, 
   signInWithPopup, 
-  signInWithRedirect,
-  getRedirectResult,
   GoogleAuthProvider, 
   signOut,
   createUserWithEmailAndPassword,
@@ -45,47 +43,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let unsubscribeProfile: (() => void) | null = null;
-    let isRedirectChecking = true;
-
-    // Handle standard Google login redirect results (necessary for mobile/Safari compatibility under custom domains)
-    const handleRedirectResult = async () => {
-      try {
-        const result = await getRedirectResult(auth);
-        if (result && result.user) {
-          const firebaseUser = result.user;
-          const userRef = doc(db, 'users', firebaseUser.uid);
-          const userDoc = await getDoc(userRef);
-
-          if (!userDoc.exists()) {
-            const preferredRole = (localStorage.getItem('google_preferred_role') as UserRole) || 'candidate';
-            const newProfile: UserProfile = {
-              uid: firebaseUser.uid,
-              email: firebaseUser.email || '',
-              role: preferredRole,
-              status: preferredRole === 'recruiter' ? 'pending' : 'approved',
-              displayName: firebaseUser.displayName || 'Utilisateur',
-              companyName: preferredRole === 'recruiter' ? (firebaseUser.displayName || '') : undefined,
-              photoUrl: firebaseUser.photoURL || null,
-              createdAt: serverTimestamp(),
-            };
-            await setDoc(userRef, newProfile);
-            setUser(newProfile);
-          } else {
-            setUser(userDoc.data() as UserProfile);
-          }
-        }
-      } catch (error) {
-        console.error("Error retrieving redirect login result:", error);
-      } finally {
-        isRedirectChecking = false;
-        // If there's no currentUser loaded, nobody is logged in, so safe to stop loading
-        if (!auth.currentUser) {
-          setLoading(false);
-        }
-      }
-    };
-
-    handleRedirectResult();
 
     const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
       if (unsubscribeProfile) {
@@ -110,10 +67,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         });
       } else {
         setUser(null);
-        // Only set loading to false if we are not currently processing a Google Auth Redirect
-        if (!isRedirectChecking) {
-          setLoading(false);
-        }
+        setLoading(false);
       }
     });
 
@@ -127,45 +81,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setLoading(true);
     try {
       const provider = new GoogleAuthProvider();
-      
-      // Store preferred role in localStorage in case we need it after redirect
-      localStorage.setItem('google_preferred_role', preferredRole);
+      const result = await signInWithPopup(auth, provider);
+      const firebaseUser = result.user;
 
-      try {
-        console.log("Attempting Google login via Popup flow...");
-        const result = await signInWithPopup(auth, provider);
-        const firebaseUser = result.user;
+      const userRef = doc(db, 'users', firebaseUser.uid);
+      const userDoc = await getDoc(userRef);
 
-        const userRef = doc(db, 'users', firebaseUser.uid);
-        const userDoc = await getDoc(userRef);
-
-        if (!userDoc.exists()) {
-          const newProfile: UserProfile = {
-            uid: firebaseUser.uid,
-            email: firebaseUser.email || '',
-            role: preferredRole,
-            status: preferredRole === 'recruiter' ? 'pending' : 'approved',
-            displayName: firebaseUser.displayName || 'Utilisateur',
-            companyName: preferredRole === 'recruiter' ? (firebaseUser.displayName || '') : undefined,
-            photoUrl: firebaseUser.photoURL || null,
-            createdAt: serverTimestamp(),
-          };
-          await setDoc(userRef, newProfile);
-          setUser(newProfile);
-        } else {
-          setUser(userDoc.data() as UserProfile);
-        }
-        setLoading(false);
-      } catch (popupError: any) {
-        console.warn("Popup blocked or failed, falling back to secure redirect...", popupError);
-        await signInWithRedirect(auth, provider);
-        // Skip setting loading to false since the browser is redirecting
-        return;
+      if (!userDoc.exists()) {
+        const newProfile: UserProfile = {
+          uid: firebaseUser.uid,
+          email: firebaseUser.email || '',
+          role: preferredRole,
+          status: preferredRole === 'recruiter' ? 'pending' : 'approved',
+          displayName: firebaseUser.displayName || 'Utilisateur',
+          companyName: preferredRole === 'recruiter' ? (firebaseUser.displayName || '') : undefined,
+          photoUrl: firebaseUser.photoURL || null,
+          createdAt: serverTimestamp(),
+        };
+        await setDoc(userRef, newProfile);
+        setUser(newProfile);
+      } else {
+        setUser(userDoc.data() as UserProfile);
       }
     } catch (error) {
       console.error('Login error:', error);
-      setLoading(false);
       throw error;
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -214,19 +156,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
       if (userDoc.exists()) {
         setUser(userDoc.data() as UserProfile);
-      } else {
-        // Self-heal mechanism: recreate a profile if missing in Firestore to avoid lock-outs
-        const newProfile: UserProfile = {
-          uid: firebaseUser.uid,
-          email: firebaseUser.email || email,
-          role: 'candidate',
-          status: 'approved',
-          displayName: firebaseUser.displayName || email.split('@')[0],
-          photoUrl: firebaseUser.photoURL || null,
-          createdAt: serverTimestamp(),
-        };
-        await setDoc(doc(db, 'users', firebaseUser.uid), newProfile);
-        setUser(newProfile);
       }
     } catch (error) {
       console.error('Login error:', error);

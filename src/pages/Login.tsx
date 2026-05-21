@@ -25,7 +25,7 @@ export default function Login() {
   useEffect(() => {
     if (!authLoading && user) {
       if (user.role === 'recruiter') {
-        if (user.status === 'pending' || user.status === 'submitted') {
+        if (user.status === 'pending') {
           navigate('/pending-approval');
         } else {
           navigate('/recruiter');

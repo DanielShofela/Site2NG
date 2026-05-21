@@ -30,7 +30,7 @@ function ProtectedRoute({ children, role }: { children: React.ReactNode, role: s
   if (!user) return <Navigate to="/login" />;
   
   // Recruiter pending status check
-  if (user.role === 'recruiter' && (user.status === 'pending' || user.status === 'submitted') && window.location.pathname !== '/pending-approval') {
+  if (user.role === 'recruiter' && user.status === 'pending' && window.location.pathname !== '/pending-approval') {
     return <Navigate to="/pending-approval" />;
   }
 
