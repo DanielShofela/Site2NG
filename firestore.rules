@@ -45,7 +45,11 @@ service cloud.firestore {
       allow create: if isOwner(userId) && 
                       incoming().uid == userId &&
                       incoming().role in ['candidate', 'recruiter', 'admin'] &&
-                      incoming().status == (incoming().role == 'recruiter' ? 'pending' : 'approved');
+                      (
+                        (incoming().role == 'recruiter' && (incoming().status == 'pending' || incoming().status == 'submitted')) ||
+                        (incoming().role == 'candidate' && incoming().status == 'approved') ||
+                        (incoming().role == 'admin' && incoming().status == 'approved')
+                      );
       
       allow update: if isAdmin() || (
         isOwner(userId) && 

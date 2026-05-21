@@ -156,6 +156,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
       if (userDoc.exists()) {
         setUser(userDoc.data() as UserProfile);
+      } else {
+        // Self-heal mechanism: recreate a profile if missing in Firestore to avoid lock-outs
+        const newProfile: UserProfile = {
+          uid: firebaseUser.uid,
+          email: firebaseUser.email || email,
+          role: 'candidate',
+          status: 'approved',
+          displayName: firebaseUser.displayName || email.split('@')[0],
+          photoUrl: firebaseUser.photoURL || null,
+          createdAt: serverTimestamp(),
+        };
+        await setDoc(doc(db, 'users', firebaseUser.uid), newProfile);
+        setUser(newProfile);
       }
     } catch (error) {
       console.error('Login error:', error);
