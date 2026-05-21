@@ -8,6 +8,8 @@ import { UserProfile, UserRole, ApprovalStatus } from '@/types';
 import { 
   onAuthStateChanged, 
   signInWithPopup, 
+  signInWithRedirect,
+  getRedirectResult,
   GoogleAuthProvider, 
   signOut,
   createUserWithEmailAndPassword,
@@ -43,6 +45,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let unsubscribeProfile: (() => void) | null = null;
+
+    // Handle standard Google login redirect results (necessary for mobile/Safari compatibility under custom domains)
+    const handleRedirectResult = async () => {
+      try {
+        const result = await getRedirectResult(auth);
+        if (result && result.user) {
+          const firebaseUser = result.user;
+          const userRef = doc(db, 'users', firebaseUser.uid);
+          const userDoc = await getDoc(userRef);
+
+          if (!userDoc.exists()) {
+            const preferredRole = (localStorage.getItem('google_preferred_role') as UserRole) || 'candidate';
+            const newProfile: UserProfile = {
+              uid: firebaseUser.uid,
+              email: firebaseUser.email || '',
+              role: preferredRole,
+              status: preferredRole === 'recruiter' ? 'pending' : 'approved',
+              displayName: firebaseUser.displayName || 'Utilisateur',
+              companyName: preferredRole === 'recruiter' ? (firebaseUser.displayName || '') : undefined,
+              photoUrl: firebaseUser.photoURL || null,
+              createdAt: serverTimestamp(),
+            };
+            await setDoc(userRef, newProfile);
+            setUser(newProfile);
+          } else {
+            setUser(userDoc.data() as UserProfile);
+          }
+        }
+      } catch (error) {
+        console.error("Error retrieving redirect login result:", error);
+      }
+    };
+
+    handleRedirectResult();
 
     const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
       if (unsubscribeProfile) {
@@ -81,27 +117,52 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setLoading(true);
     try {
       const provider = new GoogleAuthProvider();
-      const result = await signInWithPopup(auth, provider);
-      const firebaseUser = result.user;
+      
+      // Store preferred role in localStorage in case we need it after redirect
+      localStorage.setItem('google_preferred_role', preferredRole);
 
-      const userRef = doc(db, 'users', firebaseUser.uid);
-      const userDoc = await getDoc(userRef);
+      // Detect Safari / iOS / Mobile to prefer redirect for a better UX on restricted devices
+      const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+      const isMobile = /Android|webOS|iPhone|iPad|Macintosh|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      
+      if (isSafari || isMobile) {
+        console.log("Safari/Mobile detected, utilizing redirect flow for Google Login...");
+        await signInWithRedirect(auth, provider);
+        return;
+      }
 
-      if (!userDoc.exists()) {
-        const newProfile: UserProfile = {
-          uid: firebaseUser.uid,
-          email: firebaseUser.email || '',
-          role: preferredRole,
-          status: preferredRole === 'recruiter' ? 'pending' : 'approved',
-          displayName: firebaseUser.displayName || 'Utilisateur',
-          companyName: preferredRole === 'recruiter' ? (firebaseUser.displayName || '') : undefined,
-          photoUrl: firebaseUser.photoURL || null,
-          createdAt: serverTimestamp(),
-        };
-        await setDoc(userRef, newProfile);
-        setUser(newProfile);
-      } else {
-        setUser(userDoc.data() as UserProfile);
+      try {
+        const result = await signInWithPopup(auth, provider);
+        const firebaseUser = result.user;
+
+        const userRef = doc(db, 'users', firebaseUser.uid);
+        const userDoc = await getDoc(userRef);
+
+        if (!userDoc.exists()) {
+          const newProfile: UserProfile = {
+            uid: firebaseUser.uid,
+            email: firebaseUser.email || '',
+            role: preferredRole,
+            status: preferredRole === 'recruiter' ? 'pending' : 'approved',
+            displayName: firebaseUser.displayName || 'Utilisateur',
+            companyName: preferredRole === 'recruiter' ? (firebaseUser.displayName || '') : undefined,
+            photoUrl: firebaseUser.photoURL || null,
+            createdAt: serverTimestamp(),
+          };
+          await setDoc(userRef, newProfile);
+          setUser(newProfile);
+        } else {
+          setUser(userDoc.data() as UserProfile);
+        }
+      } catch (popupError: any) {
+        console.warn("Popup blocked or failed, falling back to redirect...", popupError);
+        if (popupError.code === 'auth/popup-blocked' || 
+            popupError.code === 'auth/operation-not-supported-in-this-environment' ||
+            popupError.code === 'auth/web-storage-unsupported') {
+          await signInWithRedirect(auth, provider);
+        } else {
+          throw popupError;
+        }
       }
     } catch (error) {
       console.error('Login error:', error);

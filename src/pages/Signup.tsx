@@ -389,7 +389,10 @@ export default function Signup() {
                             onChange={async (e) => {
                               const file = e.target.files?.[0];
                               if (!file) return;
-                              if (file.size > 1024 * 1024) { alert("Fichier trop lourd (Max 1Mo)"); return; }
+                              if (file.size > 350 * 1024) { 
+                                alert("Document trop volumineux (Maximum 350 Ko requis pour ce document). Veuillez compresser votre PDF/Image avant l'envoi."); 
+                                return; 
+                              }
                               const reader = new FileReader();
                               reader.onloadend = () => {
                                 setFormData({
@@ -403,7 +406,6 @@ export default function Signup() {
                               };
                               reader.readAsDataURL(file);
                             }}
-                            required
                           />
                           <Upload className="h-6 w-6 text-slate-300 mx-auto mb-2 group-hover:text-orange-500 transition-colors" />
                           <p className="text-xs font-black text-slate-900">RCCM</p>
@@ -420,7 +422,10 @@ export default function Signup() {
                             onChange={async (e) => {
                               const file = e.target.files?.[0];
                               if (!file) return;
-                              if (file.size > 1024 * 1024) { alert("Fichier trop lourd (Max 1Mo)"); return; }
+                              if (file.size > 350 * 1024) { 
+                                alert("Document trop volumineux (Maximum 350 Ko requis pour ce document). Veuillez compresser votre PDF/Image avant l'envoi."); 
+                                return; 
+                              }
                               const reader = new FileReader();
                               reader.onloadend = () => {
                                 setFormData({
@@ -434,7 +439,6 @@ export default function Signup() {
                               };
                               reader.readAsDataURL(file);
                             }}
-                            required
                           />
                           <Upload className="h-6 w-6 text-slate-300 mx-auto mb-2 group-hover:text-orange-500 transition-colors" />
                           <p className="text-xs font-black text-slate-900">Attestation Fiscale</p>
