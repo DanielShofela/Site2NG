@@ -14,6 +14,25 @@ import { Briefcase, Lock, Mail, ArrowRight } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useAuth } from '@/contexts/AuthContext';
 
+function translateAuthError(error: any, defaultMessage: string = "Une erreur est survenue"): string {
+  if (!error) return defaultMessage;
+  
+  const code = error.code || '';
+  const message = error.message || '';
+  
+  if (code === 'auth/user-disabled' || message.includes('auth/user-disabled')) {
+    return "Ce compte a été suspendu pour des raisons de sécurité ou d'inactivité.";
+  }
+  if (code === 'auth/network-request-failed' || message.includes('auth/network-request-failed')) {
+    return "Erreur réseau. Veuillez vérifier votre connexion Internet et réessayer.";
+  }
+  if (code === 'auth/popup-closed-by-user' || message.includes('auth/popup-closed-by-user')) {
+    return "La fenêtre de connexion a été fermée avant la fin de l'opération.";
+  }
+  
+  return defaultMessage;
+}
+
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -45,7 +64,7 @@ export default function Login() {
       await loginWithGoogle();
     } catch (error: any) {
       console.error(error);
-      setError(error.message || "Erreur lors de la connexion Google");
+      setError(translateAuthError(error, "Erreur lors de la connexion Google"));
     } finally {
       setIsLoading(false);
     }
@@ -59,7 +78,7 @@ export default function Login() {
       await loginWithEmail(email, password);
     } catch (error: any) {
       console.error(error);
-      setError("Email ou mot de passe incorrect");
+      setError(translateAuthError(error, "Email ou mot de passe incorrect"));
     } finally {
       setIsLoading(false);
     }

@@ -18,6 +18,34 @@ import { motion } from 'motion/react';
 import { UserRole, UserProfile } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
 
+function translateAuthError(error: any, defaultMessage: string = "Une erreur est survenue"): string {
+  if (!error) return defaultMessage;
+  
+  const code = error.code || '';
+  const message = error.message || '';
+  
+  if (code === 'auth/email-already-in-use' || message.includes('auth/email-already-in-use') || message.includes('email-already-in-use')) {
+    return "Cette adresse email est déjà associée à un compte de candidat ou de recruteur. Veuillez utiliser une autre adresse ou vous connecter.";
+  }
+  if (code === 'auth/invalid-email' || message.includes('auth/invalid-email')) {
+    return "L'adresse email saisie n'est pas valide. Veuillez la vérifier.";
+  }
+  if (code === 'auth/weak-password' || message.includes('auth/weak-password')) {
+    return "Le mot de passe est trop faible. Il doit contenir au moins 6 caractères.";
+  }
+  if (code === 'auth/popup-closed-by-user' || message.includes('auth/popup-closed-by-user')) {
+    return "La fenêtre d'authentification a été fermée avant la fin de l'opération.";
+  }
+  if (code === 'auth/user-disabled' || message.includes('auth/user-disabled')) {
+    return "Ce compte a été suspendu pour des raisons de sécurité ou d'inactivité.";
+  }
+  if (code === 'auth/network-request-failed' || message.includes('auth/network-request-failed')) {
+    return "Erreur réseau. Veuillez vérifier votre connexion Internet et réessayer.";
+  }
+  
+  return error.message || defaultMessage;
+}
+
 export default function Signup() {
   const [searchParams] = useSearchParams();
   const initialRole = (searchParams.get('role') as UserRole) || 'candidate';
@@ -123,7 +151,7 @@ export default function Signup() {
       await signupWithEmail(formData.email, formData.password, userData);
     } catch (error: any) {
       console.error(error);
-      setError(error.message || "Une erreur est survenue lors de l'inscription");
+      setError(translateAuthError(error, "Une erreur est survenue lors de l'inscription"));
     } finally {
       setIsLoading(false);
     }
@@ -135,7 +163,7 @@ export default function Signup() {
       await loginWithGoogle(role);
     } catch (error: any) {
       console.error(error);
-      setError(error.message || "Erreur lors de l'authentification Google");
+      setError(translateAuthError(error, "Erreur lors de l'authentification Google"));
     } finally {
       setIsLoading(false);
     }
