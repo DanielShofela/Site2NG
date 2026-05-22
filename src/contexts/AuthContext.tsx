@@ -8,6 +8,8 @@ import { UserProfile, UserRole, ApprovalStatus } from '@/types';
 import { 
   onAuthStateChanged, 
   signInWithPopup, 
+  signInWithRedirect,
+  getRedirectResult,
   GoogleAuthProvider, 
   signOut,
   createUserWithEmailAndPassword,
@@ -23,6 +25,33 @@ import {
   onSnapshot 
 } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
+
+export function cleanUndefined<T>(obj: T): T {
+  if (obj === undefined) {
+    return undefined as any;
+  }
+  if (typeof obj !== 'object' || obj === null) {
+    return obj;
+  }
+  if (Array.isArray(obj)) {
+    return obj.map(item => cleanUndefined(item)) as any;
+  }
+  
+  // Clean only plain objects
+  const proto = Object.getPrototypeOf(obj);
+  if (proto !== null && proto !== Object.prototype) {
+    return obj;
+  }
+
+  const cleaned: any = {};
+  for (const key of Object.keys(obj as any)) {
+    const val = (obj as any)[key];
+    if (val !== undefined) {
+      cleaned[key] = cleanUndefined(val);
+    }
+  }
+  return cleaned as T;
+}
 
 interface AuthContextType {
   user: UserProfile | null;
@@ -43,6 +72,47 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let unsubscribeProfile: (() => void) | null = null;
+    let isRedirectChecking = true;
+
+    // Handle standard Google login redirect results (necessary for mobile/Safari compatibility under custom domains)
+    const handleRedirectResult = async () => {
+      try {
+        const result = await getRedirectResult(auth);
+        if (result && result.user) {
+          const firebaseUser = result.user;
+          const userRef = doc(db, 'users', firebaseUser.uid);
+          const userDoc = await getDoc(userRef);
+
+          if (!userDoc.exists()) {
+            const preferredRole = (localStorage.getItem('google_preferred_role') as UserRole) || 'candidate';
+            const newProfile: UserProfile = {
+              uid: firebaseUser.uid,
+              email: firebaseUser.email || '',
+              role: preferredRole,
+              status: preferredRole === 'recruiter' ? 'pending' : 'approved',
+              displayName: firebaseUser.displayName || 'Utilisateur',
+              companyName: preferredRole === 'recruiter' ? (firebaseUser.displayName || '') : undefined,
+              photoUrl: firebaseUser.photoURL || null,
+              createdAt: serverTimestamp(),
+            };
+            await setDoc(userRef, cleanUndefined(newProfile));
+            setUser(newProfile);
+          } else {
+            setUser(userDoc.data() as UserProfile);
+          }
+        }
+      } catch (error) {
+        console.error("Error retrieving redirect login result:", error);
+      } finally {
+        isRedirectChecking = false;
+        // If there's no currentUser loaded, nobody is logged in, so safe to stop loading
+        if (!auth.currentUser) {
+          setLoading(false);
+        }
+      }
+    };
+
+    handleRedirectResult();
 
     const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
       if (unsubscribeProfile) {
@@ -67,7 +137,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         });
       } else {
         setUser(null);
-        setLoading(false);
+        // Only set loading to false if we are not currently processing a Google Auth Redirect
+        if (!isRedirectChecking) {
+          setLoading(false);
+        }
       }
     });
 
@@ -81,33 +154,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setLoading(true);
     try {
       const provider = new GoogleAuthProvider();
-      const result = await signInWithPopup(auth, provider);
-      const firebaseUser = result.user;
+      
+      // Store preferred role in localStorage in case we need it after redirect
+      localStorage.setItem('google_preferred_role', preferredRole);
 
-      const userRef = doc(db, 'users', firebaseUser.uid);
-      const userDoc = await getDoc(userRef);
+      try {
+        console.log("Attempting Google login via Popup flow...");
+        const result = await signInWithPopup(auth, provider);
+        const firebaseUser = result.user;
 
-      if (!userDoc.exists()) {
-        const newProfile: UserProfile = {
-          uid: firebaseUser.uid,
-          email: firebaseUser.email || '',
-          role: preferredRole,
-          status: preferredRole === 'recruiter' ? 'pending' : 'approved',
-          displayName: firebaseUser.displayName || 'Utilisateur',
-          companyName: preferredRole === 'recruiter' ? (firebaseUser.displayName || '') : undefined,
-          photoUrl: firebaseUser.photoURL || null,
-          createdAt: serverTimestamp(),
-        };
-        await setDoc(userRef, newProfile);
-        setUser(newProfile);
-      } else {
-        setUser(userDoc.data() as UserProfile);
+        const userRef = doc(db, 'users', firebaseUser.uid);
+        const userDoc = await getDoc(userRef);
+
+        if (!userDoc.exists()) {
+          const newProfile: UserProfile = {
+            uid: firebaseUser.uid,
+            email: firebaseUser.email || '',
+            role: preferredRole,
+            status: preferredRole === 'recruiter' ? 'pending' : 'approved',
+            displayName: firebaseUser.displayName || 'Utilisateur',
+            companyName: preferredRole === 'recruiter' ? (firebaseUser.displayName || '') : undefined,
+            photoUrl: firebaseUser.photoURL || null,
+            createdAt: serverTimestamp(),
+          };
+          await setDoc(userRef, cleanUndefined(newProfile));
+          setUser(newProfile);
+        } else {
+          setUser(userDoc.data() as UserProfile);
+        }
+        setLoading(false);
+      } catch (popupError: any) {
+        console.warn("Popup blocked or failed, falling back to secure redirect...", popupError);
+        await signInWithRedirect(auth, provider);
+        // Skip setting loading to false since the browser is redirecting
+        return;
       }
     } catch (error) {
       console.error('Login error:', error);
-      throw error;
-    } finally {
       setLoading(false);
+      throw error;
     }
   };
 
@@ -137,7 +222,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         createdAt: serverTimestamp(),
       };
 
-      await setDoc(doc(db, 'users', firebaseUser.uid), newProfile);
+      await setDoc(doc(db, 'users', firebaseUser.uid), cleanUndefined(newProfile));
       setUser(newProfile);
     } catch (error) {
       console.error('Signup error:', error);
@@ -156,6 +241,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
       if (userDoc.exists()) {
         setUser(userDoc.data() as UserProfile);
+      } else {
+        // Self-heal mechanism: recreate a profile if missing in Firestore to avoid lock-outs
+        const newProfile: UserProfile = {
+          uid: firebaseUser.uid,
+          email: firebaseUser.email || email,
+          role: 'candidate',
+          status: 'approved',
+          displayName: firebaseUser.displayName || email.split('@')[0],
+          photoUrl: firebaseUser.photoURL || null,
+          createdAt: serverTimestamp(),
+        };
+        await setDoc(doc(db, 'users', firebaseUser.uid), cleanUndefined(newProfile));
+        setUser(newProfile);
       }
     } catch (error) {
       console.error('Login error:', error);
@@ -187,7 +285,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!user) return;
     try {
       const userRef = doc(db, 'users', user.uid);
-      await updateDoc(userRef, data);
+      await updateDoc(userRef, cleanUndefined(data));
       
       // Update local state
       setUser(prev => prev ? { ...prev, ...data } : null);

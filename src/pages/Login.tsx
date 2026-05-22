@@ -10,32 +10,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Briefcase, Lock, Mail, ArrowRight } from 'lucide-react';
+import { Briefcase, Lock, Mail, ArrowRight, Eye, EyeOff } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useAuth } from '@/contexts/AuthContext';
-
-function translateAuthError(error: any, defaultMessage: string = "Une erreur est survenue"): string {
-  if (!error) return defaultMessage;
-  
-  const code = error.code || '';
-  const message = error.message || '';
-  
-  if (code === 'auth/user-disabled' || message.includes('auth/user-disabled')) {
-    return "Ce compte a été suspendu pour des raisons de sécurité ou d'inactivité.";
-  }
-  if (code === 'auth/network-request-failed' || message.includes('auth/network-request-failed')) {
-    return "Erreur réseau. Veuillez vérifier votre connexion Internet et réessayer.";
-  }
-  if (code === 'auth/popup-closed-by-user' || message.includes('auth/popup-closed-by-user')) {
-    return "La fenêtre de connexion a été fermée avant la fin de l'opération.";
-  }
-  
-  return defaultMessage;
-}
 
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { user, loginWithGoogle, loginWithEmail, loading: authLoading } = useAuth();
@@ -44,7 +26,7 @@ export default function Login() {
   useEffect(() => {
     if (!authLoading && user) {
       if (user.role === 'recruiter') {
-        if (user.status === 'pending') {
+        if (user.status === 'pending' || user.status === 'submitted') {
           navigate('/pending-approval');
         } else {
           navigate('/recruiter');
@@ -64,7 +46,7 @@ export default function Login() {
       await loginWithGoogle();
     } catch (error: any) {
       console.error(error);
-      setError(translateAuthError(error, "Erreur lors de la connexion Google"));
+      setError(error.message || "Erreur lors de la connexion Google");
     } finally {
       setIsLoading(false);
     }
@@ -78,7 +60,7 @@ export default function Login() {
       await loginWithEmail(email, password);
     } catch (error: any) {
       console.error(error);
-      setError(translateAuthError(error, "Email ou mot de passe incorrect"));
+      setError("Email ou mot de passe incorrect");
     } finally {
       setIsLoading(false);
     }
@@ -140,12 +122,20 @@ export default function Login() {
                   <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
                   <Input 
                     id="password" 
-                    type="password" 
-                    className="pl-12 h-14 rounded-2xl border-slate-200 focus-visible:ring-orange-600"
+                    type={showPassword ? "text" : "password"} 
+                    className="pl-12 pr-12 h-14 rounded-2xl border-slate-200 focus-visible:ring-orange-600"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none transition-colors"
+                    title={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+                  >
+                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                  </button>
                 </div>
               </div>
             </CardContent>

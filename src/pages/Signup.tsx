@@ -13,38 +13,10 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Briefcase, Building2, User, Mail, Lock, Phone, MapPin, Upload, ArrowRight } from 'lucide-react';
+import { Briefcase, Building2, User, Mail, Lock, Phone, MapPin, Upload, ArrowRight, Eye, EyeOff } from 'lucide-react';
 import { motion } from 'motion/react';
 import { UserRole, UserProfile } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
-
-function translateAuthError(error: any, defaultMessage: string = "Une erreur est survenue"): string {
-  if (!error) return defaultMessage;
-  
-  const code = error.code || '';
-  const message = error.message || '';
-  
-  if (code === 'auth/email-already-in-use' || message.includes('auth/email-already-in-use') || message.includes('email-already-in-use')) {
-    return "Cette adresse email est déjà associée à un compte de candidat ou de recruteur. Veuillez utiliser une autre adresse ou vous connecter.";
-  }
-  if (code === 'auth/invalid-email' || message.includes('auth/invalid-email')) {
-    return "L'adresse email saisie n'est pas valide. Veuillez la vérifier.";
-  }
-  if (code === 'auth/weak-password' || message.includes('auth/weak-password')) {
-    return "Le mot de passe est trop faible. Il doit contenir au moins 6 caractères.";
-  }
-  if (code === 'auth/popup-closed-by-user' || message.includes('auth/popup-closed-by-user')) {
-    return "La fenêtre d'authentification a été fermée avant la fin de l'opération.";
-  }
-  if (code === 'auth/user-disabled' || message.includes('auth/user-disabled')) {
-    return "Ce compte a été suspendu pour des raisons de sécurité ou d'inactivité.";
-  }
-  if (code === 'auth/network-request-failed' || message.includes('auth/network-request-failed')) {
-    return "Erreur réseau. Veuillez vérifier votre connexion Internet et réessayer.";
-  }
-  
-  return error.message || defaultMessage;
-}
 
 export default function Signup() {
   const [searchParams] = useSearchParams();
@@ -90,6 +62,8 @@ export default function Signup() {
   });
 
   const [error, setError] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   useEffect(() => {
     if (!authLoading && user) {
@@ -151,7 +125,7 @@ export default function Signup() {
       await signupWithEmail(formData.email, formData.password, userData);
     } catch (error: any) {
       console.error(error);
-      setError(translateAuthError(error, "Une erreur est survenue lors de l'inscription"));
+      setError(error.message || "Une erreur est survenue lors de l'inscription");
     } finally {
       setIsLoading(false);
     }
@@ -163,7 +137,7 @@ export default function Signup() {
       await loginWithGoogle(role);
     } catch (error: any) {
       console.error(error);
-      setError(translateAuthError(error, "Erreur lors de l'authentification Google"));
+      setError(error.message || "Erreur lors de l'authentification Google");
     } finally {
       setIsLoading(false);
     }
@@ -417,7 +391,10 @@ export default function Signup() {
                             onChange={async (e) => {
                               const file = e.target.files?.[0];
                               if (!file) return;
-                              if (file.size > 1024 * 1024) { alert("Fichier trop lourd (Max 1Mo)"); return; }
+                              if (file.size > 350 * 1024) { 
+                                alert("Document trop volumineux (Maximum 350 Ko requis pour ce document). Veuillez compresser votre PDF/Image avant l'envoi."); 
+                                return; 
+                              }
                               const reader = new FileReader();
                               reader.onloadend = () => {
                                 setFormData({
@@ -431,7 +408,6 @@ export default function Signup() {
                               };
                               reader.readAsDataURL(file);
                             }}
-                            required
                           />
                           <Upload className="h-6 w-6 text-slate-300 mx-auto mb-2 group-hover:text-orange-500 transition-colors" />
                           <p className="text-xs font-black text-slate-900">RCCM</p>
@@ -448,7 +424,10 @@ export default function Signup() {
                             onChange={async (e) => {
                               const file = e.target.files?.[0];
                               if (!file) return;
-                              if (file.size > 1024 * 1024) { alert("Fichier trop lourd (Max 1Mo)"); return; }
+                              if (file.size > 350 * 1024) { 
+                                alert("Document trop volumineux (Maximum 350 Ko requis pour ce document). Veuillez compresser votre PDF/Image avant l'envoi."); 
+                                return; 
+                              }
                               const reader = new FileReader();
                               reader.onloadend = () => {
                                 setFormData({
@@ -462,7 +441,6 @@ export default function Signup() {
                               };
                               reader.readAsDataURL(file);
                             }}
-                            required
                           />
                           <Upload className="h-6 w-6 text-slate-300 mx-auto mb-2 group-hover:text-orange-500 transition-colors" />
                           <p className="text-xs font-black text-slate-900">Attestation Fiscale</p>
@@ -519,12 +497,20 @@ export default function Signup() {
                       <div className="relative">
                         <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
                         <Input 
-                          type="password" 
-                          className="pl-12 h-14 rounded-2xl border-slate-200 focus-visible:ring-orange-600" 
+                          type={showPassword ? "text" : "password"} 
+                          className="pl-12 pr-12 h-14 rounded-2xl border-slate-200 focus-visible:ring-orange-600" 
                           value={formData.password}
                           onChange={e => setFormData({...formData, password: e.target.value})}
                           required 
                         />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none transition-colors"
+                          title={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+                        >
+                          {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                        </button>
                       </div>
                     </div>
                     <div className="space-y-3">
@@ -532,12 +518,20 @@ export default function Signup() {
                       <div className="relative">
                         <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
                         <Input 
-                          type="password" 
-                          className="pl-12 h-14 rounded-2xl border-slate-200 focus-visible:ring-orange-600" 
+                          type={showConfirmPassword ? "text" : "password"} 
+                          className="pl-12 pr-12 h-14 rounded-2xl border-slate-200 focus-visible:ring-orange-600" 
                           value={formData.confirmPassword}
                           onChange={e => setFormData({...formData, confirmPassword: e.target.value})}
                           required 
                         />
+                        <button
+                          type="button"
+                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                          className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none transition-colors"
+                          title={showConfirmPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+                        >
+                          {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                        </button>
                       </div>
                     </div>
                   </div>
