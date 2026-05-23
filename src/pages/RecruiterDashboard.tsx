@@ -496,6 +496,13 @@ export default function RecruiterDashboard() {
             <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
               <Button 
                 variant="outline" 
+                className="bg-orange-650 text-white hover:bg-orange-700 border-none h-11 md:h-12 rounded-xl md:rounded-2xl font-black flex-1 md:flex-none shadow-lg shadow-orange-650/35"
+                onClick={() => navigate('/')}
+              >
+                <ExternalLink className="mr-2 h-4 w-4" /> Retour au site
+              </Button>
+              <Button 
+                variant="outline" 
                 className="bg-white/10 border-white/20 text-white hover:bg-white/20 h-11 md:h-12 rounded-xl md:rounded-2xl font-bold backdrop-blur-sm flex-1 md:flex-none"
                 onClick={() => navigate('/recruiter-onboarding')}
               >

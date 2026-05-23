@@ -77,7 +77,7 @@ export default function Maintenance() {
           <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Besoin d'assistance urgente ?</p>
           <div className="flex flex-col gap-3">
             <a 
-              href="mailto:2ng.groupeentreprise@gmail.com" 
+              href="mailto:support@2ngentreprises.com" 
               className="flex items-center justify-between p-3 rounded-2xl bg-slate-950 hover:bg-slate-800 border border-slate-800 hover:border-orange-500/50 transition-all group"
             >
               <div className="flex items-center gap-3">
@@ -86,7 +86,22 @@ export default function Maintenance() {
                 </div>
                 <div className="text-left">
                   <p className="text-xs text-slate-400 font-black uppercase tracking-wider">Email Support</p>
-                  <p className="text-sm font-bold text-white group-hover:text-orange-400 transition-colors">2ng.groupeentreprise@gmail.com</p>
+                  <p className="text-sm font-bold text-white group-hover:text-orange-400 transition-colors">support@2ngentreprises.com</p>
+                </div>
+              </div>
+            </a>
+
+            <a 
+              href="tel:+2250540504790" 
+              className="flex items-center justify-between p-3 rounded-2xl bg-slate-950 hover:bg-slate-800 border border-slate-800 hover:border-orange-500/50 transition-all group"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-orange-500/10 flex items-center justify-center text-orange-400 group-hover:bg-orange-500/20">
+                  <Phone className="h-5 w-5" />
+                </div>
+                <div className="text-left">
+                  <p className="text-xs text-slate-400 font-black uppercase tracking-wider">Téléphone Support</p>
+                  <p className="text-sm font-bold text-white group-hover:text-orange-400 transition-colors">+225 054 050 47 90</p>
                 </div>
               </div>
             </a>

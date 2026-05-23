@@ -91,7 +91,7 @@ export default function PendingApproval() {
             <div className={`p-8 rounded-[32px] border ${isRejected ? 'bg-red-50 border-red-100/50' : 'bg-orange-50 border-orange-100/50'}`}>
               <p className={`text-sm font-bold ${isRejected ? 'text-red-800' : 'text-orange-800'}`}>
                 {isRejected 
-                  ? "Contactez le support : 2ng.groupeentreprise@gmail.com"
+                  ? "Contactez le support : support@2ngentreprises.com ou par téléphone au +225 054 050 47 90"
                   : "Une fois validé, vous pourrez publier des offres et accéder à notre CVthèque."
                 }
               </p>

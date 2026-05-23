@@ -462,7 +462,15 @@ export default function AdminDashboard() {
           ))}
         </nav>
 
-        <div className="p-4 border-t border-slate-50 mt-auto">
+        <div className="p-4 border-t border-slate-50 mt-auto space-y-2">
+          <Button 
+            variant="ghost" 
+            className="w-full h-12 rounded-xl text-slate-600 hover:bg-slate-50 hover:text-orange-600 font-bold flex justify-start gap-4 px-4"
+            onClick={() => window.location.href = '/'}
+          >
+            <ExternalLink className="h-5 w-5 text-orange-500" />
+            {(isSidebarOpen || isMobileMenuOpen) && <span>Retour au site</span>}
+          </Button>
           <Button 
             variant="ghost" 
             className="w-full h-12 rounded-xl text-red-600 hover:bg-red-50 hover:text-red-700 font-bold flex justify-start gap-4 px-4 focus:bg-red-50"
@@ -492,9 +500,15 @@ export default function AdminDashboard() {
             </div>
             <span className="font-black text-slate-800 text-xs uppercase tracking-tighter">Admin</span>
           </div>
-          <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-bold text-xs">
-            {user.displayName?.[0] || user.email?.[0] || 'A'}
-          </div>
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => window.location.href = '/'}
+            className="h-9 px-3 rounded-xl border-slate-200 text-slate-700 font-bold text-[10px] uppercase tracking-wider flex items-center gap-1 hover:text-orange-600"
+          >
+            <ExternalLink className="h-3.5 w-3.5 text-orange-500" />
+            Retour
+          </Button>
         </header>
 
         {/* Scrollable Content */}
@@ -510,6 +524,14 @@ export default function AdminDashboard() {
               </p>
             </div>
             <div className="hidden md:flex items-center gap-4">
+              <Button 
+                variant="outline"
+                className="h-10 px-4 rounded-xl border-slate-200 text-slate-700 font-bold text-xs uppercase tracking-wider flex items-center gap-2 bg-white hover:bg-slate-50 hover:text-orange-600 transition-all shadow-sm"
+                onClick={() => window.location.href = '/'}
+              >
+                <ExternalLink className="h-4 w-4 text-orange-500" />
+                Retour au site
+              </Button>
               <div className="bg-emerald-50 text-emerald-600 px-4 py-2 rounded-full text-xs font-black flex items-center gap-2">
                 <div className="h-2 w-2 rounded-full bg-emerald-600 animate-pulse" />
                 SYSTÈME OPÉRATIONNEL
@@ -1416,7 +1438,7 @@ function JobsModule({ jobs, onAction, recruiterNames }: { jobs: Job[], onAction:
       educationLevel: "Bac +3 (Licence)",
       activityDomain: "Gestion / Administration",
       applyMethod: "email",
-      companyEmail: "recrutement@2ng.sn",
+      companyEmail: "support@2ngentreprises.com",
       conditionsDocuments: ["CV uniquement"]
     });
     setIsFormDialogOpen(true);

@@ -409,7 +409,7 @@ export default function Suspended() {
               // Easily trigger mailto with system and email context
               const subject = encodeURIComponent("Demande de réactivation de compte - AfricaJob");
               const body = encodeURIComponent(`Bonjour,\n\nMon compte (${user?.email}) a été suspendu.\nJe souhaiterais clarifier ma situation et demander l'examen de cette suspension.\n\nCordialement,\n${user?.displayName || ''}`);
-              window.location.href = `mailto:2ng.groupeentreprise@gmail.com?subject=${subject}&body=${body}`;
+              window.location.href = `mailto:support@2ngentreprises.com?subject=${subject}&body=${body}`;
             }}
             className="flex-1 bg-slate-950 hover:bg-slate-900 text-white rounded-2xl h-12 font-black text-[12px] uppercase tracking-wider shadow-md hover:shadow-lg transition-transform hover:-translate-y-0.5 active:translate-y-0"
           >

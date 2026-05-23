@@ -1164,14 +1164,14 @@ export default function Home() {
               </p>
               
               <div className="pt-2 flex flex-col gap-2 font-semibold text-xs text-slate-400">
-                <span className="flex items-center gap-2">
+                <a href="mailto:support@2ngentreprises.com" className="flex items-center gap-2 hover:text-orange-500 transition-colors">
                   <Mail className="h-4 w-4 text-orange-500" />
-                  contact@2ngentreprises.com
-                </span>
-                <span className="flex items-center gap-2">
+                  support@2ngentreprises.com
+                </a>
+                <a href="tel:+2250540504790" className="flex items-center gap-2 hover:text-orange-500 transition-colors">
                   <Phone className="h-4 w-4 text-orange-500" />
-                  +221 77 000 00 00
-                </span>
+                  +225 054 050 47 90
+                </a>
               </div>
             </div>
 

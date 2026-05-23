@@ -293,6 +293,11 @@ export default function CandidateDashboard() {
             </div>
           </div>
           <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
+            <Button className="w-full h-11 md:h-12 bg-orange-600 text-white hover:bg-orange-700 border-none font-black rounded-xl md:rounded-2xl shadow-xl shadow-orange-600/10 transition-all" asChild nativeButton={false}>
+              <Link to="/">
+                <ExternalLink className="mr-2 h-4 w-4" /> Retour au site
+              </Link>
+            </Button>
             <Button className="w-full h-11 md:h-12 bg-slate-900 text-white md:bg-white md:text-slate-900 border-none hover:bg-slate-800 md:hover:bg-slate-100 font-bold rounded-xl md:rounded-2xl shadow-xl transition-all" asChild nativeButton={false}>
               <Link to="/onboarding">
                 <Settings className="mr-2 h-4 w-4" /> Profil

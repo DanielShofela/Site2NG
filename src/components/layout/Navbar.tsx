@@ -258,12 +258,12 @@ export default function Navbar() {
         {isOpen && (
           <motion.div
             initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: '100vh' }}
+            animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
-            transition={{ duration: 0.3, ease: 'easeInOut' }}
-            className="fixed inset-0 top-[68px] z-40 w-full bg-white block lg:hidden overflow-y-auto pb-24"
+            transition={{ duration: 0.25, ease: 'easeInOut' }}
+            className="fixed inset-x-0 top-[68px] z-40 bg-white block lg:hidden overflow-y-auto shadow-xl border-b border-slate-200/80 max-h-[85vh] pb-10"
           >
-            <div className="space-y-1.5 px-6 py-8">
+            <div className="space-y-1 px-5 py-4">
               {navLinks.map((link) => {
                 const isActive = location.pathname === link.href;
                 return (
@@ -271,8 +271,8 @@ export default function Navbar() {
                     key={link.name}
                     to={link.href}
                     onClick={() => setIsOpen(false)}
-                    className={`block rounded-2xl px-5 py-4 text-lg font-black transition-all uppercase tracking-wide border-b border-dashed border-slate-100 ${
-                      isActive ? 'bg-orange-50 text-orange-600' : 'text-slate-800 hover:bg-slate-50'
+                    className={`block rounded-xl px-4 py-2.5 text-xs font-black transition-all uppercase tracking-wider border-b border-dashed border-slate-100 last:border-0 ${
+                      isActive ? 'bg-orange-50 text-orange-600' : 'text-slate-700 hover:bg-slate-50'
                     }`}
                   >
                     {link.name}
@@ -280,7 +280,7 @@ export default function Navbar() {
                 );
               })}
               
-              <div className="mt-8 border-t border-slate-100 pt-8 px-2">
+              <div className="mt-4 border-t border-slate-100 pt-5 px-1">
                 {user ? (
                   <div className="space-y-4">
                     <Link to={getDashboardLink()} onClick={() => setIsOpen(false)} className="block w-full">
