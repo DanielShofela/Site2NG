@@ -172,6 +172,19 @@ export interface Job {
   createdAt: any;
   suspendedAt?: any;
   suspensionReason?: string | null;
+  expiresAt?: any;
+  isFeatured?: boolean;
+  companyLogo?: string;
+  requirements?: string;
+  contractType?: string;
+  createdBy?: string;
+  experienceLevel?: string;
+  experienceYears?: number | string;
+  educationLevel?: string;
+  activityDomain?: string;
+  applyMethod?: string;
+  companyEmail?: string;
+  conditionsDocuments?: string[];
 }
 
 export interface Application {

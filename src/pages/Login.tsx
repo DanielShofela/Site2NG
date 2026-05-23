@@ -29,10 +29,12 @@ export default function Login() {
         if (user.status === 'pending' || user.status === 'submitted') {
           navigate('/pending-approval');
         } else {
-          navigate('/recruiter');
+          navigate('/dashboard/company');
         }
       } else if (user.role === 'candidate') {
-        navigate('/candidate');
+        navigate('/dashboard/member');
+      } else if (user.role === 'admin') {
+        navigate('/dashboard/admin');
       } else {
         navigate('/');
       }

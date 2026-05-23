@@ -19,9 +19,12 @@ import ForgotPassword from './pages/ForgotPassword';
 import RecruiterOnboarding from './pages/RecruiterOnboarding';
 import CompanyProfile from './pages/CompanyProfile';
 import Suspended from './pages/Suspended';
+import NotFound from './pages/NotFound';
+import Maintenance from './pages/Maintenance';
 import Navbar from './components/layout/Navbar';
+import ScrollToTop from './components/layout/ScrollToTop';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
-import { SiteConfigProvider } from './contexts/SiteConfigContext';
+import { SiteConfigProvider, useSiteConfig } from './contexts/SiteConfigContext';
 
 function ProtectedRoute({ children, role }: { children: React.ReactNode, role: string }) {
   const { user, loading } = useAuth();
@@ -52,6 +55,7 @@ export default function App() {
     <AuthProvider>
       <SiteConfigProvider>
         <Router>
+          <ScrollToTop />
           <AppLayout />
         </Router>
       </SiteConfigProvider>
@@ -61,10 +65,12 @@ export default function App() {
 
 function AppLayout() {
   const { user, loading } = useAuth();
+  const { maintenanceEnabled } = useSiteConfig();
   const location = useLocation();
   const isDashboardPage = location.pathname.startsWith('/admin') || 
                           location.pathname.startsWith('/recruiter') || 
                           location.pathname.startsWith('/candidate') ||
+                          location.pathname.startsWith('/dashboard') ||
                           location.pathname === '/suspended';
 
   if (loading) {
@@ -73,6 +79,12 @@ function AppLayout() {
         <div className="w-10 h-10 border-4 border-orange-600 border-t-transparent rounded-full animate-spin"></div>
       </div>
     );
+  }
+
+  // Admin bypass login or logged-in admin
+  const isBypass = location.pathname === '/login' || (user && user.role === 'admin');
+  if (maintenanceEnabled && !isBypass) {
+    return <Maintenance />;
   }
 
   if (user && (user.accountStatus === 'suspended' || user.status === 'suspended') && location.pathname !== '/suspended') {
@@ -84,21 +96,43 @@ function AppLayout() {
       {!isDashboardPage && <Navbar />}
       <main>
         <Routes>
-          <Route path="/" element={<Jobs />} />
+          <Route path="/" element={<Home />} />
           <Route path="/landing" element={<Home />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
           <Route path="/jobs" element={<Jobs />} />
+          
+          {/* Mapping user requested canonical SaaS routing aliases */}
+          <Route path="/services" element={<Home />} />
+          <Route path="/opportunites" element={<Jobs />} />
+          <Route path="/entreprises" element={<Home />} />
+          <Route path="/contact" element={<Home />} />
+          <Route path="/about" element={<About />} />
+
+          {/* Authentication dropdown custom routes */}
+          <Route path="/auth/login/member" element={<Login />} />
+          <Route path="/auth/login/company" element={<Login />} />
+          <Route path="/auth/register/member" element={<Navigate to="/signup?role=candidate" replace />} />
+          <Route path="/auth/register/company" element={<Navigate to="/signup?role=recruiter" replace />} />
+
+          {/* Protected Dashboards aliases */}
+          <Route path="/dashboard/member" element={<ProtectedRoute role="candidate"><CandidateDashboard /></ProtectedRoute>} />
+          <Route path="/dashboard/company" element={<ProtectedRoute role="recruiter"><RecruiterDashboard /></ProtectedRoute>} />
+          <Route path="/dashboard/admin" element={<ProtectedRoute role="admin"><AdminDashboard /></ProtectedRoute>} />
+
+          {/* Core Routes */}
           <Route path="/recruiter" element={<ProtectedRoute role="recruiter"><RecruiterDashboard /></ProtectedRoute>} />
           <Route path="/candidate" element={<ProtectedRoute role="candidate"><CandidateDashboard /></ProtectedRoute>} />
           <Route path="/onboarding" element={<ProtectedRoute role="candidate"><Onboarding /></ProtectedRoute>} />
           <Route path="/recruiter-onboarding" element={<ProtectedRoute role="recruiter"><RecruiterOnboarding /></ProtectedRoute>} />
           <Route path="/admin" element={<ProtectedRoute role="admin"><AdminDashboard /></ProtectedRoute>} />
-          <Route path="/about" element={<About />} />
           <Route path="/pending-approval" element={<PendingApproval />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/company/:id" element={<CompanyProfile />} />
           <Route path="/suspended" element={<Suspended />} />
+
+          {/* Wildcard 404 Route */}
+          <Route path="*" element={<NotFound />} />
         </Routes>
       </main>
     </div>

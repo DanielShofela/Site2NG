@@ -137,7 +137,7 @@ export default function CandidateDashboard() {
     setIsLoadingJob(true);
     try {
       const { doc, getDoc } = await import('firebase/firestore');
-      const jobDoc = await getDoc(doc(db, 'jobs', app.jobId));
+      const jobDoc = await getDoc(doc(db, 'offers', app.jobId));
       if (jobDoc.exists()) {
         setSelectedJob({ id: jobDoc.id, ...jobDoc.data() });
       } else {

@@ -39,7 +39,12 @@ import {
   ExternalLink,
   AlertCircle,
   Target,
-  HelpCircle
+  HelpCircle,
+  Plus,
+  Edit,
+  Sparkles,
+  Calendar,
+  DollarSign
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import React, { useState, useEffect, useMemo, ChangeEvent, FormEvent } from 'react';
@@ -209,12 +214,12 @@ export default function AdminDashboard() {
       handleFirestoreError(error, OperationType.GET, 'users');
     });
 
-    const jobsUnsub = onSnapshot(collection(db, 'jobs'), (snapshot) => {
+    const jobsUnsub = onSnapshot(collection(db, 'offers'), (snapshot) => {
       const jobsList = snapshot.docs.map(d => ({ id: d.id, ...d.data() })) as Job[];
       setAllJobs(jobsList);
       setStats(prev => ({ ...prev, jobs: jobsList.length }));
     }, (error) => {
-      handleFirestoreError(error, OperationType.GET, 'jobs');
+      handleFirestoreError(error, OperationType.GET, 'offers');
     });
 
     const appsUnsub = onSnapshot(collection(db, 'applications'), (snapshot) => {
@@ -314,7 +319,7 @@ export default function AdminDashboard() {
   };
 
   const handleJobAction = async (jobId: string, action: 'approve' | 'suspend' | 'delete', reason?: string) => {
-      const path = 'jobs';
+      const path = 'offers';
       try {
           const jobRef = doc(db, path, jobId);
           if (action === 'delete') {
@@ -1304,294 +1309,1046 @@ function ApprovalsModule({ pending, onAction }: { pending: UserProfile[], onActi
 function JobsModule({ jobs, onAction, recruiterNames }: { jobs: Job[], onAction: any, recruiterNames: Record<string, string> }) {
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [isViewOpen, setIsViewOpen] = useState(false);
-  
-  // Suspension modal state
-  const [isSuspendOpen, setIsSuspendOpen] = useState(false);
-  const [jobToSuspend, setJobToSuspend] = useState<Job | null>(null);
-  const [suspensionReason, setSuspensionReason] = useState("");
+  const [isFormDialogOpen, setIsFormDialogOpen] = useState(false);
+  const [editingJob, setEditingJob] = useState<any | null>(null);
+
+  // Filters State
+  const [searchQuery, setSearchQuery] = useState("");
+  const [typeFilter, setTypeFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [expiryFilter, setExpiryFilter] = useState("all");
+
+  // Form Fields State
+  const [formFields, setFormFields] = useState({
+    title: "",
+    companyName: "",
+    companyLogo: "",
+    description: "",
+    requirements: "",
+    location: "Sénégal",
+    type: "popular", // default to popular for admin convenience
+    contractType: "CDI",
+    field: "Technologie",
+    salary: "",
+    expiresAt: "",
+    status: "active",
+    isFeatured: true,
+    experienceLevel: "Junior",
+    experienceYears: "1-3 ans",
+    educationLevel: "Bac +3 (Licence)",
+    activityDomain: "Technologie / Télécoms",
+    applyMethod: "email",
+    companyEmail: "",
+    conditionsDocuments: ["CV uniquement"] as string[]
+  });
+
+  const [savingOffer, setSavingOffer] = useState(false);
+
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFormFields(prev => ({ ...prev, companyLogo: reader.result as string }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // Pre-populate fields on edit
+  const handleOpenEdit = (job: any) => {
+    setEditingJob(job);
+    let expDateStr = "";
+    if (job.expiresAt) {
+      try {
+        const d = job.expiresAt.toDate ? job.expiresAt.toDate() : new Date(job.expiresAt);
+        if (!isNaN(d.getTime())) {
+          expDateStr = d.toISOString().split('T')[0];
+        }
+      } catch (e) {
+        console.warn("Could not parse expiry date on edit", e);
+      }
+    }
+
+    setFormFields({
+      title: job.title || "",
+      companyName: job.companyName || "",
+      companyLogo: job.companyLogo || "",
+      description: job.description || "",
+      requirements: job.requirements || "",
+      location: job.location || "Sénégal",
+      type: job.type || "popular",
+      contractType: job.contractType || "CDI",
+      field: job.field || "Technologie",
+      salary: job.salary || "",
+      expiresAt: expDateStr,
+      status: job.status || "active",
+      isFeatured: job.isFeatured !== undefined ? job.isFeatured : (job.type === 'popular'),
+      experienceLevel: job.experienceLevel || "Junior",
+      experienceYears: job.experienceYears || "1-3 ans",
+      educationLevel: job.educationLevel || "Bac +3 (Licence)",
+      activityDomain: job.activityDomain || job.field || "Technologie / Télécoms",
+      applyMethod: job.applyMethod || "email",
+      companyEmail: job.companyEmail || "",
+      conditionsDocuments: job.conditionsDocuments || ["CV uniquement"]
+    });
+    setIsFormDialogOpen(true);
+  };
+
+  const handleOpenCreate = () => {
+    setEditingJob(null);
+    setFormFields({
+      title: "",
+      companyName: "Administration 2NG",
+      companyLogo: "",
+      description: "",
+      requirements: "",
+      location: "Dakar, Sénégal",
+      type: "popular",
+      contractType: "CDI",
+      field: "Gestion / Administration",
+      salary: "800k - 1.2M CFA / mois",
+      expiresAt: new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString().split('T')[0], // 30 days default
+      status: "active",
+      isFeatured: true,
+      experienceLevel: "Junior",
+      experienceYears: "1-3 ans",
+      educationLevel: "Bac +3 (Licence)",
+      activityDomain: "Gestion / Administration",
+      applyMethod: "email",
+      companyEmail: "recrutement@2ng.sn",
+      conditionsDocuments: ["CV uniquement"]
+    });
+    setIsFormDialogOpen(true);
+  };
+
+  const handleSaveOffer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formFields.title.trim() || !formFields.companyName.trim()) {
+      alert("Veuillez remplir le titre et le nom de l'entreprise.");
+      return;
+    }
+
+    setSavingOffer(true);
+    try {
+      const expiresDate = formFields.expiresAt ? new Date(formFields.expiresAt) : null;
+      const parsedExpiresAt = expiresDate && !isNaN(expiresDate.getTime()) ? Timestamp.fromDate(expiresDate) : null;
+
+      let calculatedType = formFields.type;
+      if (expiresDate && !isNaN(expiresDate.getTime())) {
+        const diffHours = (expiresDate.getTime() - Date.now()) / (1000 * 60 * 60);
+        if (diffHours > 0 && diffHours <= 48) {
+          calculatedType = 'rapid';
+        }
+      }
+
+      const payload: any = {
+        title: formFields.title.trim(),
+        companyName: formFields.companyName.trim(),
+        companyLogo: formFields.companyLogo.trim(),
+        description: formFields.description.trim(),
+        requirements: formFields.requirements.trim(),
+        location: formFields.location.trim(),
+        type: calculatedType,
+        contractType: formFields.contractType.trim(),
+        field: formFields.activityDomain, // sync sector/field
+        salary: formFields.salary.trim(),
+        expiresAt: parsedExpiresAt,
+        status: formFields.status,
+        isFeatured: formFields.isFeatured,
+        experienceLevel: formFields.experienceLevel,
+        experienceYears: formFields.experienceYears,
+        educationLevel: formFields.educationLevel,
+        activityDomain: formFields.activityDomain,
+        applyMethod: formFields.applyMethod,
+        companyEmail: formFields.companyEmail.trim(),
+        conditionsDocuments: formFields.conditionsDocuments,
+        updatedAt: serverTimestamp()
+      };
+
+      if (editingJob) {
+        // Edit existing document
+        const ref = doc(db, 'offers', editingJob.id);
+        await updateDoc(ref, payload);
+      } else {
+        // Create new document
+        payload.createdAt = serverTimestamp();
+        payload.views = 0;
+        payload.createdBy = "admin"; // Identify as created by the administrator
+        await addDoc(collection(db, 'offers'), payload);
+      }
+
+      setIsFormDialogOpen(false);
+      setEditingJob(null);
+    } catch (err) {
+      console.error("Error saving offer in admin:", err);
+      alert("Erreur lors de la sauvegarde de l'offre: " + (err instanceof Error ? err.message : String(err)));
+    } finally {
+      setSavingOffer(false);
+    }
+  };
+
+  const handleQuickToggleFeature = async (job: any) => {
+    try {
+      const ref = doc(db, 'offers', job.id);
+      const newFeaturedValue = !job.isFeatured;
+      await updateDoc(ref, { 
+        isFeatured: newFeaturedValue,
+        // Aligns type automatically if toggling
+        type: newFeaturedValue ? 'popular' : (job.type === 'popular' ? 'standard' : job.type)
+      });
+    } catch (e) {
+      console.error("Error toggling popularity badge:", e);
+    }
+  };
+
+  const handleQuickToggleStatus = async (job: any) => {
+    try {
+      const ref = doc(db, 'offers', job.id);
+      const newStatus = job.status === 'active' ? 'suspended' : 'active';
+      await updateDoc(ref, { status: newStatus });
+    } catch (e) {
+      console.error("Error toggling visibility state:", e);
+    }
+  };
+
+  const handleDeleteOffer = async (jobId: string) => {
+    if (!confirm("Voulez-vous supprimer définitivement cette offre d'emploi ? Cette action est irréversible.")) return;
+    try {
+      const ref = doc(db, 'offers', jobId);
+      await deleteDoc(ref);
+    } catch (e) {
+      console.error("Error deleting offer:", e);
+    }
+  };
+
+  // Compute stats for current filter selection
+  const filteredJobs = useMemo(() => {
+    return jobs.filter(j => {
+      // 1. Search Query
+      const q = searchQuery.toLowerCase();
+      const matchesSearch = !q || 
+        (j.title || "").toLowerCase().includes(q) || 
+        (j.companyName || "").toLowerCase().includes(q) || 
+        (j.location || "").toLowerCase().includes(q);
+
+      // 2. Type Filter
+      let matchesType = true;
+      if (typeFilter !== "all") {
+        if (typeFilter === "featured") {
+          matchesType = !!(j as any).isFeatured || j.type === 'popular';
+        } else {
+          matchesType = j.type === typeFilter;
+        }
+      }
+
+      // 3. Status Filter
+      let matchesStatus = true;
+      if (statusFilter !== "all") {
+        matchesStatus = j.status === statusFilter;
+      }
+
+      // 4. Expiry Filter
+      let matchesExpiry = true;
+      if (expiryFilter !== "all" && j.expiresAt) {
+        try {
+          const exp = j.expiresAt.toDate ? j.expiresAt.toDate() : new Date(j.expiresAt);
+          const isExpired = Date.now() > exp.getTime();
+          matchesExpiry = expiryFilter === "expired" ? isExpired : !isExpired;
+        } catch (e) {}
+      }
+
+      return matchesSearch && matchesType && matchesStatus && matchesExpiry;
+    });
+  }, [jobs, searchQuery, typeFilter, statusFilter, expiryFilter]);
 
   const getJobStatusBadge = (status?: string) => {
     switch (status) {
       case 'active':
-        return <Badge variant="outline" className="border-emerald-100 text-emerald-600 bg-emerald-50 text-[10px] font-black uppercase px-2 py-0.5">Actif</Badge>;
+        return <Badge variant="outline" className="border-emerald-100 text-emerald-600 bg-emerald-50 text-[10px] font-black uppercase px-2 py-1 rounded-lg">Publié</Badge>;
       case 'suspended':
-        return <Badge variant="outline" className="border-red-100 text-red-600 bg-red-50 text-[10px] font-black uppercase px-2 py-0.5">Suspendu</Badge>;
+        return <Badge variant="outline" className="border-red-100 text-red-600 bg-red-50 text-[10px] font-black uppercase px-2 py-1 rounded-lg">Non publié / Brouillon</Badge>;
       case 'pending_validation':
       default:
-        return <Badge variant="outline" className="border-amber-100 text-amber-600 bg-amber-50 text-[10px] font-black uppercase px-2 py-0.5">En validation</Badge>;
+        return <Badge variant="outline" className="border-amber-100 text-amber-600 bg-amber-50 text-[10px] font-black uppercase px-2 py-1 rounded-lg">En attente de validation</Badge>;
     }
-  };
-
-  const checkDeletionEligibility = (job: Job) => {
-    if (job.status !== 'suspended') return { eligible: false, hoursLeft: 0 };
-    if (!job.suspendedAt) return { eligible: true, hoursLeft: 0 }; // If timestamp was somehow missing
-    
-    const suspendedTime = job.suspendedAt.seconds 
-      ? job.suspendedAt.seconds * 1000 
-      : new Date(job.suspendedAt).getTime();
-      
-    const elapsedMs = Date.now() - suspendedTime;
-    const elapsedHours = elapsedMs / (3600 * 1000);
-    const hoursLeft = 72 - elapsedHours;
-    
-    return {
-      eligible: hoursLeft <= 0,
-      hoursLeft: Math.ceil(hoursLeft)
-    };
-  };
-
-  const handleConfirmSuspension = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!jobToSuspend || !suspensionReason.trim()) return;
-    await onAction(jobToSuspend.id!, 'suspend', suspensionReason.trim());
-    setIsSuspendOpen(false);
-    setJobToSuspend(null);
-    setSuspensionReason("");
   };
 
   return (
     <>
-    <Card className="border-none shadow-sm rounded-[32px] overflow-hidden bg-white">
-      <CardHeader className="border-b border-slate-50 p-6 md:p-8">
-        <CardTitle className="text-lg md:text-xl font-black">Modération des Offres</CardTitle>
-        <CardDescription className="text-xs">Gérez la visibilité des opportunités publiées sur le marché.</CardDescription>
-      </CardHeader>
-      <div className="overflow-x-auto">
-        <table className="w-full text-left">
-          <thead>
-            <tr className="bg-slate-50/50">
-              <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Offre d'emploi</th>
-              <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Entreprise</th>
-              <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Statut</th>
-              <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-50">
-            {jobs.map((j) => {
-              const eligibleRes = checkDeletionEligibility(j);
-              return (
-                <tr key={j.id} className="hover:bg-slate-50/30 transition-colors group">
-                  <td className="px-6 py-4">
-                    <div className="min-w-[180px]">
-                      <p className="text-sm font-black text-slate-900 leading-tight mb-1">{j.title}</p>
-                      <div className="flex items-center gap-3 text-[9px] font-bold text-slate-400">
-                          <span className="flex items-center gap-1 shrink-0"><MapPin className="h-3 w-3" /> {j.location}</span>
-                          <span className="flex items-center gap-1 capitalize shrink-0"><Clock className="h-3 w-3" /> {j.type}</span>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-xs font-bold text-slate-600 whitespace-nowrap">
-                    {recruiterNames[j.recruiterId] || j.companyName}
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex flex-col gap-1 items-start">
-                      {getJobStatusBadge(j.status)}
-                      {j.status === 'suspended' && j.suspensionReason && (
-                        <p className="text-[9px] text-red-500 font-bold max-w-[200px] truncate" title={j.suspensionReason}>
-                          Motif: {j.suspensionReason}
-                        </p>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-right shrink-0 whitespace-nowrap">
-                     <div className="flex justify-end items-center gap-1 text-slate-400">
+    <div className="space-y-6">
+      {/* 1. SECTION BAR ACTIONS */}
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
+            <Briefcase className="h-6 w-6 text-orange-600" />
+            Gestion des Offres d'Emploi
+          </h2>
+          <p className="text-xs text-slate-500 font-bold mt-1">
+            Recherchez, créez, modifiez, désactivez ou configurez les offres d'emploi et "Offres Populaires" du site en temps réel.
+          </p>
+        </div>
+        <Button 
+          onClick={handleOpenCreate}
+          className="bg-orange-600 hover:bg-orange-700 text-white font-black text-xs uppercase h-11 px-6 rounded-2xl flex items-center gap-2 shadow-lg shadow-orange-600/15"
+        >
+          <Plus className="h-4 w-4" />
+          Créer une Offre d'Emploi
+        </Button>
+      </div>
+
+      {/* 2. STATS OVERVIEW DECK */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {[
+          { label: "Total Offres", value: jobs.length, bg: "bg-slate-50 text-slate-900 border-slate-100" },
+          { label: "Offres Populaires (Admin)", value: jobs.filter(j => (j as any).isFeatured || j.type === "popular").length, bg: "bg-indigo-50/50 text-indigo-700 border-indigo-100/30" },
+          { label: "Candidatures Express", value: jobs.filter(j => j.type === "rapid").length, bg: "bg-amber-50/50 text-amber-700 border-amber-100/30" },
+          { label: "Offres Actives", value: jobs.filter(j => j.status === "active").length, bg: "bg-emerald-50 text-emerald-700 border-emerald-100/50" }
+        ].map((stat, i) => (
+          <Card key={i} className={`p-4 border shadow-none rounded-2xl text-left ${stat.bg}`}>
+            <p className="text-[10px] uppercase font-bold tracking-widest text-slate-400">{stat.label}</p>
+            <p className="text-2xl font-black mt-1 leading-none">{stat.value}</p>
+          </Card>
+        ))}
+      </div>
+
+      {/* 3. FILTERS BAR */}
+      <Card className="border-none shadow-sm rounded-2xl p-4 bg-white flex flex-col md:flex-row gap-4 items-center justify-between">
+        <div className="relative w-full md:w-96">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <Input 
+            placeholder="Rechercher par poste, entreprise, lieu..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10 h-10 border-slate-100 bg-slate-50/50 rounded-xl font-medium text-xs focus-visible:ring-orange-500"
+          />
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto justify-end">
+          {/* Category Type Filter */}
+          <div className="flex items-center gap-1.5">
+            <Filter className="h-3.5 w-3.5 text-slate-400" />
+            <select 
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value)}
+              className="border border-slate-100 rounded-xl bg-slate-50/50 h-10 px-3 text-xs font-bold text-slate-700 focus:outline-none focus:ring-1 focus:ring-orange-550"
+            >
+              <option value="all">Tous les types d'offres</option>
+              <option value="featured">✨ Offres Populaires/Featured</option>
+              <option value="rapid">⏱️ Offres Rapides</option>
+              <option value="unique">🏢 Offres Directes</option>
+              <option value="standard">Standard</option>
+            </select>
+          </div>
+
+          {/* Status Filter */}
+          <select 
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="border border-slate-100 rounded-xl bg-slate-50/50 h-10 px-3 text-xs font-bold text-slate-700 focus:outline-none focus:ring-1 focus:ring-orange-550"
+          >
+            <option value="all">Tous les statuts</option>
+            <option value="active">Actif / Publié</option>
+            <option value="suspended">Non publié / Brouillon</option>
+            <option value="pending_validation">En attente dev</option>
+          </select>
+
+          {/* Expiry Filter */}
+          <select 
+            value={expiryFilter}
+            onChange={(e) => setExpiryFilter(e.target.value)}
+            className="border border-slate-100 rounded-xl bg-slate-50/50 h-10 px-3 text-xs font-bold text-slate-700 focus:outline-none focus:ring-1 focus:ring-orange-550"
+          >
+            <option value="all">Validité: Toutes</option>
+            <option value="valid">Valides (En cours)</option>
+            <option value="expired">Expirées</option>
+          </select>
+        </div>
+      </Card>
+
+      {/* 4. TABLE GRID */}
+      <Card className="border-none shadow-sm rounded-[32px] overflow-hidden bg-white">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead>
+              <tr className="bg-slate-50/60 border-b border-slate-100">
+                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Offre d'emploi</th>
+                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Entreprise</th>
+                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Type & Catégorie</th>
+                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Statut</th>
+                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Expiration / Stats</th>
+                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-50">
+              {filteredJobs.length > 0 ? (
+                filteredJobs.map((j) => {
+                  let isExpired = false;
+                  let expiryLabel = "Sans limite";
+                  if (j.expiresAt) {
+                    try {
+                      const exp = j.expiresAt.toDate ? j.expiresAt.toDate() : new Date(j.expiresAt);
+                      isExpired = Date.now() > exp.getTime();
+                      expiryLabel = exp.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+                    } catch(e) {}
+                  }
+
+                  // Determine if company logo is available or fallback required
+                  const hasLogo = !!(j as any).companyLogo;
+
+                  return (
+                    <tr key={j.id} className="hover:bg-slate-50/30 transition-colors group">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          {/* Logo displays */}
+                          <div className="w-10 h-10 shrink-0 rounded-xl bg-slate-950 text-white flex items-center justify-center font-black text-xs uppercase overflow-hidden border border-slate-800">
+                            {hasLogo ? (
+                              <img src={(j as any).companyLogo} alt={j.companyName} className="h-full w-full object-cover" referrerPolicy="no-referrer" />
+                            ) : (
+                              (j.companyName || "").substring(0, 2)
+                            )}
+                          </div>
+                          <div className="min-w-[150px]">
+                            <p className="text-sm font-black text-slate-900 leading-tight mb-1">{j.title}</p>
+                            <span className="text-[10px] font-medium text-slate-405 flex items-center gap-1 text-slate-400">
+                              <MapPin className="h-3 w-3 text-orange-600 shrink-0" /> {j.location}
+                            </span>
+                          </div>
+                        </div>
+                      </td>
+
+                      <td className="px-6 py-4">
+                        <div className="truncate max-w-[150px] font-bold text-xs text-slate-800">
+                          {/* Link info if recruiters map matches */}
+                          {recruiterNames[j.recruiterId] || j.companyName}
+                        </div>
+                        {j.createdBy === 'admin' ? (
+                          <span className="text-[8px] font-black uppercase tracking-wider text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded-md mt-0.5 inline-block">Créateur : Admin</span>
+                        ) : (
+                          <span className="text-[8px] font-bold uppercase text-slate-400 block mt-0.5">Recruteur Externe</span>
+                        )}
+                      </td>
+
+                      <td className="px-6 py-4 space-y-1">
+                        <div className="flex items-center gap-1.5">
+                          {j.type === 'popular' && (
+                            <Badge className="bg-indigo-100 text-indigo-700 border-none font-bold text-[9px] uppercase tracking-wide rounded-md px-1.5 py-0.5">⭐ Populaire</Badge>
+                          )}
+                          {j.type === 'rapid' && (
+                            <Badge className="bg-amber-100 text-amber-700 border-none font-bold text-[9px] uppercase tracking-wide rounded-md px-1.5 py-0.5">⏱️ Rapide</Badge>
+                          )}
+                          {j.type === 'unique' && (
+                            <Badge className="bg-emerald-100 text-emerald-700 border-none font-bold text-[9px] uppercase tracking-wide rounded-md px-1.5 py-0.5">🏢 Direct</Badge>
+                          )}
+                          {!['popular', 'rapid', 'unique'].includes(j.type) && (
+                            <Badge className="bg-slate-100 text-slate-600 border-none font-bold text-[9px] uppercase tracking-wide rounded-md px-1.5 py-0.5">Standard</Badge>
+                          )}
+                        </div>
+                        <p className="text-[10px] text-slate-500 font-bold capitalize">Type Contrat : {j.contractType || 'CDI'}</p>
+                      </td>
+
+                      <td className="px-6 py-4">
+                        {getJobStatusBadge(j.status)}
+                      </td>
+
+                      <td className="px-6 py-4 space-y-1">
+                        <div className="flex items-center gap-1 font-bold text-[10px]">
+                          <Calendar className="h-3.5 w-3.5 text-slate-400" />
+                          <span className={isExpired ? "text-red-600 font-black animate-pulse" : "text-slate-600"}>
+                            {expiryLabel} {isExpired && "(Expirée)"}
+                          </span>
+                        </div>
+                        <div className="text-[9px] font-bold text-slate-400 flex items-center gap-1">
+                          <Eye className="h-3 w-3 text-slate-400" /> {j.views || 0} vues • {j.salary || "Non spécifié"}
+                        </div>
+                      </td>
+
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex justify-end items-center gap-1 text-slate-400">
+                          {/* 1. Toggle feature status directly */}
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className={`h-8 w-8 rounded-lg transition-colors ${ (j.isFeatured || j.type === 'popular') ? 'text-indigo-600 hover:bg-indigo-50 bg-indigo-50/20' : 'hover:text-amber-500' }`}
+                            onClick={() => handleQuickToggleFeature(j)}
+                            title={(j.isFeatured || j.type === 'popular') ? "Retirer des Offres Populaires" : "Marquer comme Offre Populaire"}
+                          >
+                            <Sparkles className="h-4 w-4" />
+                          </Button>
+
+                          {/* 2. Visual presentation */}
                           <Button 
                             variant="ghost" 
                             size="icon" 
                             className="h-8 w-8 rounded-lg hover:text-slate-900"
                             onClick={() => { setSelectedJob(j); setIsViewOpen(true); }}
+                            title="Aperçu rapide"
                           >
-                               <Eye className="h-4 w-4" />
+                            <Eye className="h-4 w-4" />
                           </Button>
 
-                          {j.status === 'pending_validation' && (
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="h-8 w-8 rounded-lg text-emerald-600 hover:bg-emerald-50"
-                              onClick={() => {
-                                if (confirm("Voulez-vous approuver et publier cette offre ?")) {
-                                  onAction(j.id!, 'approve');
-                                }
-                              }}
-                              title="Valider et Publier l'offre"
-                            >
-                                 <Check className="h-4 w-4 font-bold" />
-                            </Button>
-                          )}
+                          {/* 3. Edit */}
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-8 w-8 rounded-lg text-blue-600 hover:bg-blue-50"
+                            onClick={() => handleOpenEdit(j)}
+                            title="Modifier l'offre"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
 
-                          {j.status === 'active' && (
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="h-8 w-8 rounded-lg text-orange-600 hover:bg-orange-50"
-                              onClick={() => {
-                                setJobToSuspend(j);
-                                setIsSuspendOpen(true);
-                              }}
-                              title="Suspendre l'offre"
-                            >
-                                 <AlertCircle className="h-4 w-4" />
-                            </Button>
-                          )}
+                          {/* 4. Quick Visibility switch */}
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className={`h-8 w-8 rounded-lg ${j.status === 'active' ? 'text-emerald-600 hover:bg-emerald-50' : 'text-slate-400 hover:bg-slate-100'}`}
+                            onClick={() => handleQuickToggleStatus(j)}
+                            title={j.status === 'active' ? "Passer en Brouillon (Masquer)" : "Publier l'offre directement"}
+                          >
+                            <Check className="h-4 w-4" />
+                          </Button>
 
-                          {j.status === 'suspended' && (
-                            <>
-                              {eligibleRes.eligible ? (
-                                <Button 
-                                  variant="ghost" 
-                                  size="icon" 
-                                  className="h-8 w-8 rounded-lg text-red-500 hover:bg-red-50" 
-                                  onClick={() => {
-                                    if (confirm("Voulez-vous supprimer définitivement cette offre d'emploi suspendue depuis plus de 72h ?")) {
-                                      onAction(j.id!, 'delete');
-                                    }
-                                  }}
-                                  title="Supprimer définitivement"
-                                >
-                                     <Trash2 className="h-4 w-4" />
-                                </Button>
-                              ) : (
-                                <div 
-                                  className="flex items-center gap-1 px-2 py-1 bg-slate-100 rounded-lg text-[9px] font-black text-slate-500 cursor-help"
-                                  title="La suppression définitive sera disponible après 72h de suspension sans modification"
-                                >
-                                  <Lock className="h-3 w-3 text-slate-400" />
-                                  <span>{eligibleRes.hoursLeft}h rest.</span>
-                                </div>
-                              )}
-                            </>
-                          )}
-                     </div>
+                          {/* 5. Delete physically */}
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-8 w-8 rounded-lg text-red-500 hover:bg-red-50" 
+                            onClick={() => handleDeleteOffer(j.id!)}
+                            title="Supprimer définitivement"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              ) : (
+                <tr>
+                  <td colSpan={6} className="px-6 py-12 text-center">
+                    <div className="h-12 w-12 bg-slate-50 text-slate-400 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                      <Briefcase className="h-6 w-6" />
+                    </div>
+                    <p className="text-sm font-black text-slate-700">Aucune offre d'emploi trouvée</p>
+                    <p className="text-xs text-slate-400 font-bold mt-1">Essayez d'ajuster vos filtres ou créez une nouvelle offre ci-dessus.</p>
                   </td>
                 </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-    </Card>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+    </div>
 
-    {/* Manual Suspension Dialog with Reason */}
-    <Dialog open={isSuspendOpen} onOpenChange={(open) => { if (!open) { setIsSuspendOpen(false); setJobToSuspend(null); setSuspensionReason(""); } }}>
-      <DialogContent className="max-w-md rounded-[32px] p-8 border-none shadow-2xl">
+    {/* ========================================================= */}
+    {/* 5. CREATE AND EDIT FORM DIALOG                            */}
+    {/* ========================================================= */}
+    <Dialog open={isFormDialogOpen} onOpenChange={setIsFormDialogOpen}>
+      <DialogContent className="max-w-xl rounded-[32px] p-8 border-none shadow-2xl overflow-y-auto max-h-[90vh]">
         <DialogHeader>
-          <DialogTitle className="text-xl font-black text-slate-950 flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5 text-orange-500" />
-            Suspendre l'offre
+          <DialogTitle className="text-2xl font-black text-slate-950 flex items-center gap-2">
+            <Briefcase className="h-5 w-5 text-orange-600" />
+            {editingJob ? "Modifier l'offre" : "Créer une nouvelle offre d'emploi"}
           </DialogTitle>
-          <DialogDescription className="text-slate-500 font-bold">
-            Fournissez une raison explicite pour justifier la suspension de l'offre "{jobToSuspend?.title}". L'entreprise en sera immédiatement notifiée dans son dashboard.
+          <DialogDescription className="text-xs">
+            {editingJob ? "Ajustez les détails de la publication pour l'offre active." : "Publiez une offre directement en tant qu'administrateur. Remplissez tous les champs ci-dessous."}
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleConfirmSuspension} className="mt-4 space-y-4">
-          <div className="space-y-1">
-            <label className="text-[10px] font-black uppercase text-slate-500 tracking-wider">Motif de la suspension *</label>
-            <textarea
-              required
-              rows={4}
-              placeholder="Ex: Le descriptif de l'offre ne correspond pas à nos règles de sécurité ou d'éthique."
-              className="w-full rounded-2xl border border-slate-100 bg-slate-50 p-4 font-medium text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
-              value={suspensionReason}
-              onChange={(e) => setSuspensionReason(e.target.value)}
+
+        <form onSubmit={handleSaveOffer} className="p-1 space-y-5 mt-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1 text-left">
+              <Label htmlFor="of-title" className="text-[10px] font-black uppercase text-slate-500 tracking-wider">Titre du poste *</Label>
+              <Input 
+                id="of-title"
+                required
+                placeholder="Ex: Architecte de Solutions Cloud" 
+                value={formFields.title}
+                onChange={(e) => setFormFields({...formFields, title: e.target.value})}
+                className="h-11 rounded-xl border-slate-100 bg-slate-50 focus-visible:ring-orange-500 font-medium text-xs"
+              />
+            </div>
+
+            <div className="space-y-1 text-left">
+              <Label htmlFor="of-company" className="text-[10px] font-black uppercase text-slate-500 tracking-wider">Nom de l'entreprise *</Label>
+              <Input 
+                id="of-company"
+                required
+                placeholder="Ex: Administration 2NG ou Nom d'entreprise cliente" 
+                value={formFields.companyName}
+                onChange={(e) => setFormFields({...formFields, companyName: e.target.value})}
+                className="h-11 rounded-xl border-slate-100 bg-slate-50 focus-visible:ring-orange-500 font-medium text-xs"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-4 text-left p-4 bg-slate-50/50 rounded-2xl border border-slate-100">
+            <Label className="text-[10px] font-black uppercase text-slate-500 tracking-wider">Logo de l'entreprise (Optionnel)</Label>
+            <div className="flex flex-col sm:flex-row gap-4 items-center mt-1">
+              {formFields.companyLogo ? (
+                <div className="relative w-16 h-16 shrink-0 rounded-2xl bg-slate-950 text-white flex items-center justify-center font-black text-sm uppercase overflow-hidden border border-slate-800">
+                  <img src={formFields.companyLogo} className="h-full w-full object-cover" alt="Selected Logo" referrerPolicy="no-referrer" />
+                  <button 
+                    type="button"
+                    onClick={() => setFormFields({...formFields, companyLogo: ""})}
+                    className="absolute inset-0 bg-black/60 text-white font-bold text-[10px] flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity"
+                  >
+                    Retirer
+                  </button>
+                </div>
+              ) : (
+                <div className="w-16 h-16 shrink-0 rounded-2xl bg-slate-100 border-2 border-dashed border-slate-305 flex items-center justify-center font-bold text-slate-400 text-xs text-center p-1">
+                  Pas de logo
+                </div>
+              )}
+              
+              <div className="flex-1 w-full space-y-2">
+                <Input 
+                  type="file"
+                  accept="image/*"
+                  onChange={handleLogoUpload}
+                  className="h-10 text-xs rounded-xl bg-white border-slate-200 cursor-pointer"
+                />
+                <div className="flex items-center gap-2">
+                  <span className="text-[9px] text-slate-400 font-bold whitespace-nowrap">OU URL directe :</span>
+                  <Input 
+                    value={formFields.companyLogo}
+                    onChange={(e) => setFormFields({...formFields, companyLogo: e.target.value})}
+                    placeholder="https://images.unsplash.com/..."
+                    className="h-8 text-[11px] rounded-lg bg-white border-slate-100 flex-1 py-0 px-2"
+                  />
+                </div>
+              </div>
+            </div>
+            <p className="text-[9px] text-slate-400 font-bold">Sélectionnez une image logo pour cette offre d'emploi, ou indiquez une URL directe. L'upload se fait instantanément.</p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1 text-left">
+              <Label htmlFor="of-loc" className="text-[10px] font-black uppercase text-slate-500 tracking-wider">Localisation *</Label>
+              <Input 
+                id="of-loc"
+                required
+                placeholder="Ex: Dakar, Sénégal (Hybride)" 
+                value={formFields.location}
+                onChange={(e) => setFormFields({...formFields, location: e.target.value})}
+                className="h-11 rounded-xl border-slate-100 bg-slate-50 focus-visible:ring-orange-500 font-medium text-xs"
+              />
+            </div>
+
+            <div className="space-y-1 text-left">
+              <Label htmlFor="of-salary" className="text-[10px] font-black uppercase text-slate-500 tracking-wider">Salaire (Optionnel)</Label>
+              <Input 
+                id="of-salary"
+                placeholder="Ex: 1.5M - 2.0M CFA" 
+                value={formFields.salary}
+                onChange={(e) => setFormFields({...formFields, salary: e.target.value})}
+                className="h-11 rounded-xl border-slate-100 bg-slate-50 focus-visible:ring-orange-500 font-medium text-xs"
+              />
+            </div>
+          </div>
+
+          {/* 1. Niveau d'expérience & Années d'expérience */}
+          <div className="space-y-3 p-4 bg-slate-50/50 rounded-2xl border border-slate-100 text-left">
+            <div>
+              <Label className="text-[10px] font-black uppercase text-slate-500 tracking-wider">Niveau d'expérience requis *</Label>
+              <div className="flex flex-wrap gap-2 mt-1.5">
+                {["Stagiaire", "Junior", "Intermédiaire", "Senior", "Expert / Dirigeant"].map((lvl) => {
+                  const isSelected = formFields.experienceLevel === lvl;
+                  return (
+                    <button
+                      key={lvl}
+                      type="button"
+                      onClick={() => setFormFields(prev => ({ ...prev, experienceLevel: lvl }))}
+                      className={`px-3 py-1.5 rounded-xl border text-xs font-black transition-all ${
+                        isSelected 
+                          ? "bg-orange-600 border-orange-600 text-white shadow-sm" 
+                          : "bg-white border-slate-200 text-slate-700 hover:border-slate-300"
+                      }`}
+                    >
+                      {lvl}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div>
+              <Label className="text-[10px] font-black uppercase text-slate-500 tracking-wider">Nombre d'années d'expérience *</Label>
+              <div className="flex flex-wrap gap-2 mt-1.5">
+                {["0-1 an", "1-3 ans", "3-5 ans", "5-10 ans", "10 ans +"].map((yrs) => {
+                  const isSelected = formFields.experienceYears === yrs;
+                  return (
+                    <button
+                      key={yrs}
+                      type="button"
+                      onClick={() => setFormFields(prev => ({ ...prev, experienceYears: yrs }))}
+                      className={`px-3 py-1.5 rounded-xl border text-xs font-black transition-all ${
+                        isSelected 
+                          ? "bg-orange-600 border-orange-600 text-white shadow-sm" 
+                          : "bg-white border-slate-200 text-slate-700 hover:border-slate-300"
+                      }`}
+                    >
+                      {yrs}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* 2. Niveau d'études requis */}
+          <div className="p-4 bg-slate-50/50 rounded-2xl border border-slate-100 text-left">
+            <Label className="text-[10px] font-black uppercase text-slate-500 tracking-wider font-bold">Niveau d'études requis *</Label>
+            <div className="flex flex-wrap gap-2 mt-1.5">
+              {["Bac", "Bac + 2 (BTS/DUT)", "Bac + 3 (Licence)", "Bac + 5 (Master/Ingénieur)", "Doctorat / Autre"].map((edu) => {
+                const isSelected = formFields.educationLevel === edu;
+                return (
+                  <button
+                    key={edu}
+                    type="button"
+                    onClick={() => setFormFields(prev => ({ ...prev, educationLevel: edu }))}
+                    className={`px-3 py-1.5 rounded-xl border text-xs font-black transition-all ${
+                      isSelected 
+                        ? "bg-orange-600 border-orange-600 text-white shadow-sm" 
+                        : "bg-white border-slate-200 text-slate-700 hover:border-slate-300"
+                    }`}
+                  >
+                    {edu}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* 3. Domaines d'activité */}
+          <div className="p-4 bg-slate-50/50 rounded-2xl border border-slate-100 text-left">
+            <Label className="text-[10px] font-black uppercase text-slate-500 tracking-wider">Domaine d'activité principal *</Label>
+            <p className="text-[9px] text-slate-400 font-bold mb-2">Sélectionnez le secteur d'activité auquel l'offre est rattachée :</p>
+            <div className="grid grid-cols-2 gap-2 mt-1.5 max-h-48 overflow-y-auto pr-1">
+              {[
+                "Audit / Conseil",
+                "Banque / Assurance",
+                "Commerce / Vente",
+                "Comptabilité / Finance",
+                "Énergie / Mines",
+                "Enseignement / Formation",
+                "Gestion / Administration",
+                "Graphisme / Design",
+                "Humanitaire / ONG",
+                "Immobilier / BTP",
+                "Logistique / Transport",
+                "Marketing / Com",
+                "Ressources Humaines",
+                "Santé / Médical",
+                "Service Public",
+                "Technologie / Télécoms"
+              ].map((domain) => {
+                const isSelected = formFields.activityDomain === domain;
+                return (
+                  <button
+                    key={domain}
+                    type="button"
+                    onClick={() => setFormFields(prev => ({ ...prev, activityDomain: domain }))}
+                    className={`px-3 py-2 rounded-xl border text-[11px] font-black transition-all text-left truncate ${
+                      isSelected 
+                        ? "bg-orange-600 border-orange-600 text-white shadow-sm" 
+                        : "bg-white border-slate-200 text-slate-700 hover:border-slate-300"
+                    }`}
+                  >
+                    {domain}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Type de contrat explicitly needed */}
+          <div className="space-y-1 text-left">
+            <Label htmlFor="of-contract" className="text-[10px] font-black uppercase text-slate-500 tracking-wider">Type de contrat (Ex: CDI, CDD, Stage...)</Label>
+            <Input 
+              id="of-contract"
+              placeholder="Ex: CDI, CDD, Freelance, Stage" 
+              value={formFields.contractType}
+              onChange={(e) => setFormFields({...formFields, contractType: e.target.value})}
+              className="h-11 rounded-xl border-slate-100 bg-slate-50 focus-visible:ring-orange-500 font-medium text-xs"
             />
           </div>
-          <DialogFooter className="pt-2 flex gap-2">
+
+          {/* 4. Méthode de candidature & Dossier de candidature */}
+          <div className="p-4 bg-slate-50/50 rounded-2xl border border-slate-100 text-left space-y-4">
+            <div>
+              <Label className="text-[10px] font-black uppercase text-slate-500 tracking-wider">Mode de réception des candidatures *</Label>
+              <div className="flex gap-3 mt-1.5">
+                {[
+                  { id: "email", label: "📧 Par E-mail" },
+                  { id: "platform", label: "✨ Via Plateforme 2NG" }
+                ].map((mode) => {
+                  const isSelected = formFields.applyMethod === mode.id;
+                  return (
+                    <button
+                      key={mode.id}
+                      type="button"
+                      onClick={() => setFormFields(prev => ({ ...prev, applyMethod: mode.id }))}
+                      className={`flex-1 py-1.5 rounded-xl border text-xs font-black transition-all ${
+                        isSelected 
+                          ? "bg-orange-600 border-orange-600 text-white shadow-sm" 
+                          : "bg-white border-slate-200 text-slate-700 hover:border-slate-300"
+                      }`}
+                    >
+                      {mode.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="of-company-email" className="text-[10px] font-black uppercase text-slate-500 tracking-wider">Email de l'entreprise pour réception *</Label>
+              <Input 
+                id="of-company-email"
+                type="email"
+                required
+                placeholder="Ex: recrutement@entreprise.com" 
+                value={formFields.companyEmail}
+                onChange={(e) => setFormFields({...formFields, companyEmail: e.target.value})}
+                className="h-11 rounded-xl border-slate-100 bg-white focus-visible:ring-orange-500 font-medium text-xs"
+              />
+            </div>
+
+            <div>
+              <Label className="text-[10px] font-black uppercase text-slate-500 tracking-wider">Pièces requises pour le dossier *</Label>
+              <p className="text-[9px] text-slate-400 font-bold mb-2">Sélectionnez les documents exigés pour postuler :</p>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  "CV uniquement",
+                  "CV + Lettre de motivation",
+                  "Portfolio / Réalisations",
+                  "Copie de diplômes",
+                  "Pièce d'identité"
+                ].map((docItem) => {
+                  const isChecked = formFields.conditionsDocuments.includes(docItem);
+                  return (
+                    <button
+                      key={docItem}
+                      type="button"
+                      onClick={() => {
+                        const currentDocs = [...formFields.conditionsDocuments];
+                        if (currentDocs.includes(docItem)) {
+                          setFormFields(prev => ({ ...prev, conditionsDocuments: currentDocs.filter(d => d !== docItem) }));
+                        } else {
+                          setFormFields(prev => ({ ...prev, conditionsDocuments: [...currentDocs, docItem] }));
+                        }
+                      }}
+                      className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition-all ${
+                        isChecked 
+                          ? "bg-slate-900 border-slate-900 text-white shadow-sm" 
+                          : "bg-white border-slate-200 text-slate-700 hover:border-slate-300"
+                      }`}
+                    >
+                      {isChecked ? "✓ " : ""}{docItem}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="space-y-1 text-left">
+              <Label htmlFor="of-type" className="text-[10px] font-black uppercase text-slate-500 tracking-wider">Format d'offre</Label>
+              <select
+                id="of-type"
+                value={formFields.type}
+                onChange={(e) => setFormFields({...formFields, type: e.target.value, isFeatured: e.target.value === 'popular' ? true : formFields.isFeatured})}
+                className="w-full h-11 border border-slate-100 rounded-xl bg-slate-50 px-3 text-xs font-bold text-slate-700 focus:outline-none focus:ring-1 focus:ring-orange-550"
+              >
+                <option value="popular">⭐ Populaire</option>
+                <option value="unique">🏢 Directe (Partenaire)</option>
+                <option value="standard">Standard d'Entreprise</option>
+              </select>
+            </div>
+
+            <div className="space-y-1 text-left">
+              <Label htmlFor="of-status" className="text-[10px] font-black uppercase text-slate-500 tracking-wider">Statut de publication</Label>
+              <select
+                id="of-status"
+                value={formFields.status}
+                onChange={(e) => setFormFields({...formFields, status: e.target.value})}
+                className="w-full h-11 border border-slate-100 rounded-xl bg-slate-50 px-3 text-xs font-bold text-slate-700 focus:outline-none focus:ring-1 focus:ring-orange-550"
+              >
+                <option value="active">Actif (Publié et visible)</option>
+                <option value="suspended">Désactivé (Brouillon/Masqué)</option>
+              </select>
+            </div>
+
+            <div className="space-y-1 text-left">
+              <Label htmlFor="of-expiry" className="text-[10px] font-black uppercase text-slate-500 tracking-wider">Date limite d'expiration</Label>
+              <input 
+                id="of-expiry"
+                type="date"
+                value={formFields.expiresAt}
+                onChange={(e) => setFormFields({...formFields, expiresAt: e.target.value})}
+                className="w-full h-11 border border-slate-100 rounded-xl bg-slate-50 px-3 text-xs font-bold text-slate-700 focus:outline-none focus:ring-1 focus:ring-orange-550"
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-100 text-left">
+            <input 
+              id="of-featured"
+              type="checkbox"
+              checked={formFields.isFeatured}
+              onChange={(e) => setFormFields({...formFields, isFeatured: e.target.checked})}
+              className="h-4.5 w-4.5 text-orange-600 focus:ring-orange-500 border-slate-200 rounded shrink-0 cursor-pointer"
+            />
+            <div>
+              <Label htmlFor="of-featured" className="text-xs font-black text-slate-900 cursor-pointer">Marquer comme offre "Populaire / Vedette"</Label>
+              <p className="text-[10px] text-slate-400 font-bold leading-normal">L'offre apparaîtra automatiquement et de manière prioritaire dans la section "Offres Populaires" de la page d'accueil.</p>
+            </div>
+          </div>
+
+          <div className="space-y-1 text-left">
+            <Label htmlFor="of-desc" className="text-[10px] font-black uppercase text-slate-500 tracking-wider">Description de l'offre *</Label>
+            <Textarea 
+              id="of-desc"
+              required
+              rows={5}
+              placeholder="Décrivez les objectifs, responsabilités, le contexte de la mission..."
+              value={formFields.description}
+              onChange={(e) => setFormFields({...formFields, description: e.target.value})}
+              className="rounded-xl border-slate-100 bg-slate-50 focus-visible:ring-orange-500 font-medium text-xs leading-relaxed"
+            />
+          </div>
+
+          <div className="space-y-1 text-left">
+            <Label htmlFor="of-req" className="text-[10px] font-black uppercase text-slate-500 tracking-wider">Exigences / Profil recherché (Optionnel)</Label>
+            <Textarea 
+              id="of-req"
+              rows={4}
+              placeholder="Ex: Bac+5 en Informatique, 3 ans d'expérience React & Node, Maîtrise de l'anglais technique..."
+              value={formFields.requirements}
+              onChange={(e) => setFormFields({...formFields, requirements: e.target.value})}
+              className="rounded-xl border-slate-100 bg-slate-50 focus-visible:ring-orange-500 font-medium text-xs leading-relaxed"
+            />
+          </div>
+
+          <DialogFooter className="pt-4 flex gap-3">
             <Button 
               type="button" 
               variant="outline"
               className="rounded-xl font-black uppercase text-xs h-12 flex-1"
-              onClick={() => { setIsSuspendOpen(false); setJobToSuspend(null); setSuspensionReason(""); }}
+              onClick={() => setIsFormDialogOpen(false)}
             >
               Annuler
             </Button>
             <Button 
               type="submit"
-              className="rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-black uppercase text-xs h-12 flex-1"
+              disabled={savingOffer}
+              className="rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-black uppercase text-xs h-12 flex-1 shadow-lg shadow-orange-650/15"
             >
-              Suspendre l'offre
+              {savingOffer ? "Sauvegarde en cours..." : (editingJob ? "Enregistrer les modifications" : "Créer et Publier")}
             </Button>
           </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
 
+    {/* ========================================================= */}
+    {/* 6. APERÇU RAPIDE DIALOG                                   */}
+    {/* ========================================================= */}
     <Dialog open={isViewOpen} onOpenChange={setIsViewOpen}>
       <DialogContent className="max-w-2xl rounded-[32px] p-8 border-none shadow-2xl">
         <DialogHeader>
           <DialogTitle className="text-2xl font-black">Aperçu de l'Offre</DialogTitle>
-          <DialogDescription>Détails de l'opportunité publiée par {recruiterNames[selectedJob?.recruiterId!] || selectedJob?.companyName}.</DialogDescription>
+          <DialogDescription>Détails de l'opportunité d'emploi.</DialogDescription>
         </DialogHeader>
         {selectedJob && (
-          <div className="py-6 space-y-6 max-h-[60vh] overflow-y-auto pr-2">
-            <div className="flex justify-between items-start">
-              <div>
-                <h3 className="text-xl font-black text-slate-900">{selectedJob.title}</h3>
-                <p className="text-slate-500 font-bold">{recruiterNames[selectedJob.recruiterId] || selectedJob.companyName} • {selectedJob.location}</p>
+          <div className="py-6 space-y-6 max-h-[60vh] overflow-y-auto pr-2 text-left">
+            <div className="flex gap-4 items-start justify-between">
+              <div className="flex gap-3 items-center">
+                <div className="w-12 h-12 rounded-2xl bg-slate-950 text-white flex items-center justify-center font-black text-sm uppercase overflow-hidden border border-slate-850 shadow-sm">
+                  {(selectedJob as any).companyLogo ? (
+                    <img src={(selectedJob as any).companyLogo} alt={selectedJob.companyName} className="h-full w-full object-cover" referrerPolicy="no-referrer" />
+                  ) : (
+                    selectedJob.companyName.substring(0, 2)
+                  )}
+                </div>
+                <div>
+                  <h3 className="text-xl font-black text-slate-900 leading-tight">{selectedJob.title}</h3>
+                  <p className="text-slate-500 font-bold text-xs">{selectedJob.companyName} • {selectedJob.location}</p>
+                </div>
               </div>
-              <div className="flex flex-col items-end gap-1">
-                <Badge variant="outline" className="font-black uppercase">{selectedJob.type}</Badge>
+              <div className="flex flex-col items-end gap-1.5 shrink-0">
+                <Badge variant="outline" className="font-extrabold uppercase tracking-wide text-[9px]">{selectedJob.type}</Badge>
                 {getJobStatusBadge(selectedJob.status)}
               </div>
             </div>
-            
-            {selectedJob.status === 'suspended' && selectedJob.suspensionReason && (
-              <div className="p-4 bg-red-50 text-red-700 border border-red-100 rounded-2xl text-xs">
-                <p className="font-black uppercase mb-1 flex items-center gap-1.5">
-                  <AlertTriangle className="h-4 w-4 text-red-500 animate-pulse" />
-                  Offre Suspendue par la Modération
-                </p>
-                <p className="font-medium">{selectedJob.suspensionReason}</p>
+
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+               <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100/50">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Salaire proposé</p>
+                  <p className="font-bold text-xs text-slate-800">{selectedJob.salary || 'Non spécifié'}</p>
+               </div>
+               <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100/50">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Secteur / Domaine</p>
+                  <p className="font-bold text-[11px] text-slate-800 truncate">{selectedJob.activityDomain || selectedJob.field || selectedJob.category || 'Non spécifié'}</p>
+               </div>
+               <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100/50">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Expérience</p>
+                  <p className="font-bold text-[11px] text-slate-800 truncate">{(selectedJob as any).experienceLevel || 'Intermédiaire'} ({(selectedJob as any).experienceYears || '1-3 ans'})</p>
+               </div>
+               <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100/50">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Études max</p>
+                  <p className="font-bold text-[11px] text-slate-800 truncate">{(selectedJob as any).educationLevel || 'Bac +3'}</p>
+               </div>
+            </div>
+
+            <div className="p-5 bg-orange-50/50 border border-orange-100 rounded-[28px] space-y-3">
+              <h4 className="text-[10px] font-black uppercase text-orange-700 tracking-wider">📁 Dossier & Candidature</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                <div>
+                  <span className="text-slate-400 font-bold block mb-0.5">Mode de candidature :</span>
+                  <span className="font-black text-slate-800 uppercase bg-white border px-2 py-0.5 rounded-lg inline-block text-[10px]">
+                    {(selectedJob as any).applyMethod === 'platform' ? '🔥 Plateforme 2NG' : '✉️ E-mail de l\'entreprise'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-400 font-bold block mb-0.5">Contact de réception :</span>
+                  <p className="font-black text-slate-900 truncate">{(selectedJob as any).companyEmail || 'Non spécifié'}</p>
+                </div>
+              </div>
+              
+              {(selectedJob as any).conditionsDocuments && (selectedJob as any).conditionsDocuments.length > 0 && (
+                <div className="pt-2 border-t border-orange-100/60">
+                  <span className="text-[10px] text-slate-400 font-black uppercase block tracking-wider mb-1.5">Pièces à fournir :</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {(selectedJob as any).conditionsDocuments.map((docItem: string, idx: number) => (
+                      <span key={idx} className="bg-white border text-slate-700 font-bold text-[9px] px-2 py-0.5 rounded-md">
+                        ✓ {docItem}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-3">
+              <h4 className="text-xs font-black text-slate-950 uppercase tracking-wider flex items-center gap-1.5">Description</h4>
+              <p className="text-sm text-slate-600 leading-relaxed font-medium bg-slate-50/30 p-4 rounded-2xl border border-slate-100/30">{selectedJob.description}</p>
+            </div>
+
+            {selectedJob.requirements && (
+              <div className="space-y-3">
+                <h4 className="text-xs font-black text-slate-950 uppercase tracking-wider flex items-center gap-1.5">Profil recherché & Exigences</h4>
+                <p className="text-sm text-slate-600 leading-relaxed font-medium bg-slate-50/30 p-4 rounded-2xl border border-slate-100/30 whitespace-pre-line">{selectedJob.requirements}</p>
               </div>
             )}
-
-            <div className="grid grid-cols-2 gap-4">
-               <div className="p-4 bg-slate-50 rounded-2xl">
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Salaire</p>
-                  <p className="font-bold">{selectedJob.salary || 'Non spécifié'}</p>
-               </div>
-               <div className="p-4 bg-slate-50 rounded-2xl">
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Domaine</p>
-                  <p className="font-bold">{selectedJob.category || 'Non spécifié'}</p>
-               </div>
-            </div>
-
-            <div className="space-y-3">
-              <h4 className="text-xs font-black text-slate-900 uppercase">Description</h4>
-              <p className="text-sm text-slate-600 leading-relaxed">{selectedJob.description}</p>
-            </div>
-
-            <div className="space-y-3">
-              <h4 className="text-xs font-black text-slate-900 uppercase">Exigences</h4>
-              <p className="text-sm text-slate-600 leading-relaxed">{selectedJob.requirements}</p>
-            </div>
           </div>
         )}
-        <DialogFooter className="mt-6 flex flex-col sm:flex-row gap-2">
-           {selectedJob && selectedJob.status === 'pending_validation' && (
-             <Button
-               className="flex-1 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase text-xs h-12"
-               onClick={() => {
-                 onAction(selectedJob.id!, 'approve');
-                 setIsViewOpen(false);
-               }}
-             >
-               Approuver & Publier l'offre
-             </Button>
-           )}
-           {selectedJob && selectedJob.status === 'active' && (
-             <Button
-               className="flex-1 rounded-xl bg-red-500 hover:bg-red-600 text-white font-black uppercase text-xs h-12"
-               onClick={() => {
-                 setIsViewOpen(false);
-                 setJobToSuspend(selectedJob);
-                 setIsSuspendOpen(true);
-               }}
-             >
-               Suspendre l'offre
-             </Button>
-           )}
-           <Button className="flex-1 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-black uppercase text-xs h-12" onClick={() => setIsViewOpen(false)}>Fermer l'aperçu</Button>
+        <DialogFooter className="mt-6">
+          <Button className="w-full rounded-xl bg-slate-900 hover:bg-slate-950 text-white font-black uppercase text-xs h-12" onClick={() => setIsViewOpen(false)}>Fermer l'aperçu</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

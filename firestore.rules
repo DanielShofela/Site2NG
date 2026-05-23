@@ -60,18 +60,45 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
-    // 4. Job Rules
-    match /jobs/{jobId} {
+    // 4. Offer Rules
+    match /offers/{offerId} {
       allow read: if true; // Public listings
-      allow create: if isRole('recruiter') || isAdmin();
+      allow create: if isSignedIn();
       allow update: if isAdmin() || (
-        isSignedIn() && existing().recruiterId == request.auth.uid &&
-        !incoming().diff(existing()).affectedKeys().hasAny(['recruiterId'])
+        isSignedIn() && (
+          existing().createdBy == request.auth.uid || 
+          existing().recruiterId == request.auth.uid || 
+          existing().companyId == request.auth.uid
+        )
       ) || (
-        // Allow anonymous view increments
+        // Allow view/anonymous view increments
         incoming().diff(existing()).affectedKeys().hasOnly(['views'])
       );
-      allow delete: if isAdmin() || (isSignedIn() && existing().recruiterId == request.auth.uid);
+      allow delete: if isAdmin() || (
+        isSignedIn() && (
+          existing().createdBy == request.auth.uid || 
+          existing().recruiterId == request.auth.uid || 
+          existing().companyId == request.auth.uid
+        )
+      );
+    }
+
+    // Maintenance Rules
+    match /maintenance/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Partner Logos Rules
+    match /partner_logos/{partnerLogoId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Admin Settings / Goals Rules
+    match /settings/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
     }
 
     // 5. Application Rules

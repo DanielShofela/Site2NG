@@ -71,10 +71,10 @@ export default function Signup() {
         if (user.status === 'submitted' || user.status === 'pending') {
           navigate('/pending-approval');
         } else {
-          navigate('/recruiter');
+          navigate('/dashboard/company');
         }
       } else if (user.role === 'candidate') {
-        navigate('/candidate');
+        navigate('/dashboard/member');
       } else {
         navigate('/');
       }

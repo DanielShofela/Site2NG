@@ -40,7 +40,7 @@ export default function Jobs() {
     const fetchJobs = async () => {
       try {
         const q = query(
-          collection(db, 'jobs'),
+          collection(db, 'offers'),
           where('status', '==', 'active')
         );
         const querySnapshot = await getDocs(q);
@@ -59,7 +59,7 @@ export default function Jobs() {
         setJobs(jobsData);
 
         // Fetch company names for these jobs to ensure we display the latest ones
-        const recruiterIds = Array.from(new Set(jobsData.map(j => j.recruiterId).filter(Boolean)));
+        const recruiterIds = Array.from(new Set(jobsData.map(j => j.recruiterId || (j as any).companyId).filter(Boolean)));
         if (recruiterIds.length > 0) {
           const namesMap: Record<string, string> = {};
           
@@ -101,12 +101,13 @@ export default function Jobs() {
 
     setIsApplying(true);
     try {
+      const rId = selectedJob.recruiterId || (selectedJob as any).companyId || 'admin_popular';
       const applicationData = {
         jobId: selectedJob.id,
         candidateId: user.uid,
-        recruiterId: selectedJob.recruiterId,
+        recruiterId: rId,
         jobTitle: selectedJob.title,
-        companyName: companyNames[selectedJob.recruiterId] || selectedJob.companyName,
+        companyName: companyNames[rId] || selectedJob.companyName || 'Entreprise Partenaire',
         status: 'pending',
         appliedAt: serverTimestamp(),
         candidateProfile: {
@@ -131,7 +132,8 @@ export default function Jobs() {
   };
 
   const getCompanyName = (job: Job) => {
-    return companyNames[job.recruiterId] || job.companyName;
+    const rId = job.recruiterId || (job as any).companyId;
+    return companyNames[rId || ''] || job.companyName;
   };
 
   const filteredJobs = jobs.filter(job => 
@@ -182,7 +184,7 @@ export default function Jobs() {
                   
                   // Increment job views
                   try {
-                    const jobRef = doc(db, 'jobs', job.id);
+                    const jobRef = doc(db, 'offers', job.id);
                     await updateDoc(jobRef, {
                       views: increment(1)
                     });
@@ -201,9 +203,9 @@ export default function Jobs() {
                               {job.title}
                             </CardTitle>
                             <div className="flex flex-wrap items-center text-sm font-medium text-slate-500">
-                              {job.recruiterId ? (
+                              {(job.type !== 'popular' && (job.recruiterId || (job as any).companyId)) ? (
                                 <Link 
-                                  to={`/company/${job.recruiterId}`} 
+                                  to={`/company/${job.recruiterId || (job as any).companyId}`} 
                                   className="text-slate-900 hover:text-orange-600 transition-colors flex items-center gap-1 group/company relative z-10"
                                   onClick={(e) => e.stopPropagation()}
                                 >
@@ -219,9 +221,27 @@ export default function Jobs() {
                               </div>
                             </div>
                           </div>
-                          <Badge variant="secondary" className="bg-orange-50 text-orange-600 border-none font-bold px-3 py-1">
-                            {job.type}
-                          </Badge>
+                          <div className="flex items-center gap-2">
+                            {job.type === 'rapid' && (
+                              <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100 border-none font-black text-[10px] uppercase tracking-wider px-3 py-1 animate-pulse flex items-center gap-1 rounded-lg">
+                                <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-ping" />
+                                Offre Rapide
+                              </Badge>
+                            )}
+                            {job.type === 'popular' && (
+                              <Badge className="bg-indigo-100 text-indigo-700 hover:bg-indigo-100 border-none font-black text-[10px] uppercase tracking-wider px-3 py-1 flex items-center gap-1 rounded-lg">
+                                ✨ Offre Populaire
+                              </Badge>
+                            )}
+                            {job.type === 'unique' && (
+                              <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-none font-black text-[10px] uppercase tracking-wider px-3 py-1 flex items-center gap-1 rounded-lg">
+                                ✅ Partenaire Direct
+                              </Badge>
+                            )}
+                            <Badge variant="secondary" className="bg-slate-100 text-slate-700 border-none font-bold px-3 py-1 rounded-lg">
+                              {(job as any).contractType || (job.type !== 'rapid' && job.type !== 'popular' && job.type !== 'unique' ? job.type : 'CDI')}
+                            </Badge>
+                          </div>
                         </div>
                         <div className="mt-4">
                            <p className="text-sm text-slate-500 line-clamp-2 italic leading-relaxed">
@@ -267,9 +287,9 @@ export default function Jobs() {
                         <DialogHeader>
                           <DialogTitle className="text-3xl font-extrabold tracking-tight">{selectedJob.title}</DialogTitle>
                           <DialogDescription className="flex flex-wrap items-center gap-2 mt-3 text-slate-300 font-medium">
-                            {selectedJob.recruiterId ? (
+                            {(selectedJob.type !== 'popular' && (selectedJob.recruiterId || (selectedJob as any).companyId)) ? (
                               <Link 
-                                to={`/company/${selectedJob.recruiterId}`}
+                                to={`/company/${selectedJob.recruiterId || (selectedJob as any).companyId}`}
                                 className="text-white bg-white/10 px-3 py-1 rounded-lg hover:bg-white/20 transition-all flex items-center gap-2"
                               >
                                 {getCompanyName(selectedJob)}
@@ -288,15 +308,61 @@ export default function Jobs() {
                       
                       <div className="p-8 space-y-8">
                         <div className="flex gap-3">
-                          <Badge variant="secondary" className="bg-orange-50 text-orange-600">{selectedJob.type}</Badge>
+                          <Badge variant="secondary" className="bg-orange-50 text-orange-600">{(selectedJob as any).contractType || (selectedJob.type !== 'rapid' && selectedJob.type !== 'popular' && selectedJob.type !== 'unique' ? selectedJob.type : 'CDI')}</Badge>
                           <Badge variant="secondary" className="bg-slate-100 text-slate-600">{selectedJob.field}</Badge>
                         </div>
 
-                        <div className="space-y-4">
+                        <div className="space-y-4 text-left">
                           <h4 className="text-lg font-bold text-slate-900 border-l-4 border-orange-600 pl-4">Description du poste</h4>
                           <p className="text-slate-500 leading-relaxed font-medium">
                             {selectedJob.description}
                           </p>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4 text-left">
+                          <div className="bg-slate-50 p-4 rounded-xl border border-slate-100/60">
+                            <span className="text-[10px] font-black uppercase text-slate-400 block mb-1">Expérience</span>
+                            <span className="text-xs font-bold text-slate-800">
+                              {(selectedJob as any).experienceLevel || "Intermédiaire"} ({(selectedJob as any).experienceYears || "1-3 ans"})
+                            </span>
+                          </div>
+                          <div className="bg-slate-50 p-4 rounded-xl border border-slate-100/60">
+                            <span className="text-[10px] font-black uppercase text-slate-400 block mb-1">Niveau d'études</span>
+                            <span className="text-xs font-bold text-slate-800">
+                              {(selectedJob as any).educationLevel || "Bac +3 (Licence)"}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Dossier de candidature */}
+                        <div className="bg-orange-50/50 p-5 rounded-2xl border border-orange-100 text-left space-y-3">
+                          <h4 className="text-xs font-black text-orange-900 uppercase tracking-wider">📁 Dossier de Candidature</h4>
+                          <div className="text-xs space-y-2 text-slate-700 font-medium">
+                            <p>
+                              <span className="text-slate-400 font-bold">Mode de dépôt :</span>{" "}
+                              <span className="font-extrabold uppercase text-slate-800 bg-white border px-2 py-0.5 rounded text-[10px]">
+                                {(selectedJob as any).applyMethod === 'platform' ? '🔥 Plateforme 2NG' : '✉️ E-mail de l\'entreprise'}
+                              </span>
+                            </p>
+                            {(selectedJob as any).companyEmail && (
+                              <p>
+                                <span className="text-slate-400 font-bold">Adresse d'envoi :</span>{" "}
+                                <span className="font-extrabold text-slate-900 select-all">{(selectedJob as any).companyEmail}</span>
+                              </p>
+                            )}
+                            {(selectedJob as any).conditionsDocuments && (selectedJob as any).conditionsDocuments.length > 0 && (
+                              <div className="pt-2 border-t border-orange-100/50">
+                                <span className="text-[10px] text-slate-400 font-black uppercase block tracking-wider mb-1">Pièces exigées :</span>
+                                <div className="flex flex-wrap gap-1 mt-1">
+                                  {(selectedJob as any).conditionsDocuments.map((docItem: string, idx: number) => (
+                                    <span key={idx} className="bg-white border text-slate-700 font-bold text-[9px] px-2 py-0.5 rounded-md">
+                                      ✓ {docItem}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
                         </div>
 
                         <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100">

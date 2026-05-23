@@ -86,6 +86,7 @@ export default function RecruiterDashboard() {
   const [jobDescription, setJobDescription] = useState('');
   const [jobField, setJobField] = useState('Informatique');
   const [jobSalary, setJobSalary] = useState('');
+  const [jobExpiresAt, setJobExpiresAt] = useState('');
 
   // Edit form state
   const [editingJob, setEditingJob] = useState<Job | null>(null);
@@ -96,6 +97,7 @@ export default function RecruiterDashboard() {
   const [editDescription, setEditDescription] = useState('');
   const [editField, setEditField] = useState('Informatique');
   const [editSalary, setEditSalary] = useState('');
+  const [editExpiresAt, setEditExpiresAt] = useState('');
 
   // Data state
   const [myJobs, setMyJobs] = useState<Job[]>([]);
@@ -208,7 +210,7 @@ export default function RecruiterDashboard() {
       try {
         // Fetch jobs
         const jobsQ = query(
-          collection(db, 'jobs'),
+          collection(db, 'offers'),
           where('recruiterId', '==', user.uid),
           orderBy('createdAt', 'desc')
         );
@@ -269,11 +271,13 @@ export default function RecruiterDashboard() {
   const handleOpenEdit = (job: Job) => {
     setEditingJob(job);
     setEditTitle(job.title || '');
-    setEditType(job.type || 'CDI');
+    setEditType((job as any).contractType || job.type || 'CDI');
     setEditLocation(job.location || '');
     setEditDescription(job.description || '');
     setEditField(job.field || 'Informatique');
     setEditSalary(job.salary || '');
+    const expiresVal = (job as any).expiresAt ? (typeof (job as any).expiresAt === 'string' ? (job as any).expiresAt : ((job as any).expiresAt.toDate ? (job as any).expiresAt.toDate() : new Date((job as any).expiresAt)).toISOString().substring(0, 16)) : '';
+    setEditExpiresAt(expiresVal);
     setIsEditingJobOpen(true);
   };
 
@@ -282,15 +286,26 @@ export default function RecruiterDashboard() {
     if (!editingJob || !user) return;
     
     try {
-      const jobRef = doc(db, 'jobs', editingJob.id!);
+      let calculatedType = 'unique';
+      if (editExpiresAt) {
+        const expiresDate = new Date(editExpiresAt);
+        const diffHours = (expiresDate.getTime() - Date.now()) / (1000 * 60 * 60);
+        if (diffHours > 0 && diffHours <= 48) {
+          calculatedType = 'rapid';
+        }
+      }
+
+      const jobRef = doc(db, 'offers', editingJob.id!);
       await updateDoc(jobRef, {
         title: editTitle,
-        type: editType,
+        contractType: editType,
+        type: calculatedType,
         location: editLocation,
         description: editDescription,
         field: editField,
         category: editField,
         salary: editSalary,
+        expiresAt: editExpiresAt ? new Date(editExpiresAt) : null,
         status: 'pending_validation', // Go back to pending validation upon modification
         updatedAt: serverTimestamp()
       });
@@ -299,12 +314,14 @@ export default function RecruiterDashboard() {
       setMyJobs(prev => prev.map(j => j.id === editingJob.id ? {
         ...j,
         title: editTitle,
-        type: editType,
+        type: calculatedType,
+        contractType: editType,
         location: editLocation,
         description: editDescription,
         field: editField,
         category: editField,
         salary: editSalary,
+        expiresAt: editExpiresAt ? new Date(editExpiresAt) : null,
         status: 'pending_validation'
       } : j));
       
@@ -328,21 +345,35 @@ export default function RecruiterDashboard() {
 
     setIsCreatingJob(true);
     try {
+      let calculatedType = 'unique';
+      if (jobExpiresAt) {
+        const expiresDate = new Date(jobExpiresAt);
+        const diffHours = (expiresDate.getTime() - Date.now()) / (1000 * 60 * 60);
+        if (diffHours > 0 && diffHours <= 48) {
+          calculatedType = 'rapid';
+        }
+      }
+
       const jobData = {
-        recruiterId: user.uid,
+        companyId: user.uid,
+        createdBy: user.uid,
         companyName: user.companyName || user.displayName || "Entreprise",
+        companyLogo: user.photoUrl || '',
         title: jobTitle,
         description: jobDescription,
         location: jobLocation,
-        type: jobType,
+        type: calculatedType,
+        contractType: jobType,
         field: jobField,
         category: jobField,
         salary: jobSalary,
+        expiresAt: jobExpiresAt ? new Date(jobExpiresAt) : null,
         status: 'pending_validation', // Default is en attente de validation
         createdAt: serverTimestamp(),
+        isFeatured: false
       };
 
-      const docRef = await addDoc(collection(db, 'jobs'), jobData);
+      const docRef = await addDoc(collection(db, 'offers'), jobData);
       setJobCreated(true);
       
       // Update local state
@@ -353,6 +384,7 @@ export default function RecruiterDashboard() {
       setJobLocation('');
       setJobDescription('');
       setJobSalary('');
+      setJobExpiresAt('');
     } catch (error) {
       console.error('Error creating job:', error);
     } finally {
@@ -566,6 +598,11 @@ export default function RecruiterDashboard() {
                         <Label htmlFor="salary" className="font-black text-slate-700 ml-1 uppercase text-xs tracking-widest">Salaire (CFA) *</Label>
                         <Input id="salary" placeholder="Ex: 500 000 CFA / mois" className="h-14 rounded-2xl border-slate-200 focus-visible:ring-orange-600 font-bold" value={jobSalary} onChange={e => setJobSalary(e.target.value)} required />
                       </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="expiresAt" className="font-black text-slate-700 ml-1 uppercase text-xs tracking-widest">Date d'expiration (Sous 48h = Automatiquement "Offre Rapide")</Label>
+                      <Input id="expiresAt" type="datetime-local" className="h-14 rounded-2xl border-slate-200 focus-visible:ring-orange-600 font-bold" value={jobExpiresAt} onChange={e => setJobExpiresAt(e.target.value)} />
                     </div>
 
                     <div className="space-y-2">
@@ -1339,6 +1376,11 @@ export default function RecruiterDashboard() {
                 <Label htmlFor="edit-salary" className="font-black text-slate-700 ml-1 uppercase text-xs tracking-widest">Salaire (CFA) *</Label>
                 <Input id="edit-salary" placeholder="Ex: 500 000 CFA" className="h-14 rounded-2xl border-slate-200 focus-visible:ring-orange-600 font-bold" value={editSalary} onChange={e => setEditSalary(e.target.value)} required />
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-expiresAt" className="font-black text-slate-700 ml-1 uppercase text-xs tracking-widest">Date d'expiration (Sous 48h = Automatiquement "Offre Rapide")</Label>
+              <Input id="edit-expiresAt" type="datetime-local" className="h-14 rounded-2xl border-slate-200 focus-visible:ring-orange-600 font-bold" value={editExpiresAt} onChange={e => setEditExpiresAt(e.target.value)} />
             </div>
 
             <div className="space-y-2">

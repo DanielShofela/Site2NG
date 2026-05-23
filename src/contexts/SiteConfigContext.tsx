@@ -22,18 +22,25 @@ const defaultContent: SiteConfig = {
 
 const SiteConfigContext = createContext<{
   config: SiteConfig;
+  maintenanceEnabled: boolean;
+  maintenanceMessage: string;
   loading: boolean;
 }>({
   config: defaultContent,
+  maintenanceEnabled: false,
+  maintenanceMessage: "",
   loading: true
 });
 
 export function SiteConfigProvider({ children }: { children: React.ReactNode }) {
   const [config, setConfig] = useState<SiteConfig>(defaultContent);
-  const [loading, setLoading] = useState(true);
+  const [maintenanceEnabled, setMaintenanceEnabled] = useState(false);
+  const [maintenanceMessage, setMaintenanceMessage] = useState("");
+  const [configLoading, setConfigLoading] = useState(true);
+  const [maintenanceLoading, setMaintenanceLoading] = useState(true);
 
   useEffect(() => {
-    const unsub = onSnapshot(doc(db, 'site_config', 'home'), (snapshot) => {
+    const unsubConfig = onSnapshot(doc(db, 'site_config', 'home'), (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.data() as SiteConfig;
         setConfig({ ...defaultContent, ...data });
@@ -51,19 +58,42 @@ export function SiteConfigProvider({ children }: { children: React.ReactNode }) 
           }
         }
         
-        // Dynamic Title Update (Optional, usually better on specific pages, but site name is global)
+        // Dynamic Title Update
         if (data.siteName) {
             document.title = `${data.siteName} | Emploi & Recrutement`;
         }
       }
-      setLoading(false);
+      setConfigLoading(false);
+    }, (error) => {
+      console.error("Error reading site config:", error);
+      setConfigLoading(false);
     });
 
-    return () => unsub();
+    const unsubMaintenance = onSnapshot(doc(db, 'maintenance', 'config'), (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.data();
+        setMaintenanceEnabled(!!data?.enabled);
+        setMaintenanceMessage(data?.message || "");
+      } else {
+        setMaintenanceEnabled(false);
+        setMaintenanceMessage("");
+      }
+      setMaintenanceLoading(false);
+    }, (error) => {
+      console.error("Error reading maintenance state:", error);
+      setMaintenanceLoading(false);
+    });
+
+    return () => {
+      unsubConfig();
+      unsubMaintenance();
+    };
   }, []);
 
+  const loading = configLoading || maintenanceLoading;
+
   return (
-    <SiteConfigContext.Provider value={{ config, loading }}>
+    <SiteConfigContext.Provider value={{ config, maintenanceEnabled, maintenanceMessage, loading }}>
       {children}
     </SiteConfigContext.Provider>
   );

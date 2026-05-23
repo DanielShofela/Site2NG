@@ -54,7 +54,7 @@ export default function CompanyProfile() {
             
             // Fetch company jobs
             const jobsQ = query(
-              collection(db, 'jobs'),
+              collection(db, 'offers'),
               where('recruiterId', '==', id),
               where('status', '==', 'active'),
               limit(5)
