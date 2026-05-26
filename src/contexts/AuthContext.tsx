@@ -184,7 +184,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
         setLoading(false);
       } catch (popupError: any) {
-        console.warn("Popup blocked or failed, falling back to secure redirect...", popupError);
+        console.warn("Popup blocked or failed, checking environment for redirection compatibility...", popupError);
+        
+        const isIframe = typeof window !== 'undefined' && window.self !== window.top;
+        const isDevelopmentUrl = typeof window !== 'undefined' && (
+          window.location.hostname.includes('run.app') || 
+          window.location.hostname.includes('localhost') || 
+          window.location.hostname.includes('127.0.0.1')
+        );
+
+        if (isIframe || isDevelopmentUrl) {
+          throw new Error(
+            "L'authentification Google ne peut pas s'effectuer via redirection dans cet environnement de prévisualisation (pour éviter une erreur 450/404). " +
+            "Veuillez ouvrir l'application dans un nouvel onglet autonome (le bouton avec une icône de flèche tout en haut à droite) " +
+            "pour vous connecter ou vous inscrire avec Google sans restrictions de sécurité de l'iframe."
+          );
+        }
+
         await signInWithRedirect(auth, provider);
         // Skip setting loading to false since the browser is redirecting
         return;
