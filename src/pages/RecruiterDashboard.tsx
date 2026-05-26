@@ -61,7 +61,8 @@ import {
   onSnapshot
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { Job, Application, SupportTicket } from '@/types';
+import { Job, Application, SupportTicket, UserProfile } from '@/types';
+import { generateCV } from '@/lib/pdfUtils';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
@@ -114,6 +115,43 @@ export default function RecruiterDashboard() {
   const [ticketMessage, setTicketMessage] = useState('');
   const [isSubmittingTicket, setIsSubmittingTicket] = useState(false);
   const [ticketSuccess, setTicketSuccess] = useState(false);
+
+  // CVthèque states
+  const [allCandidates, setAllCandidates] = useState<UserProfile[]>([]);
+  const [candidatesLoading, setCandidatesLoading] = useState(true);
+  const [cvSearchTerm, setCvSearchTerm] = useState('');
+  const [cvSector, setCvSector] = useState('all');
+  const [cvExperience, setCvExperience] = useState('all');
+  const [cvLocation, setCvLocation] = useState('');
+  const [cvDisponibility, setCvDisponibility] = useState('all');
+  const [selectedCandidate, setSelectedCandidate] = useState<UserProfile | null>(null);
+  const [isCandidateModalOpen, setIsCandidateModalOpen] = useState(false);
+
+  useEffect(() => {
+    const fetchCandidates = async () => {
+      try {
+        const q = query(
+          collection(db, 'users'),
+          where('role', '==', 'candidate')
+        );
+        const snapshot = await getDocs(q);
+        const list: UserProfile[] = [];
+        snapshot.forEach((doc) => {
+          const data = doc.data() as UserProfile;
+          // Only show active and where visibleInCvtheque is not explicitly false
+          if (data.visibleInCvtheque !== false) {
+            list.push({ uid: doc.id, ...data });
+          }
+        });
+        setAllCandidates(list);
+      } catch (err) {
+        console.error("Error fetching candidates for CVthèque:", err);
+      } finally {
+        setCandidatesLoading(false);
+      }
+    };
+    fetchCandidates();
+  }, []);
 
   useEffect(() => {
     if (!user) return;
@@ -441,6 +479,50 @@ export default function RecruiterDashboard() {
     }
   };
 
+  const filteredCandidates = allCandidates.filter(c => {
+    // 1. Search term
+    if (cvSearchTerm.trim()) {
+      const term = cvSearchTerm.toLowerCase();
+      const nameMatch = c.displayName?.toLowerCase().includes(term);
+      const titleMatch = c.jobTitle?.toLowerCase().includes(term);
+      const sectorMatch = c.sector?.toLowerCase().includes(term);
+      const skillsMatch = c.skills?.some(s => s.name?.toLowerCase().includes(term));
+      if (!nameMatch && !titleMatch && !sectorMatch && !skillsMatch) {
+         return false;
+      }
+    }
+
+    // 2. Sector
+    if (cvSector !== 'all') {
+      if (c.sector !== cvSector) return false;
+    }
+
+    // 3. Experience level
+    if (cvExperience !== 'all') {
+      const expYears = c.yearsOfExperience || 0;
+      if (cvExperience === '0-1' && expYears > 1) return false;
+      if (cvExperience === '1-3' && (expYears < 1 || expYears > 3)) return false;
+      if (cvExperience === '3-5' && (expYears < 3 || expYears > 5)) return false;
+      if (cvExperience === '5+' && expYears < 5) return false;
+    }
+
+    // 4. Location
+    if (cvLocation.trim()) {
+      const locTerm = cvLocation.toLowerCase();
+      const locMatch = c.location?.toLowerCase().includes(locTerm) || c.city?.toLowerCase().includes(locTerm) || c.commune?.toLowerCase().includes(locTerm);
+      if (!locMatch) return false;
+    }
+
+    // 5. Disponibility
+    if (cvDisponibility !== 'all') {
+      const isAvail = c.availableImmediately || false;
+      if (cvDisponibility === 'available' && !isAvail) return false;
+      if (cvDisponibility === 'not-available' && isAvail) return false;
+    }
+
+    return true;
+  });
+
   const stats = [
     { label: "Offres Actives", value: myJobs.filter(j => j.status === 'active').length.toString(), icon: Briefcase, color: "text-blue-600" },
     { label: "Candidatures", value: myApplications.length.toString(), icon: Users, color: "text-green-600" },
@@ -671,6 +753,9 @@ export default function RecruiterDashboard() {
               <TabsTrigger value="applications" className="rounded-xl px-4 md:px-8 font-black data-[state=active]:bg-slate-900 data-[state=active]:text-white whitespace-nowrap">
                 <Users className="mr-2 h-4 w-4" /> Candidatures
               </TabsTrigger>
+              <TabsTrigger value="cvtheque" className="rounded-xl px-4 md:px-8 font-black data-[state=active]:bg-slate-900 data-[state=active]:text-white whitespace-nowrap">
+                <FileText className="mr-2 h-4 w-4" /> CVthèque
+              </TabsTrigger>
               <TabsTrigger value="profile" className="rounded-xl px-4 md:px-8 font-black data-[state=active]:bg-slate-900 data-[state=active]:text-white whitespace-nowrap">
                 <Building2 className="mr-2 h-4 w-4" /> Profil
               </TabsTrigger>
@@ -859,12 +944,223 @@ export default function RecruiterDashboard() {
               })
             ) : (
               <div className="text-center py-24 bg-white rounded-[40px] border border-dashed border-slate-200 shadow-sm">
-                 <div className="h-20 w-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-6 text-slate-300">
+                <div className="h-20 w-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-6 text-slate-300">
                   <Users className="h-10 w-10" />
                 </div>
                 <h3 className="text-2xl font-black text-slate-900">Aucune candidature</h3>
                 <p className="text-slate-400 font-medium max-w-sm mx-auto mt-2">
                   Les candidatures reçues apparaîtront ici dès que vos offres seront actives.
+                </p>
+              </div>
+            )}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="cvtheque">
+          <div className="grid gap-6">
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-2">
+              <div>
+                <h2 className="text-2xl font-black text-slate-900 flex items-center gap-3">
+                  <FileText className="h-8 w-8 text-orange-600" /> CVthèque Partenaire
+                </h2>
+                <p className="text-slate-500 font-bold text-sm mt-1">
+                  Découvrez, filtrez et recrutez parmi nos meilleurs talents d'Afrique de l'Ouest.
+                </p>
+              </div>
+              <div className="text-slate-400 text-xs font-black uppercase tracking-wider bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200 self-start md:self-auto">
+                {filteredCandidates.length} candidat{filteredCandidates.length > 1 ? 's' : ''} trouvé{filteredCandidates.length > 1 ? 's' : ''}
+              </div>
+            </div>
+
+            {/* Filters Bar */}
+            <Card className="border-none shadow-xl shadow-slate-200/50 rounded-[32px] overflow-hidden bg-white p-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                {/* Search Term */}
+                <div className="space-y-1.5 col-span-1 md:col-span-2 lg:col-span-1">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block ml-1">Mots-clés (Métier, Nom, Compétence)</label>
+                  <div className="relative">
+                    <Input 
+                      placeholder="Ex: Développeur, Marie Kouassi, React..." 
+                      value={cvSearchTerm}
+                      onChange={e => setCvSearchTerm(e.target.value)}
+                      className="h-11 pl-4 pr-4 border-slate-100 rounded-xl"
+                    />
+                  </div>
+                </div>
+
+                {/* Sector */}
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block ml-1">Métier / Secteur</label>
+                  <Select value={cvSector} onValueChange={setCvSector}>
+                    <SelectTrigger className="h-11 border-slate-200 rounded-xl bg-white">
+                      <SelectValue placeholder="Tous" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Tous les secteurs</SelectItem>
+                      <SelectItem value="it">Informatique / IT</SelectItem>
+                      <SelectItem value="finance">Finance / Banque</SelectItem>
+                      <SelectItem value="marketing">Marketing / Communication</SelectItem>
+                      <SelectItem value="construction">BTP / Construction</SelectItem>
+                      <SelectItem value="logistics">Logistique / Transport</SelectItem>
+                      <SelectItem value="healthcare">Santé</SelectItem>
+                      <SelectItem value="education">Éducation</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Experience */}
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block ml-1">Expérience</label>
+                  <Select value={cvExperience} onValueChange={setCvExperience}>
+                    <SelectTrigger className="h-11 border-slate-200 rounded-xl bg-white">
+                      <SelectValue placeholder="Toutes" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Toutes d'expériences</SelectItem>
+                      <SelectItem value="0-1">Débutant (0-1 an)</SelectItem>
+                      <SelectItem value="1-3">Junior (1-3 ans)</SelectItem>
+                      <SelectItem value="3-5">Intermédiaire (3-5 ans)</SelectItem>
+                      <SelectItem value="5+">Sénior (5 ans+)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Availability */}
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block ml-1">Disponibilité</label>
+                  <Select value={cvDisponibility} onValueChange={setCvDisponibility}>
+                    <SelectTrigger className="h-11 border-slate-200 rounded-xl bg-white">
+                      <SelectValue placeholder="Toutes" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Tous statuts</SelectItem>
+                      <SelectItem value="available">Disponible Immédiatement</SelectItem>
+                      <SelectItem value="not-available">Sous préavis</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Location */}
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block ml-1">Localisation (Ville / Pays)</label>
+                  <Input 
+                    placeholder="Ex: Abidjan, Dakar, Lomé..." 
+                    value={cvLocation}
+                    onChange={e => setCvLocation(e.target.value)}
+                    className="h-11 border-slate-100 rounded-xl"
+                  />
+                </div>
+              </div>
+
+              {/* Clear filters */}
+              {(cvSearchTerm || cvSector !== 'all' || cvExperience !== 'all' || cvLocation || cvDisponibility !== 'all') && (
+                <div className="mt-4 flex justify-end">
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => {
+                      setCvSearchTerm('');
+                      setCvSector('all');
+                      setCvExperience('all');
+                      setCvLocation('');
+                      setCvDisponibility('all');
+                    }}
+                    className="text-orange-600 hover:text-orange-700 hover:bg-orange-50 font-bold"
+                  >
+                    Réinitialiser les filtres
+                  </Button>
+                </div>
+              )}
+            </Card>
+
+            {/* Candidates List */}
+            {candidatesLoading ? (
+              <div className="text-center py-20 bg-white rounded-[40px] border border-slate-100 shadow-sm flex flex-col items-center justify-center">
+                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-orange-600"></div>
+                <p className="text-slate-400 font-bold mt-4">Chargement des talents...</p>
+              </div>
+            ) : filteredCandidates.length > 0 ? (
+              <div className="grid gap-6">
+                {filteredCandidates.map((cand) => (
+                  <Card key={cand.uid} className="border-none shadow-lg shadow-slate-200/50 rounded-[32px] overflow-hidden group hover:shadow-2xl transition-all bg-white">
+                    <CardContent className="p-8 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5 w-full lg:w-auto">
+                        <div className="h-20 w-20 bg-slate-50 border border-slate-100 rounded-2xl flex items-center justify-center font-black text-4xl text-orange-600 shrink-0 overflow-hidden">
+                          {cand.photoUrl ? (
+                            <img src={cand.photoUrl} alt={cand.displayName} className="h-full w-full object-cover" referrerPolicy="no-referrer" />
+                          ) : (
+                            cand.displayName?.[0] || 'C'
+                          )}
+                        </div>
+                        <div className="space-y-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="text-xl font-black text-slate-900 group-hover:text-orange-600 transition-colors">{cand.displayName}</h3>
+                            {cand.availableImmediately ? (
+                              <Badge className="bg-emerald-50 text-emerald-600 border-none px-2.5 py-0.5 rounded-full text-[10px] font-black tracking-wider uppercase">
+                                Disponible
+                              </Badge>
+                            ) : (
+                              <Badge className="bg-slate-100 text-slate-500 border-none px-2.5 py-0.5 rounded-full text-[10px] font-black tracking-wider uppercase">
+                                En poste
+                              </Badge>
+                            )}
+                          </div>
+                          
+                          <p className="text-sm font-bold text-slate-600">{cand.jobTitle || 'Titre de profil non défini'}</p>
+                          
+                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-400 font-semibold pt-1">
+                            <span className="flex items-center gap-1">
+                              <MapPin className="h-3.5 w-3.5 text-orange-500" /> 
+                              {cand.city || cand.location || 'Localisation non renseignée'}{cand.commune ? `, ${cand.commune}` : ''}
+                            </span>
+                            <span className="opacity-40">•</span>
+                            <span className="flex items-center gap-1">
+                              <Briefcase className="h-3.5 w-3.5" /> 
+                              {cand.yearsOfExperience || 0} an{(cand.yearsOfExperience || 1) > 1 ? 's' : ''} d'exp.
+                            </span>
+                          </div>
+
+                          {/* Skills preview */}
+                          {cand.skills && cand.skills.length > 0 && (
+                            <div className="flex flex-wrap gap-1 bg-slate-50 p-2.5 rounded-xl border border-slate-100/50 mt-3 max-w-xl">
+                              {cand.skills.slice(0, 5).map((skill, sIdx) => (
+                                <span key={sIdx} className="bg-white px-2 py-0.5 rounded-md text-[10px] font-black text-slate-600 border border-slate-150">
+                                  {skill.name}
+                                </span>
+                              ))}
+                              {cand.skills.length > 5 && (
+                                <span className="text-[10px] font-black text-orange-600 px-1 py-0.5">
+                                  +{cand.skills.length - 5}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-4 w-full lg:w-auto shrink-0 mt-2 lg:mt-0 justify-end">
+                        <Button 
+                          className="flex-1 sm:flex-none h-14 px-8 rounded-2xl bg-slate-900 border-none font-black text-white hover:bg-slate-800 transition-all shadow-xl shadow-slate-900/10"
+                          onClick={() => {
+                            setSelectedCandidate(cand);
+                            setIsCandidateModalOpen(true);
+                          }}
+                        >
+                          <Eye className="mr-2 h-5 w-5" /> VOIR PROFIL
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-24 bg-white rounded-[40px] border border-dashed border-slate-200 shadow-sm">
+                <div className="h-20 w-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-6 text-slate-300">
+                  <FileText className="h-10 w-10" />
+                </div>
+                <h3 className="text-2xl font-black text-slate-900">Aucun candidat</h3>
+                <p className="text-slate-400 font-medium max-w-sm mx-auto mt-2">
+                  Aucun talent ne correspond à vos filtres actuels. Recommencez en ajustant vos critères.
                 </p>
               </div>
             )}
@@ -1411,6 +1707,163 @@ export default function RecruiterDashboard() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Candidate Profile Detail Dialog for CVthèque */}
+      <Dialog open={isCandidateModalOpen} onOpenChange={setIsCandidateModalOpen}>
+        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto rounded-[40px] border-none shadow-2xl p-0">
+          {selectedCandidate && (
+            <>
+              <div className="bg-slate-900 text-white p-8 md:p-10 relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-48 h-48 bg-orange-600/10 rounded-full blur-[60px] -translate-y-1/2 translate-x-1/3"></div>
+                <div className="flex flex-col sm:flex-row items-center gap-6 relative z-10">
+                  <div className="h-24 w-24 bg-white/10 rounded-3xl flex items-center justify-center font-black text-4xl text-orange-400 border border-white/10 shrink-0 overflow-hidden">
+                    {selectedCandidate.photoUrl ? (
+                      <img src={selectedCandidate.photoUrl} alt={selectedCandidate.displayName} className="h-full w-full object-cover" referrerPolicy="no-referrer" />
+                    ) : (
+                      selectedCandidate.displayName?.[0] || 'C'
+                    )}
+                  </div>
+                  <div className="text-center sm:text-left space-y-2">
+                    <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                      <h3 className="text-2xl font-black">{selectedCandidate.displayName}</h3>
+                      {selectedCandidate.availableImmediately ? (
+                        <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider">
+                          Disponible
+                        </span>
+                      ) : (
+                        <span className="bg-white/10 text-slate-300 border border-white/5 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider">
+                          En poste
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-sm font-black text-orange-400 uppercase tracking-widest">{selectedCandidate.jobTitle || 'Titre non spécifié'}</p>
+                    <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3 text-xs text-slate-300 font-bold">
+                      <span className="flex items-center gap-1"><MapPin className="h-3.5 w-3.5 text-orange-500" /> {selectedCandidate.city || selectedCandidate.location || 'N/A'}{selectedCandidate.commune ? `, ${selectedCandidate.commune}` : ''}</span>
+                      <span>•</span>
+                      <span className="flex items-center gap-1"><Briefcase className="h-3.5 w-3.5" /> {selectedCandidate.yearsOfExperience || 0} an{(selectedCandidate.yearsOfExperience || 1) > 1 ? 's' : ''} d'exp.</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-8 space-y-8 bg-white">
+                {/* Contact and Overview grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50 p-6 rounded-3xl border border-slate-100">
+                  <div className="space-y-4">
+                    <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">Coordonnées</h4>
+                    <div className="space-y-2.5 text-xs text-slate-700 font-bold">
+                      {selectedCandidate.email && (
+                        <div className="flex items-center gap-2.5">
+                          <Mail className="h-4 w-4 text-orange-500 shrink-0" />
+                          <a href={`mailto:${selectedCandidate.email}`} className="hover:text-orange-600 transition-colors">{selectedCandidate.email}</a>
+                        </div>
+                      )}
+                      {selectedCandidate.phone && (
+                        <div className="flex items-center gap-2.5">
+                          <Phone className="h-4 w-4 text-orange-500 shrink-0" />
+                          <a href={`tel:${selectedCandidate.phone}`} className="hover:text-orange-600 transition-colors">{selectedCandidate.phone}</a>
+                        </div>
+                      )}
+                      {selectedCandidate.whatsApp && (
+                        <div className="flex items-center gap-2.5">
+                          <MessageSquare className="h-4 w-4 text-emerald-500 shrink-0" />
+                          <a href={`https://wa.me/${selectedCandidate.whatsApp.replace(/[^0-9]/g, '')}`} target="_blank" rel="noopener noreferrer" className="hover:text-emerald-600 transition-colors">{selectedCandidate.whatsApp} (WhatsApp)</a>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">Résumé</h4>
+                    <p className="text-xs font-bold text-slate-500 leading-relaxed">
+                      {selectedCandidate.objective || "Ce candidat n'a pas rédigé d'introduction de profil."}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Experiences Timeline */}
+                {selectedCandidate.experience && selectedCandidate.experience.length > 0 && (
+                  <div className="space-y-4">
+                    <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-2">Expériences Professionnelles</h4>
+                    <div className="space-y-4">
+                      {selectedCandidate.experience.map((exp: any, i: number) => (
+                        <div key={i} className="flex gap-4">
+                          <div className="text-xs text-orange-600 font-black min-w-[80px] pt-1">{exp.period || exp.years}</div>
+                          <div className="space-y-1">
+                            <h5 className="text-sm font-black text-slate-900">{exp.title || exp.role}</h5>
+                            <p className="text-xs text-slate-500 font-bold">{exp.company || exp.employer}</p>
+                            {exp.description && <p className="text-xs text-slate-400 font-bold leading-relaxed">{exp.description}</p>}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Education Timeline */}
+                {selectedCandidate.education && selectedCandidate.education.length > 0 && (
+                  <div className="space-y-4">
+                    <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-2">Formations / Études</h4>
+                    <div className="space-y-4">
+                      {selectedCandidate.education.map((edu: any, i: number) => (
+                        <div key={i} className="flex gap-4">
+                          <div className="text-xs text-orange-600 font-black min-w-[80px] pt-1">{edu.period || edu.years}</div>
+                          <div className="space-y-1">
+                            <h5 className="text-sm font-black text-slate-900">{edu.degree || edu.diploma}</h5>
+                            <p className="text-xs text-slate-500 font-bold">{edu.institution || edu.school}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Skills Section */}
+                {selectedCandidate.skills && selectedCandidate.skills.length > 0 && (
+                  <div className="space-y-4">
+                    <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-2">Compétences</h4>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedCandidate.skills.map((skill: any, i: number) => (
+                        <span key={i} className="bg-slate-50 hover:bg-orange-50 hover:text-orange-600 border border-slate-200/60 px-3 py-1.5 rounded-xl text-xs font-black text-slate-600 transition-colors">
+                          {skill.name} {skill.level ? `• ${skill.level}` : ''}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* PDF generation and actual CV preview */}
+                <div className="flex flex-col sm:flex-row gap-4 pt-4 border-t border-slate-100">
+                  <Button 
+                    variant="outline"
+                    className="flex-1 h-14 rounded-2xl border-2 border-slate-200 hover:bg-slate-50 font-black text-slate-700 uppercase tracking-wider text-xs"
+                    disabled={!selectedCandidate.cvUrl}
+                    asChild={!!selectedCandidate.cvUrl}
+                    nativeButton={!selectedCandidate.cvUrl}
+                  >
+                    {selectedCandidate.cvUrl ? (
+                      <a href={selectedCandidate.cvUrl} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center w-full h-full">
+                        <ExternalLink className="mr-2 h-4 w-4 text-orange-500" /> Ouvrir le CV original
+                      </a>
+                    ) : (
+                      <span className="flex items-center justify-center">
+                        <ExternalLink className="mr-2 h-4 w-4 text-slate-300" /> Aucun CV téléversé
+                      </span>
+                    )}
+                  </Button>
+                  
+                  <Button 
+                    className="flex-1 h-14 rounded-2xl bg-orange-600 hover:bg-orange-700 font-black text-white uppercase tracking-wider text-xs shadow-xl shadow-orange-600/10"
+                    onClick={() => generateCV(selectedCandidate)}
+                  >
+                    <FileText className="mr-2 h-4 w-4" /> Générer CV Synthèse
+                  </Button>
+                </div>
+              </div>
+            </>
+          )}
         </DialogContent>
       </Dialog>
     </div>

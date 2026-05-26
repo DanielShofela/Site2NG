@@ -411,14 +411,14 @@ function ProfessionalStep({ data, onChange }: { data: Partial<UserProfile>, onCh
         </Select>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="space-y-2">
           <Label htmlFor="yearsExp">Années d'expérience</Label>
           <Input 
             id="yearsExp" 
             type="number"
             value={data.yearsOfExperience || 0} 
-            onChange={e => onChange({ yearsOfExperience: parseInt(e.target.value) })}
+            onChange={e => onChange({ yearsOfExperience: parseInt(e.target.value) || 0 })}
             className="h-12 border-slate-200"
           />
         </div>
@@ -427,10 +427,21 @@ function ProfessionalStep({ data, onChange }: { data: Partial<UserProfile>, onCh
           <div className="flex items-center space-x-2 pt-2">
             <Switch 
               id="available" 
-              checked={data.availableImmediately} 
+              checked={data.availableImmediately || false} 
               onCheckedChange={v => onChange({ availableImmediately: v })}
             />
             <span className="text-sm font-medium">{data.availableImmediately ? 'Oui' : 'Non'}</span>
+          </div>
+        </div>
+        <div className="flex flex-col justify-center space-y-2">
+          <Label htmlFor="visibleInCv">Visibilité CVthèque</Label>
+          <div className="flex items-center space-x-2 pt-2">
+            <Switch 
+              id="visibleInCv" 
+              checked={data.visibleInCvtheque !== false} 
+              onCheckedChange={v => onChange({ visibleInCvtheque: v })}
+            />
+            <span className="text-sm font-medium">{data.visibleInCvtheque !== false ? 'Visible' : 'Masqué'}</span>
           </div>
         </div>
       </div>

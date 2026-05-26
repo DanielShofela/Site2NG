@@ -96,6 +96,7 @@ export interface UserProfile {
   // Profile status
   completionScore?: number;
   profileComplete?: boolean;
+  visibleInCvtheque?: boolean;
   profileViews?: number;
   profileViewsTotal?: number; // Optional alias if needed
   adminNotes?: string | null;

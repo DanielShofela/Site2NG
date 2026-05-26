@@ -12,6 +12,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Progress } from '@/components/ui/progress';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { 
   Search, 
   FileText, 
@@ -338,6 +339,36 @@ export default function CandidateDashboard() {
                     <CheckCircle className="h-5 w-5" /> Profil Parfait !
                   </div>
                 )}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-none shadow-xl shadow-slate-200/50">
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg font-bold">Visibilité CVthèque</CardTitle>
+                <span className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full ${
+                  user.visibleInCvtheque !== false 
+                    ? "bg-emerald-50 text-emerald-700 border border-emerald-150" 
+                    : "bg-slate-100 text-slate-500 border border-slate-200"
+                }`}>
+                  {user.visibleInCvtheque !== false ? "√ Active" : "Ø Masquée"}
+                </span>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-xs font-semibold text-slate-500 leading-relaxed">
+                Lorsque votre visibilité est active, votre profil est consultable par les recruteurs via la CVthèque pour des opportunités professionnelles.
+              </p>
+              <div className="flex items-center justify-between p-3.5 bg-slate-50 rounded-xl border border-slate-100">
+                <span className="text-xs font-bold text-slate-700">Autoriser la recherche de mon profil</span>
+                <Switch 
+                  id="dashboard-visible-cv" 
+                  checked={user.visibleInCvtheque !== false}
+                  onCheckedChange={(checked) => {
+                    updateProfile({ visibleInCvtheque: checked });
+                  }}
+                />
               </div>
             </CardContent>
           </Card>
