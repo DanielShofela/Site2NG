@@ -626,7 +626,7 @@ export default function CandidateDashboard() {
                   animate={{ opacity: 1, y: 0 }}
                   className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-2xl font-bold text-xs flex items-center justify-between"
                 >
-                  <span>✨ Votre message d'assistance a été envoyé avec succès ! Un administrateur va l'examiner rapidement.</span>
+                  <span>Votre message d'assistance a été envoyé avec succès ! Un administrateur va l'examiner rapidement.</span>
                 </motion.div>
               )}
 
@@ -766,17 +766,17 @@ export default function CandidateDashboard() {
         <DialogContent className="sm:max-w-[550px] rounded-[32px] p-0 overflow-hidden border-none shadow-2xl">
           {selectedApp && (
             <div className="bg-white">
-              <div className="bg-slate-900 p-8 text-white">
+              <div className="bg-slate-900 p-4 md:p-8 text-white">
                 <DialogHeader>
-                  <DialogTitle className="text-2xl font-extrabold tracking-tight">Détails de la candidature</DialogTitle>
-                  <DialogDescription className="text-slate-400 mt-1">
+                  <DialogTitle className="text-lg md:text-2xl font-extrabold tracking-tight">Détails de la candidature</DialogTitle>
+                  <DialogDescription className="text-slate-400 mt-1 text-xs md:text-sm">
                     Candidature envoyée le {formatDistanceToNow(selectedApp.appliedAt?.seconds ? new Date(selectedApp.appliedAt.seconds * 1000) : new Date(selectedApp.appliedAt), { addSuffix: true, locale: fr })}
                   </DialogDescription>
                 </DialogHeader>
               </div>
 
-              <div className="p-8 space-y-6">
-                <div className="flex items-center gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-100">
+              <div className="p-4 md:p-8 space-y-4">
+                <div className="flex items-center gap-4 bg-slate-50 p-3 md:p-4 rounded-xl md:rounded-2xl border border-slate-100">
                   <div className="h-12 w-12 bg-slate-900 rounded-xl flex items-center justify-center font-black text-white text-lg shrink-0">
                     {getCompanyName(selectedApp)?.[0] || 'J'}
                   </div>
@@ -848,10 +848,10 @@ export default function CandidateDashboard() {
                 )}
               </div>
 
-              <div className="p-8 pt-0">
+              <div className="p-4 md:p-8 pt-0">
                 <Button 
                   variant="outline" 
-                  className="w-full h-12 rounded-xl font-bold border-slate-200"
+                  className="w-full h-10 md:h-12 rounded-xl font-bold border-slate-200 text-xs md:text-sm"
                   onClick={() => setIsDetailsOpen(false)}
                 >
                   Fermer

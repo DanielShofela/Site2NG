@@ -1378,7 +1378,7 @@ export default function RecruiterDashboard() {
               animate={{ opacity: 1, y: 0 }}
               className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-2xl font-bold text-xs flex items-center justify-between animate-in fade-in"
             >
-              <span>✨ Message envoyé avec succès ! Nos équipes de support vont se pencher sur votre problème.</span>
+              <span>Message envoyé avec succès ! Nos équipes de support vont se pencher sur votre problème.</span>
             </motion.div>
           )}
 

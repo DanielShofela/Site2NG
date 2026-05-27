@@ -6,13 +6,15 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { doc, getDoc, collection, query, where, getDocs, limit } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs, limit, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { UserProfile, Job } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { useAuth } from '@/contexts/AuthContext';
+import { compressImage } from '@/lib/utils';
 import { 
   Building2, 
   MapPin, 
@@ -30,15 +32,62 @@ import {
   Heart,
   ShieldCheck,
   Clock,
-  FileText
+  FileText,
+  Camera
 } from 'lucide-react';
 
 export default function CompanyProfile() {
   const { id } = useParams();
+  const { user } = useAuth();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [uploadingBanner, setUploadingBanner] = useState(false);
+
+  const isOwner = user?.uid === id;
+
+  const handleBannerChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setUploadingBanner(true);
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        try {
+          const compressed = await compressImage(reader.result as string, 1200, 600, 0.6);
+          
+          // Update Firestore doc
+          const userDocRef = doc(db, 'users', id!);
+          
+          // branding might not exist yet, so we get current branding state or construct it
+          const currentBranding = profile?.branding || {};
+          const updatedBranding = { ...currentBranding, bannerUrl: compressed };
+
+          await updateDoc(userDocRef, {
+            branding: updatedBranding
+          });
+
+          // Update local profile state as well
+          setProfile(prev => prev ? {
+            ...prev,
+            branding: updatedBranding
+          } : null);
+
+        } catch (innerError) {
+          console.error("Error compressing and saving banner photo:", innerError);
+          alert("Une erreur s'est produite lors de la sauvegarde de la photo.");
+        } finally {
+          setUploadingBanner(false);
+        }
+      };
+      reader.readAsDataURL(file);
+    } catch (err) {
+      console.error("Error reading file:", err);
+      setUploadingBanner(false);
+    }
+  };
 
   useEffect(() => {
     const fetchCompany = async () => {
@@ -116,6 +165,31 @@ export default function CompanyProfile() {
         )}
         
         <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 to-transparent" />
+        
+        {isOwner && (
+          <div className="absolute top-4 right-4 z-20">
+            <label className="flex items-center gap-2 px-4 py-2 bg-black/60 hover:bg-black/80 backdrop-blur-sm rounded-xl text-white text-xs font-bold cursor-pointer border border-white/20 shadow-md transition-all active:scale-95 duration-150">
+              {uploadingBanner ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Mise à jour...
+                </>
+              ) : (
+                <>
+                  <Camera className="h-4 w-4" />
+                  Modifier la couverture
+                </>
+              )}
+              <input
+                type="file"
+                className="hidden"
+                accept="image/*"
+                disabled={uploadingBanner}
+                onChange={handleBannerChange}
+              />
+            </label>
+          </div>
+        )}
         
         <div className="container relative h-full flex flex-col justify-end pb-8 md:pb-12 px-4">
           <div className="flex flex-col md:flex-row items-center md:items-end gap-6 text-center md:text-left">

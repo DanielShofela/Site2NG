@@ -57,6 +57,7 @@ export default function Home() {
   const [activeSegmentFilter, setActiveSegmentFilter] = useState<'popular' | 'unique'>('popular');
   const [dbPartnerLogos, setDbPartnerLogos] = useState<any[]>([]);
   const [selectedContractFilter, setSelectedContractFilter] = useState<string>('all');
+  const [selectedSectorFilter, setSelectedSectorFilter] = useState<string>('all');
   const [loadingJobs, setLoadingJobs] = useState(true);
   
   // Real database recruiters/companies states
@@ -191,15 +192,63 @@ export default function Home() {
 
   // Filter based on selected tag for segments
   const filteredPopularOffers = popularOffers.filter(offer => {
-    if (selectedContractFilter === 'all') return true;
-    const cType = offer.contractType || offer.type || 'CDI';
-    return cType.toLowerCase() === selectedContractFilter.toLowerCase();
+    if (selectedContractFilter !== 'all') {
+      const cType = offer.contractType || offer.type || 'CDI';
+      if (cType.toLowerCase() !== selectedContractFilter.toLowerCase()) return false;
+    }
+    if (selectedSectorFilter !== 'all') {
+      const field = (offer.field || '').toLowerCase();
+      const title = (offer.title || '').toLowerCase();
+      const desc = (offer.description || '').toLowerCase();
+      const target = selectedSectorFilter.toLowerCase();
+      
+      if (target === 'tech') {
+        if (!field.includes('tech') && !field.includes('web') && !field.includes('informatique') && !field.includes('code') && !field.includes('développeur') && !title.includes('développeur') && !title.includes('tech')) return false;
+      } else if (target === 'btp') {
+        if (!field.includes('btp') && !field.includes('construction') && !field.includes('bâtiment')) return false;
+      } else if (target === 'rh') {
+        if (!field.includes('rh') && !field.includes('ressources') && !field.includes('recrutement')) return false;
+      } else if (target === 'finance') {
+        if (!field.includes('finance') && !field.includes('banque') && !field.includes('comptabilité')) return false;
+      } else if (target === 'marketing') {
+        if (!field.includes('marketing') && !field.includes('com') && !field.includes('vent') && !field.includes('business')) return false;
+      } else if (target === 'sante') {
+        if (!field.includes('santé') && !field.includes('médic') && !field.includes('social')) return false;
+      } else if (target === 'logistique') {
+        if (!field.includes('logis') && !field.includes('transport')) return false;
+      }
+    }
+    return true;
   });
 
   const filteredUniqueOffers = uniqueOffers.filter(offer => {
-    if (selectedContractFilter === 'all') return true;
-    const cType = offer.contractType || offer.type || 'CDI';
-    return cType.toLowerCase() === selectedContractFilter.toLowerCase();
+    if (selectedContractFilter !== 'all') {
+      const cType = offer.contractType || offer.type || 'CDI';
+      if (cType.toLowerCase() !== selectedContractFilter.toLowerCase()) return false;
+    }
+    if (selectedSectorFilter !== 'all') {
+      const field = (offer.field || '').toLowerCase();
+      const title = (offer.title || '').toLowerCase();
+      const desc = (offer.description || '').toLowerCase();
+      const target = selectedSectorFilter.toLowerCase();
+      
+      if (target === 'tech') {
+        if (!field.includes('tech') && !field.includes('web') && !field.includes('informatique') && !field.includes('code') && !field.includes('développeur') && !title.includes('développeur') && !title.includes('tech')) return false;
+      } else if (target === 'btp') {
+        if (!field.includes('btp') && !field.includes('construction') && !field.includes('bâtiment')) return false;
+      } else if (target === 'rh') {
+        if (!field.includes('rh') && !field.includes('ressources') && !field.includes('recrutement')) return false;
+      } else if (target === 'finance') {
+        if (!field.includes('finance') && !field.includes('banque') && !field.includes('comptabilité')) return false;
+      } else if (target === 'marketing') {
+        if (!field.includes('marketing') && !field.includes('com') && !field.includes('vent') && !field.includes('business')) return false;
+      } else if (target === 'sante') {
+        if (!field.includes('santé') && !field.includes('médic') && !field.includes('social')) return false;
+      } else if (target === 'logistique') {
+        if (!field.includes('logis') && !field.includes('transport')) return false;
+      }
+    }
+    return true;
   });
 
   const getDashboardLink = () => {
@@ -605,7 +654,7 @@ export default function Home() {
         <div className="flex flex-col lg:flex-row items-start lg:items-end justify-between gap-8 mb-12">
           <div className="text-left max-w-xl">
             <Badge variant="outline" className="border-orange-200/80 text-orange-600 bg-orange-50 font-black uppercase tracking-widest text-[10px] px-3 py-1.5 rounded-full mb-4">
-              ✨ Réseau d'Opportunités 2NG
+              Réseau d'Opportunités 2NG
             </Badge>
             <h2 className="text-3xl md:text-5xl font-black tracking-tight text-slate-900 leading-none">
               Explorez nos Secteurs Élite
@@ -623,13 +672,13 @@ export default function Home() {
                 onClick={() => setActiveSegmentFilter('popular')}
                 className={`flex-1 sm:flex-none px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-300 ${activeSegmentFilter === 'popular' ? 'bg-white text-slate-900 shadow' : 'text-slate-500 hover:text-slate-900'}`}
               >
-                ⭐ Offres Populaires
+                Offres Populaires
               </button>
               <button 
                 onClick={() => setActiveSegmentFilter('unique')}
                 className={`flex-1 sm:flex-none px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-300 ${activeSegmentFilter === 'unique' ? 'bg-white text-slate-900 shadow' : 'text-slate-500 hover:text-slate-900'}`}
               >
-                🏢 Offres Directes
+                Offres Directes
               </button>
             </div>
 
@@ -653,6 +702,101 @@ export default function Home() {
                 </button>
               ))}
             </div>
+          </div>
+        </div>
+
+        {/* Instagram-style Sectors Carousel */}
+        <div className="w-full relative mb-12 bg-white/40 border border-slate-100/50 p-6 rounded-[32px] shadow-sm">
+          {/* Subtle fade overlay for scroll indicators */}
+          <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-[#fcfbf9]/50 to-transparent z-10 pointer-events-none md:hidden" />
+          <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-[#fcfbf9]/50 to-transparent z-10 pointer-events-none md:hidden" />
+          
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-6">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-black uppercase tracking-widest text-orange-600 bg-orange-50 px-3 py-1.5 rounded-full">
+                Secteurs d'activité ➔
+              </span>
+              <span className="text-xs text-slate-400 font-bold">Faites défiler vers la droite</span>
+            </div>
+            {selectedSectorFilter !== 'all' && (
+              <button 
+                onClick={() => setSelectedSectorFilter('all')}
+                className="text-[10px] font-black uppercase text-orange-600 hover:text-orange-700 bg-orange-50 hover:bg-orange-100/60 px-2.5 py-1 rounded-lg transition-colors"
+              >
+                Tout afficher x
+              </button>
+            )}
+          </div>
+
+          <div className="flex gap-6 overflow-x-auto pb-2 pt-2 no-scrollbar scroll-smooth snap-x">
+            {[
+              { id: 'all', label: 'Tous les domaines', icon: <Briefcase className="h-5 w-5" />, gradient: 'from-orange-500 via-pink-500 to-yellow-500' },
+              { id: 'tech', label: 'Tech & Numérique', icon: <Sparkles className="h-5 w-5" />, gradient: 'from-indigo-500 via-purple-500 to-pink-500' },
+              { id: 'btp', label: 'BTP & Construction', icon: <Building2 className="h-5 w-5" />, gradient: 'from-amber-500 via-orange-500 to-yellow-500' },
+              { id: 'rh', label: 'Ressources Humaines', icon: <Users className="h-5 w-5" />, gradient: 'from-red-500 via-rose-500 to-orange-500' },
+              { id: 'finance', label: 'Banque & Finance', icon: <Award className="h-5 w-5" />, gradient: 'from-emerald-500 via-teal-500 to-cyan-500' },
+              { id: 'marketing', label: 'Comm. & Ventes', icon: <TrendingUp className="h-5 w-5" />, gradient: 'from-pink-500 via-fuchsia-500 to-rose-500' },
+              { id: 'sante', label: 'Santé & Social', icon: <CheckCircle2 className="h-5 w-5" />, gradient: 'from-teal-500 via-emerald-500 to-lime-500' },
+              { id: 'logistique', label: 'Logistique & Transport', icon: <Globe2 className="h-5 w-5" />, gradient: 'from-sky-500 via-blue-500 to-indigo-500' },
+            ].map((sector, index) => {
+              const isActive = selectedSectorFilter === sector.id;
+              
+              return (
+                <motion.button
+                  key={sector.id}
+                  onClick={() => setSelectedSectorFilter(sector.id)}
+                  whileHover={{ scale: 1.05, y: -2 }}
+                  whileTap={{ scale: 0.95 }}
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ 
+                    type: "spring", 
+                    stiffness: 300, 
+                    damping: 25, 
+                    delay: index * 0.04 
+                  }}
+                  className="flex flex-col items-center gap-2.5 shrink-0 focus:outline-none cursor-pointer snap-start"
+                >
+                  {/* Circle container resembling Instagram Story with active border */}
+                  <div className="relative p-[2.5px] rounded-full transition-all duration-300">
+                    {/* Animated gradient ring */}
+                    <div className={`absolute inset-0 rounded-full bg-gradient-to-tr ${sector.gradient} transition-transform duration-300 ${
+                      isActive ? 'scale-105 opacity-100' : 'scale-100 opacity-40 hover:opacity-100'
+                    }`} />
+                    
+                    {/* Inner spacing helper */}
+                    <div className="relative p-[2.5px] bg-white rounded-full">
+                      {/* Round icon container with 360 rotation on selection */}
+                      <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center transition-all duration-500 ${
+                        isActive 
+                          ? 'bg-slate-950 text-white shadow-lg rotate-[360deg]' 
+                          : 'bg-slate-50 text-slate-700 hover:bg-slate-100 hover:text-slate-900'
+                      }`}>
+                        {sector.icon}
+                      </div>
+                    </div>
+
+                    {/* Check badge */}
+                    {isActive && (
+                      <motion.div 
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        className="absolute bottom-0 right-0 bg-orange-600 text-white p-0.5 rounded-full border border-white"
+                      >
+                        <CheckCircle2 className="h-3 w-3 text-white fill-orange-600" />
+                      </motion.div>
+                    )}
+                  </div>
+
+                  {/* Label element */}
+                  <span className={`text-[11px] text-center font-black max-w-[90px] leading-tight transition-colors duration-205 ${
+                    isActive ? 'text-orange-600 scale-105' : 'text-slate-500 group-hover:text-slate-900'
+                  }`}>
+                    {sector.label}
+                  </span>
+                </motion.button>
+              );
+            })}
           </div>
         </div>
 
@@ -1216,7 +1360,7 @@ export default function Home() {
                     animate={{ scale: 1, opacity: 1 }}
                     className="text-xs font-black text-orange-500 font-serif whitespace-nowrap"
                   >
-                    🚀 Inscription validée ! Merci de votre fidélité.
+                    Inscription validée ! Merci de votre fidélité.
                   </motion.p>
                 )}
               </AnimatePresence>

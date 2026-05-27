@@ -241,7 +241,7 @@ export default function Suspended() {
                 exit={{ opacity: 0, scale: 0.8 }}
                 className="absolute z-30 font-black tracking-tighter text-orange-600 text-xs bg-orange-100 border border-orange-200 px-3 py-1 rounded-full flex items-center gap-1 shadow-sm"
               >
-                💥 OUCH!
+                OUCH!
               </motion.div>
             )}
           </AnimatePresence>
@@ -433,11 +433,11 @@ export default function Suspended() {
         {/* Small fun feedback footer */}
         <div id="launch-statistics" className="flex flex-col sm:flex-row gap-2 sm:gap-6 justify-center items-center text-[10px] text-slate-400 font-bold mt-6 select-none uppercase tracking-wider">
           <span className="flex items-center gap-1.5">
-            🚀 Décollages : <strong className="text-slate-600 font-black">{launchCount}</strong>
+            Décollages : <strong className="text-slate-600 font-black">{launchCount}</strong>
           </span>
           <span className="hidden sm:inline text-slate-200">|</span>
           <span className="flex items-center gap-1.5">
-            🎯 Lancements manuels : <strong className="text-slate-600 font-black">{clickCount}</strong>
+            Lancements manuels : <strong className="text-slate-600 font-black">{clickCount}</strong>
           </span>
         </div>
       </motion.div>

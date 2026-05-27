@@ -1,80 +1,66 @@
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { SupportTicket } from '@/types';
-import { 
-  ShieldCheck, 
-  UserCheck, 
-  AlertTriangle, 
-  FileBarChart, 
-  Check, 
-  X, 
-  Building2, 
-  Eye, 
-  FileText, 
-  MapPin, 
-  Globe, 
-  Users, 
-  Briefcase, 
-  LayoutDashboard, 
-  Settings, 
-  MessageSquare, 
-  Image as ImageIcon, 
-  Search,
-  Filter,
-  MoreVertical,
-  Trash2,
-  Lock,
-  Unlock,
-  TrendingUp,
-  Clock,
-  LogOut,
-  ChevronRight,
-  Menu,
-  Database,
-  ExternalLink,
-  AlertCircle,
-  Target,
-  HelpCircle,
-  Plus,
-  Edit,
-  Sparkles,
-  Calendar,
-  DollarSign
-} from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
-import React, { useState, useEffect, useMemo, ChangeEvent, FormEvent } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   collection, 
-  query, 
-  where, 
-  getDocs, 
   doc, 
   updateDoc,
   deleteDoc,
   orderBy,
   limit,
-  Timestamp,
   addDoc,
   onSnapshot,
   serverTimestamp,
-  setDoc,
-  getDocFromServer
+  query
 } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase';
 import { UserProfile, Job } from '@/types';
+import { useAuth } from '@/contexts/AuthContext';
+import { motion, AnimatePresence } from 'motion/react';
+import { 
+  LayoutDashboard, 
+  Users, 
+  ShieldCheck, 
+  Briefcase, 
+  FileText, 
+  Globe, 
+  TrendingUp, 
+  Bell, 
+  AlertTriangle, 
+  Settings, 
+  History, 
+  MessageSquare,
+  Lock,
+  LogOut,
+  Menu,
+  X,
+  ChevronRight,
+  HardDrive
+} from 'lucide-react';
+
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+
+// Admin Sub-modules imports
+import OverviewModule from '@/components/admin/OverviewModule';
+import UsersModule from '@/components/admin/UsersModule';
+import ApprovalsModule from '@/components/admin/ApprovalsModule';
+import JobsModule from '@/components/admin/JobsModule';
+import ApplicationsModule from '@/components/admin/ApplicationsModule';
+import CMSModule from '@/components/admin/CMSModule';
+import MediaModule from '@/components/admin/MediaModule';
+import AnalyticsModule from '@/components/admin/AnalyticsModule';
+import NotificationsModule from '@/components/admin/NotificationsModule';
+import MaintenanceModule from '@/components/admin/MaintenanceModule';
+import SettingsModule from '@/components/admin/SettingsModule';
+import LogsModule from '@/components/admin/LogsModule';
+import SupportModule from '@/components/admin/SupportModule';
+
+type AdminModule = 'overview' | 'users' | 'approvals' | 'jobs' | 'applications' | 'cms' | 'media' | 'analytics' | 'notifications' | 'maintenance' | 'settings' | 'logs' | 'support';
 
 enum OperationType {
   CREATE = 'create',
   UPDATE = 'update',
   DELETE = 'delete',
-  LIST = 'list',
   GET = 'get',
-  WRITE = 'write',
 }
 
 interface FirestoreErrorInfo {
@@ -84,9 +70,7 @@ interface FirestoreErrorInfo {
   authInfo: {
     userId?: string | null;
     email?: string | null;
-    emailVerified?: boolean | null;
-    isAnonymous?: boolean | null;
-  }
+  };
 }
 
 function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
@@ -95,8 +79,6 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
     authInfo: {
       userId: auth.currentUser?.uid,
       email: auth.currentUser?.email,
-      emailVerified: auth.currentUser?.emailVerified,
-      isAnonymous: auth.currentUser?.isAnonymous
     },
     operationType,
     path
@@ -104,37 +86,25 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
   console.error('Firestore Error: ', JSON.stringify(errInfo));
   throw new Error(JSON.stringify(errInfo));
 }
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  ResponsiveContainer, 
-  LineChart, 
-  Line, 
-  PieChart, 
-  Pie, 
-  Cell 
-} from 'recharts';
-import { motion, AnimatePresence } from 'motion/react';
-
-type AdminModule = 'overview' | 'users' | 'approvals' | 'jobs' | 'applications' | 'cms' | 'support' | 'analytics' | 'settings' | 'logs' | 'goals';
 
 export default function AdminDashboard() {
   const { user, logout } = useAuth();
   const [activeModule, setActiveModule] = useState<AdminModule>('overview');
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Default to false for better mobile initial state
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  
-  // Data States
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+
+  // Synced Firestore Data States
   const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
   const [allJobs, setAllJobs] = useState<Job[]>([]);
   const [allApplications, setAllApplications] = useState<any[]>([]);
   const [pendingRecruiters, setPendingRecruiters] = useState<UserProfile[]>([]);
   const [logs, setLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  // Real maintenance state
+  const [maintenanceModeActive, setMaintenanceModeActive] = useState(false);
+
   const [stats, setStats] = useState({
     totalUsers: 0,
     recruiters: 0,
@@ -144,7 +114,6 @@ export default function AdminDashboard() {
     pendingApprovals: 0
   });
 
-  // CMS State
   const [cmsData, setCmsData] = useState({
     siteName: "2NG Groupe Entreprises",
     logoUrl: "",
@@ -154,23 +123,22 @@ export default function AdminDashboard() {
     primaryColor: "#ea580c"
   });
 
-  // Goals State
   const [goals, setGoals] = useState({
-    subscribersTarget: 100,
-    applicationsTarget: 50,
-    viewsTarget: 500
+    targetUsers: 100,
+    targetJobs: 50,
+    targetApplications: 200
   });
 
-  // Adjust sidebar state based on window size on mount
+  // Responsive Sidebar auto-collapse behavior
   useEffect(() => {
     const handleResize = () => {
-      if (window.innerWidth >= 1024) {
+      if (window.innerWidth >= 1280) {
         setIsSidebarOpen(true);
       } else {
         setIsSidebarOpen(false);
       }
     };
-    handleResize(); // Initial check
+    handleResize();
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
@@ -190,10 +158,11 @@ export default function AdminDashboard() {
     }
   };
 
+  // Hydration real-time listeners block
   useEffect(() => {
     if (!user || user.role !== 'admin') return;
 
-    // Real-time listeners for stats and lists
+    // Users
     const usersUnsub = onSnapshot(collection(db, 'users'), (snapshot) => {
       const usersList = snapshot.docs.map(d => ({ uid: d.id, ...d.data() })) as UserProfile[];
       setAllUsers(usersList);
@@ -214,6 +183,7 @@ export default function AdminDashboard() {
       handleFirestoreError(error, OperationType.GET, 'users');
     });
 
+    // Jobs
     const jobsUnsub = onSnapshot(collection(db, 'offers'), (snapshot) => {
       const jobsList = snapshot.docs.map(d => ({ id: d.id, ...d.data() })) as Job[];
       setAllJobs(jobsList);
@@ -222,6 +192,7 @@ export default function AdminDashboard() {
       handleFirestoreError(error, OperationType.GET, 'offers');
     });
 
+    // Applications
     const appsUnsub = onSnapshot(collection(db, 'applications'), (snapshot) => {
       const appsList = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
       setAllApplications(appsList);
@@ -230,6 +201,7 @@ export default function AdminDashboard() {
       handleFirestoreError(error, OperationType.GET, 'applications');
     });
 
+    // Audit logs
     const logsUnsub = onSnapshot(
       query(collection(db, 'system_logs'), orderBy('timestamp', 'desc'), limit(50)),
       (snapshot) => {
@@ -245,25 +217,31 @@ export default function AdminDashboard() {
       }
     );
 
-    // Fetch CMS Config
+    // CMS config
     const cmsUnsub = onSnapshot(doc(db, 'site_config', 'home'), (snapshot) => {
       if (snapshot.exists()) {
         setCmsData(snapshot.data() as any);
       }
     });
 
-    // Fetch Goals Config
+    // Maintenance sync
+    const maintUnsub = onSnapshot(doc(db, 'maintenance', 'config'), (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.data();
+        setMaintenanceModeActive(!!data.enabled);
+      }
+    });
+
+    // Goals sync
     const goalsUnsub = onSnapshot(doc(db, 'settings', 'goals'), (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.data();
         setGoals({
-          subscribersTarget: data.subscribersTarget || 100,
-          applicationsTarget: data.applicationsTarget || 50,
-          viewsTarget: data.viewsTarget || 500
+          targetUsers: data.targetUsers || 100,
+          targetJobs: data.targetJobs || 50,
+          targetApplications: data.targetApplications || 200
         });
       }
-    }, (error) => {
-      console.warn("Could not retrieve goals settings document, using default values:", error);
     });
 
     setLoading(false);
@@ -274,17 +252,18 @@ export default function AdminDashboard() {
       appsUnsub();
       logsUnsub();
       cmsUnsub();
+      maintUnsub();
       goalsUnsub();
     };
   }, [user]);
 
+  // Handle actions proxying to the modular sub-components
   const handleUserAction = async (uid: string, action: 'suspend' | 'activate' | 'delete' | 'approve' | 'reject' | 'correction', message?: string) => {
-    const path = 'users';
     try {
-      const userRef = doc(db, path, uid);
+      const userRef = doc(db, 'users', uid);
       if (action === 'delete') {
         await deleteDoc(userRef);
-        await addLog("Suppression utilisateur", `UID: ${uid}`, "danger");
+        await addLog("Suppression utilisateur", `UID: ${uid}`, "warning");
       } else if (action === 'approve') {
         await updateDoc(userRef, { 
           status: 'approved', 
@@ -292,93 +271,105 @@ export default function AdminDashboard() {
           adminNotes: null,
           approvedAt: serverTimestamp()
         });
-        await addLog("Approbation recruteur", `UID: ${uid}`, "success");
+        await addLog("Approbation recruteur", `Compte approuvé de l'UID: ${uid}`, "info");
       } else if (action === 'reject') {
         await updateDoc(userRef, { 
           status: 'rejected',
-          adminNotes: message || "Votre compte a été refusé."
+          adminNotes: message || "Dossier refusé par le Conseil."
         });
-        await addLog("Rejet recruteur", `UID: ${uid}`, "danger");
+        await addLog("Rejet recruteur", `Compte refusé de l'UID: ${uid}`, "warning");
       } else if (action === 'correction') {
         await updateDoc(userRef, { 
           status: 'draft',
-          adminNotes: message || "Des corrections sont nécessaires sur votre profil."
+          adminNotes: message || "Des pièces justificatives complémentaires sont demandées."
         });
-        await addLog("Demande correction", `UID: ${uid}`, "warning");
+        await addLog("Demande de corrections", `Modifications requises pour l'UID: ${uid}`, "warning");
       } else {
         await updateDoc(userRef, {
           accountStatus: action === 'suspend' ? 'suspended' : 'active',
           status: action === 'suspend' ? 'suspended' : 'approved',
-          approvedAt: action === 'suspend' ? null : serverTimestamp()
         });
-        await addLog(action === 'suspend' ? "Suspension" : "Activation", `UID: ${uid}`, "warning");
+        await addLog(action === 'suspend' ? "Utilisateur suspendu" : "Abonnement réactivé", `UID modifié: ${uid}`, "warning");
       }
     } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, `${path}/${uid}`);
+      handleFirestoreError(error, OperationType.UPDATE, `users/${uid}`);
     }
   };
 
-  const handleJobAction = async (jobId: string, action: 'approve' | 'suspend' | 'delete', reason?: string) => {
-      const path = 'offers';
-      try {
-          const jobRef = doc(db, path, jobId);
-          if (action === 'delete') {
-              await deleteDoc(jobRef);
-              await addLog("Suppression offre", `Offre ID: ${jobId}`, "danger");
-          } else if (action === 'approve') {
-              await updateDoc(jobRef, { 
-                status: 'active',
-                approvedAt: serverTimestamp(),
-                suspensionReason: null
-              });
-              await addLog("Approbation offre", `Offre ID: ${jobId}`, "success");
-          } else if (action === 'suspend') {
-              await updateDoc(jobRef, { 
-                status: 'suspended', 
-                suspensionReason: reason || "Aucune raison fournie par l'administrateur.",
-                suspendedAt: serverTimestamp()
-              });
-              await addLog("Suspension offre", `Offre ID: ${jobId}. Motif: ${reason}`, "warning");
-          }
-      } catch (e) {
-          handleFirestoreError(e, OperationType.WRITE, `${path}/${jobId}`);
+  const handleJobAction = async (jobId: string, action: 'approve' | 'suspend' | 'delete' | 'toggleFeatured', reason?: string) => {
+    try {
+      const jobRef = doc(db, 'offers', jobId);
+      if (action === 'delete') {
+        await deleteDoc(jobRef);
+        await addLog("Offre supprimée", `ID: ${jobId}`, "warning");
+      } else if (action === 'approve') {
+        await updateDoc(jobRef, { 
+          status: 'active',
+          approvedAt: serverTimestamp(),
+          suspensionReason: null
+        });
+        await addLog("Offre d'emploi publiée", `Offre ID: ${jobId} passée en statut actif`, "info");
+      } else if (action === 'suspend') {
+        await updateDoc(jobRef, { 
+          status: 'suspended', 
+          suspensionReason: reason || "Non-conformité de l'offre.",
+          suspendedAt: serverTimestamp()
+        });
+        await addLog("Offre d'emploi masquée", `Suspension de l'offre ID: ${jobId}. Motif: ${reason}`, "warning");
+      } else if (action === 'toggleFeatured') {
+        // Find existing Job state
+        const jobMatch = allJobs.find(j => j.id === jobId);
+        const nextFeatured = !(jobMatch?.isFeatured);
+        await updateDoc(jobRef, { isFeatured: nextFeatured });
+        await addLog("Modification offre à la une", `Offre ID: ${jobId} configurée Featured: ${nextFeatured}`, "info");
       }
+    } catch (e) {
+      handleFirestoreError(e, OperationType.UPDATE, `offers/${jobId}`);
+    }
   };
 
   const recruiterNames = useMemo(() => {
     const map: Record<string, string> = {};
     allUsers.forEach(u => {
       if (u.role === 'recruiter') {
-        map[u.uid] = u.companyName || u.tradeName || u.displayName || "Entreprise";
+        map[u.uid] = u.companyName || u.tradeName || u.displayName || "Société Partenaire";
       }
     });
     return map;
   }, [allUsers]);
 
-  const menuItems = [
-    { id: 'overview', label: 'Vue d\'ensemble', icon: LayoutDashboard },
-    { id: 'users', label: 'Utilisateurs', icon: Users },
-    { id: 'approvals', label: 'Validations', icon: ShieldCheck, badge: stats.pendingApprovals },
-    { id: 'jobs', label: 'Offres d\'emploi', icon: Briefcase },
-    { id: 'cms', label: 'Gestion du Site', icon: ImageIcon },
-    { id: 'analytics', label: 'Statistiques', icon: TrendingUp },
-    { id: 'goals', label: 'Objectifs Mensuels', icon: Target },
-    { id: 'support', label: 'Support & Tickets', icon: MessageSquare },
-    { id: 'settings', label: 'Paramètres', icon: Settings },
-    { id: 'logs', label: 'Journaux d\'accès', icon: Clock },
+  // Sidebar Menu Items Definition
+  const sidebarItems = [
+    { id: 'overview', label: "Vue d'ensemble", icon: LayoutDashboard },
+    { id: 'users', label: "Utilisateurs", icon: Users },
+    { id: 'approvals', label: "File d'attente", icon: ShieldCheck, badge: stats.pendingApprovals },
+    { id: 'jobs', label: "Offres d'emploi", icon: Briefcase },
+    { id: 'applications', label: "Candidatures", icon: FileText },
+    { id: 'cms', label: "Homepage CMS", icon: Globe },
+    { id: 'media', label: "Médiathèque", icon: HardDrive },
+    { id: 'analytics', label: "Statistiques & Cibles", icon: TrendingUp },
+    { id: 'support', label: "Assistance", icon: MessageSquare },
+    { id: 'notifications', label: "Bulletins Broad", icon: Bell },
+    { id: 'maintenance', label: "Verrou Maintenance", icon: AlertTriangle, alert: maintenanceModeActive },
+    { id: 'settings', label: "Paramètres", icon: Settings },
+    { id: 'logs', label: "Logs d'audit", icon: History },
   ];
 
+  // Access check
   if (!user || user.role !== 'admin') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 p-6">
-        <Card className="max-w-md w-full border-none shadow-2xl rounded-[32px] p-8 text-center">
+      <div className="min-h-screen flex items-center justify-center bg-[#f8f7f4] p-6 text-slate-900">
+        <Card className="max-w-md w-full border-none shadow-2xl rounded-[32px] p-8 text-center bg-white">
           <div className="h-20 w-20 bg-red-50 text-red-600 rounded-3xl flex items-center justify-center mx-auto mb-6">
-            <Lock className="h-10 w-10" />
+            <Lock className="h-10 w-10 flex-shrink-0" />
           </div>
-          <h2 className="text-2xl font-black text-slate-900">Accès Refusé</h2>
-          <p className="text-slate-500 mt-4 leading-relaxed font-medium">Vous n'avez pas les permissions nécessaires pour accéder à cette console.</p>
-          <Button className="mt-8 w-full h-12 rounded-2xl bg-slate-900 font-bold" onClick={() => window.location.href = '/'}>
-            Retour à l'accueil
+          <h2 className="text-2xl font-black text-slate-900">Console Réservée</h2>
+          <p className="text-slate-450 text-xs font-semibold leading-relaxed mt-4">Vous n'avez pas l'accréditation administrative requise pour accéder à cette zone.</p>
+          <Button 
+            className="mt-8 w-full h-12 rounded-xl bg-slate-950 text-white font-black text-xs uppercase" 
+            onClick={() => window.location.href = '/'}
+          >
+            Retour au Portail public 2NG
           </Button>
         </Card>
       </div>
@@ -386,2938 +377,262 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="flex h-screen bg-[#F8FAFC] overflow-hidden relative">
-      {/* Mobile Sidebar Overlay */}
-      {isMobileMenuOpen && (
-        <div 
-          className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[60] lg:hidden"
-          onClick={() => setIsMobileMenuOpen(false)}
-        />
-      )}
+    <div className="flex h-screen bg-[#F8FAFC] overflow-hidden text-slate-800">
+      
+      {/* Slideout overlay for mobile sizes */}
+      <AnimatePresence>
+        {isMobileMenuOpen && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-slate-900/30 backdrop-blur-sm z-50 xl:hidden"
+            onClick={() => setIsMobileMenuOpen(false)}
+          />
+        )}
+      </AnimatePresence>
 
-      {/* Sidebar - Desktop & Mobile */}
+      {/* Sidebar navigation panel */}
       <aside 
-        className={`bg-white border-r border-slate-100 transition-all duration-300 flex flex-col z-[70] 
-          ${isMobileMenuOpen ? 'translate-x-0 w-72' : '-translate-x-full lg:translate-x-0 lg:block'} 
-          ${isSidebarOpen ? 'lg:w-72' : 'lg:w-20'}
-          absolute lg:static h-full shadow-2xl lg:shadow-none`}
+        className={`bg-slate-950 text-white border-r border-slate-900 flex flex-col z-50 shrink-0 transition-all duration-300 ${
+          isSidebarOpen ? 'w-64' : 'w-0 xl:w-20'
+        } fixed xl:relative h-full ${isMobileMenuOpen ? 'w-64' : ''}`}
       >
-        <div className="p-6 flex items-center justify-between">
-          {(isSidebarOpen || isMobileMenuOpen) && (
-            <div className="flex items-center gap-2">
-              <div className="h-9 w-9 bg-slate-900 rounded-xl flex items-center justify-center shadow-lg overflow-hidden border border-slate-700">
-                {cmsData.iconUrl ? (
-                    <img src={cmsData.iconUrl} alt="Logo" className="h-full w-full object-contain" />
-                ) : (
-                    <Database className="h-5 w-5 text-white" />
-                )}
-              </div>
-              <div className="flex flex-col">
-                <span className="font-black text-slate-900 tracking-tighter uppercase whitespace-nowrap text-xs">{cmsData.siteName || "2NG Groupe Entreprises"}</span>
-                <span className="text-[10px] font-black text-orange-600 uppercase tracking-widest leading-none">Admin Portal</span>
-              </div>
-            </div>
-          )}
+        {/* Brand Banner */}
+        <div className="h-20 border-b border-slate-900 flex items-center justify-between px-6 shrink-0">
+          <div className="flex items-center gap-2.5 overflow-hidden">
+            <span className="h-9 w-9 bg-orange-600 rounded-xl flex items-center justify-center font-black text-sm text-white shrink-0 shadow-lg shadow-orange-600/20">
+              2N
+            </span>
+            {isSidebarOpen && (
+              <span className="font-extrabold text-sm tracking-tight text-white select-none whitespace-nowrap">
+                2NG Groupe Console
+              </span>
+            )}
+          </div>
+          {/* Close for mobile scale */}
           <Button 
-            variant="ghost" 
             size="icon" 
-            onClick={() => {
-              if (window.innerWidth < 1024) {
-                setIsMobileMenuOpen(false);
-              } else {
-                setIsSidebarOpen(!isSidebarOpen);
-              }
-            }} 
-            className="rounded-xl"
+            variant="ghost" 
+            className="xl:hidden text-slate-400 hover:text-white"
+            onClick={() => setIsMobileMenuOpen(false)}
           >
-            <Menu className="h-5 w-5" />
+            <X className="h-5 w-5" />
           </Button>
         </div>
 
-        <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
-          {menuItems.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => {
-                setActiveModule(item.id as AdminModule);
-                setIsMobileMenuOpen(false);
-              }}
-              className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl transition-all duration-200 group relative ${activeModule === item.id ? 'bg-orange-600 text-white shadow-lg shadow-orange-600/20' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'}`}
-            >
-              <item.icon className={`h-5 w-5 shrink-0 ${activeModule === item.id ? 'text-white' : 'group-hover:scale-110 transition-transform'}`} />
-              {(isSidebarOpen || isMobileMenuOpen) && (
-                <>
-                  <span className="font-bold flex-1 text-left whitespace-nowrap">{item.label}</span>
-                  {item.badge && item.badge > 0 && (
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${activeModule === item.id ? 'bg-white text-orange-600' : 'bg-orange-100 text-orange-600'}`}>
-                      {item.badge}
-                    </span>
-                  )}
-                </>
-              )}
-              {(!isSidebarOpen && !isMobileMenuOpen) && item.badge && item.badge > 0 && (
-                <div className="absolute top-2 right-2 h-2 w-2 bg-orange-600 rounded-full border-2 border-white" />
-              )}
-            </button>
-          ))}
+        {/* Menu Scroller area */}
+        <nav className="flex-1 overflow-y-auto p-4 space-y-1 my-1">
+          {sidebarItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = activeModule === item.id;
+            
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => {
+                  setActiveModule(item.id as AdminModule);
+                  setIsMobileMenuOpen(false);
+                }}
+                className={`w-full flex items-center justify-between p-3.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all relative ${
+                  isActive 
+                    ? 'bg-orange-600 text-white shadow-lg shadow-orange-600/15' 
+                    : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <Icon className="h-5 w-5 shrink-0" />
+                  {isSidebarOpen && <span className="truncate">{item.label}</span>}
+                </div>
+                
+                {/* Visual Alert Dot/Badges */}
+                {isSidebarOpen && (
+                  <>
+                    {item.badge !== undefined && item.badge > 0 && (
+                      <span className="h-5 min-w-[20px] px-1.5 rounded-full bg-orange-600 text-[10px] font-bold text-white flex items-center justify-center">
+                        {item.badge}
+                      </span>
+                    )}
+                    {item.alert === true && (
+                      <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse shrink-0" />
+                    )}
+                  </>
+                )}
+              </button>
+            );
+          })}
         </nav>
 
-        <div className="p-4 border-t border-slate-50 mt-auto space-y-2">
-          <Button 
-            variant="ghost" 
-            className="w-full h-12 rounded-xl text-slate-600 hover:bg-slate-50 hover:text-orange-600 font-bold flex justify-start gap-4 px-4"
-            onClick={() => window.location.href = '/'}
-          >
-            <ExternalLink className="h-5 w-5 text-orange-500" />
-            {(isSidebarOpen || isMobileMenuOpen) && <span>Retour au site</span>}
-          </Button>
-          <Button 
-            variant="ghost" 
-            className="w-full h-12 rounded-xl text-red-600 hover:bg-red-50 hover:text-red-700 font-bold flex justify-start gap-4 px-4 focus:bg-red-50"
+        {/* Sign out footer block */}
+        <div className="p-4 border-t border-slate-900 shrink-0">
+          <button
+            type="button"
             onClick={logout}
+            className="w-full h-11 rounded-xl bg-slate-900 hover:bg-red-950/20 text-xs font-black uppercase text-red-400 hover:text-red-500 flex items-center gap-3 justify-center transition-colors"
           >
-            <LogOut className="h-5 w-5" />
-            {(isSidebarOpen || isMobileMenuOpen) && <span>Déconnexion</span>}
-          </Button>
+            <LogOut className="h-5 w-5 shrink-0" />
+            {isSidebarOpen && <span>Déconnection</span>}
+          </button>
         </div>
       </aside>
 
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {/* Mobile Header */}
-        <header className="lg:hidden h-16 bg-white border-b border-slate-100 flex items-center justify-between px-4 shrink-0">
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={() => setIsMobileMenuOpen(true)}
-            className="rounded-xl"
-          >
-            <Menu className="h-6 w-6" />
-          </Button>
-          <div className="flex items-center gap-2">
-            <div className="h-7 w-7 bg-orange-600 rounded-lg flex items-center justify-center shadow-lg shadow-orange-600/20">
-              <Database className="h-4 w-4 text-white" />
+      {/* Main Panel frame */}
+      <div className="flex-1 flex flex-col min-w-0 bg-[#F8FAFC]">
+        {/* Topbar navigation metrics */}
+        <header className="h-20 bg-white border-b border-slate-100 flex items-center justify-between px-6 shrink-0">
+          <div className="flex items-center gap-3">
+            <Button 
+              size="icon" 
+              variant="ghost" 
+              className="xl:hidden hover:bg-slate-50"
+              onClick={() => setIsMobileMenuOpen(true)}
+            >
+              <Menu className="h-5 w-5 text-slate-800" />
+            </Button>
+            <Button 
+              size="icon" 
+              variant="ghost" 
+              className="hidden xl:flex hover:bg-slate-50"
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            >
+              <Menu className="h-5 w-5 text-slate-800" />
+            </Button>
+
+            {/* Title indication */}
+            <div className="hidden sm:block">
+              <h1 className="text-base font-black text-slate-900 flex items-center gap-1.5">
+                Tableau Administratif Principal
+                <ChevronRight className="h-4 w-4 text-slate-350" />
+                <span className="text-orange-600 uppercase text-xs font-black tracking-widest">{activeModule}</span>
+              </h1>
             </div>
-            <span className="font-black text-slate-800 text-xs uppercase tracking-tighter">Admin</span>
           </div>
-          <Button 
-            variant="outline" 
-            size="sm"
-            onClick={() => window.location.href = '/'}
-            className="h-9 px-3 rounded-xl border-slate-200 text-slate-700 font-bold text-[10px] uppercase tracking-wider flex items-center gap-1 hover:text-orange-600"
-          >
-            <ExternalLink className="h-3.5 w-3.5 text-orange-500" />
-            Retour
-          </Button>
+
+          <div className="flex items-center gap-4">
+            {/* Live Status indicator */}
+            <span className="hidden md:flex items-center gap-1.5 bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-full text-[10px] font-black uppercase text-slate-650 tracking-wider">
+              <span className={`h-2 w-2 rounded-full ${maintenanceModeActive ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'}`} />
+              {maintenanceModeActive ? 'Restriction active (Maint)' : 'Portail en ligne'}
+            </span>
+
+            {/* Profile widget */}
+            <div className="flex items-center gap-2 border-l border-slate-100 pl-4">
+              <div className="h-9 w-9 bg-slate-100 text-slate-700 rounded-full flex items-center justify-center font-bold font-sans text-sm select-none">
+                {user.displayName?.[0] || 'A'}
+              </div>
+              <div className="hidden lg:block text-left leading-none">
+                <p className="text-xs font-black text-slate-905">{user.displayName || 'Directeur Support'}</p>
+                <p className="text-[9px] font-bold text-slate-400 mt-0.5">Admin 2NG Groupe</p>
+              </div>
+            </div>
+          </div>
         </header>
 
-        {/* Scrollable Content */}
-        <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-6 lg:p-8">
-          <header className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6 lg:mb-8">
-            <div>
-              <h1 className="text-xl md:text-2xl font-black text-slate-900 capitalize">
-                {menuItems.find(m => m.id === activeModule)?.label}
-              </h1>
-              <p className="text-xs md:text-sm font-medium text-slate-500 mt-1">
-                Bon retour, {user.displayName || 'Admin'}. État plateforme : 
-                <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 font-black text-[9px] uppercase">Normal</span>
-              </p>
+        {/* Dynamic content view renderer */}
+        <main className="flex-1 overflow-y-auto p-6 md:p-8 space-y-8">
+          {loading ? (
+            <div className="py-24 text-center">
+              <p className="text-xs font-black text-slate-400 uppercase tracking-widest animate-pulse">Chargement de la Console 2NG...</p>
             </div>
-            <div className="hidden md:flex items-center gap-4">
-              <Button 
-                variant="outline"
-                className="h-10 px-4 rounded-xl border-slate-200 text-slate-700 font-bold text-xs uppercase tracking-wider flex items-center gap-2 bg-white hover:bg-slate-50 hover:text-orange-600 transition-all shadow-sm"
-                onClick={() => window.location.href = '/'}
+          ) : (
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={activeModule}
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -12 }}
+                transition={{ duration: 0.2 }}
               >
-                <ExternalLink className="h-4 w-4 text-orange-500" />
-                Retour au site
-              </Button>
-              <div className="bg-emerald-50 text-emerald-600 px-4 py-2 rounded-full text-xs font-black flex items-center gap-2">
-                <div className="h-2 w-2 rounded-full bg-emerald-600 animate-pulse" />
-                SYSTÈME OPÉRATIONNEL
-              </div>
-            </div>
-          </header>
-
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={activeModule}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.2 }}
-              className="w-full max-w-[1600px] mx-auto"
-            >
-              {activeModule === 'overview' && <OverviewModule stats={stats} jobs={allJobs} users={allUsers} applications={allApplications} />}
-              {activeModule === 'users' && <UsersModule users={allUsers} onAction={handleUserAction} addLog={addLog} />}
-              {activeModule === 'approvals' && <ApprovalsModule pending={pendingRecruiters} onAction={handleUserAction} />}
-              {activeModule === 'jobs' && <JobsModule jobs={allJobs} onAction={handleJobAction} recruiterNames={recruiterNames} />}
-              {activeModule === 'cms' && <CMSModule currentData={cmsData} onSave={setCmsData} />}
-              {activeModule === 'analytics' && <AnalyticsModule stats={stats} jobs={allJobs} users={allUsers} applications={allApplications} goals={goals} />}
-              {activeModule === 'support' && <SupportModule addLog={addLog} />}
-              {activeModule === 'settings' && <SettingsModule />}
-              {activeModule === 'logs' && <LogsModule logs={logs} />}
-              {activeModule === 'goals' && (
-                <GoalsModule 
-                  users={allUsers} 
-                  jobs={allJobs} 
-                  applications={allApplications} 
-                  goals={goals} 
-                  onSave={async (newGoals: any) => {
-                    try {
-                      await setDoc(doc(db, 'settings', 'goals'), {
-                        ...newGoals,
-                        updatedAt: serverTimestamp()
-                      });
-                      await addLog(
-                        "Mise à jour des objectifs", 
-                        `Abonnés: ${newGoals.subscribersTarget}, Candidatures: ${newGoals.applicationsTarget}, Vues: ${newGoals.viewsTarget}`, 
-                        "success"
-                      );
-                    } catch (e) {
-                      console.error("Error setting goals:", e);
-                      throw e;
-                    }
-                  }}
-                />
-              )}
-            </motion.div>
-          </AnimatePresence>
+                {activeModule === 'overview' && (
+                  <OverviewModule 
+                    stats={stats} 
+                    jobs={allJobs} 
+                    users={allUsers} 
+                    applications={allApplications} 
+                    onNavigate={(mod) => setActiveModule(mod)}
+                  />
+                )}
+                {activeModule === 'users' && (
+                  <UsersModule 
+                    users={allUsers} 
+                    onAction={handleUserAction} 
+                    addLog={addLog}
+                  />
+                )}
+                {activeModule === 'approvals' && (
+                  <ApprovalsModule 
+                    pending={pendingRecruiters} 
+                    onAction={handleUserAction} 
+                  />
+                )}
+                {activeModule === 'jobs' && (
+                  <JobsModule 
+                    jobs={allJobs} 
+                    onAction={handleJobAction} 
+                    recruiterNames={recruiterNames}
+                  />
+                )}
+                {activeModule === 'applications' && (
+                  <ApplicationsModule 
+                    applications={allApplications} 
+                    users={allUsers}
+                    jobs={allJobs}
+                  />
+                )}
+                {activeModule === 'cms' && (
+                  <CMSModule 
+                    currentData={cmsData} 
+                    onSave={(newData) => setCmsData(newData)} 
+                  />
+                )}
+                {activeModule === 'media' && (
+                  <MediaModule 
+                    addLog={addLog}
+                  />
+                )}
+                {activeModule === 'analytics' && (
+                  <AnalyticsModule 
+                    stats={stats} 
+                    jobs={allJobs} 
+                    users={allUsers} 
+                    applications={allApplications}
+                    goals={goals}
+                  />
+                )}
+                {activeModule === 'support' && (
+                  <SupportModule 
+                    addLog={addLog}
+                  />
+                )}
+                {activeModule === 'notifications' && (
+                  <NotificationsModule 
+                    logs={logs}
+                    pendingRecruiters={pendingRecruiters}
+                    applications={allApplications}
+                  />
+                )}
+                {activeModule === 'maintenance' && (
+                  <MaintenanceModule 
+                    addLog={addLog}
+                  />
+                )}
+                {activeModule === 'settings' && (
+                  <SettingsModule 
+                    addLog={addLog}
+                  />
+                )}
+                {activeModule === 'logs' && (
+                  <LogsModule 
+                    logs={logs}
+                  />
+                )}
+              </motion.div>
+            </AnimatePresence>
+          )}
         </main>
       </div>
+
     </div>
   );
-}
-
-// --- MODULE COMPONENTS ---
-
-function OverviewModule({ stats, jobs, users, applications }: { stats: any, jobs: Job[], users: UserProfile[], applications: any[] }) {
-  const [timeRange, setTimeRange] = useState<'7d' | '30d'>('7d');
-
-  const candidatesGrowth = useMemo(() => {
-    const list = users.filter(u => u.role === 'candidate');
-    if (list.length === 0) return 0;
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    const recent = list.filter(u => {
-      const d = u.createdAt?.toDate ? u.createdAt.toDate() : new Date(u.createdAt);
-      return d >= sevenDaysAgo;
-    }).length;
-    const past = list.length - recent;
-    if (past === 0) return recent > 0 ? 100 : 0;
-    return Math.round((recent / past) * 100);
-  }, [users]);
-
-  const recruitersGrowth = useMemo(() => {
-    const list = users.filter(u => u.role === 'recruiter');
-    if (list.length === 0) return 0;
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    const recent = list.filter(u => {
-      const d = u.createdAt?.toDate ? u.createdAt.toDate() : new Date(u.createdAt);
-      return d >= sevenDaysAgo;
-    }).length;
-    const past = list.length - recent;
-    if (past === 0) return recent > 0 ? 100 : 0;
-    return Math.round((recent / past) * 100);
-  }, [users]);
-
-  const jobsGrowth = useMemo(() => {
-    if (jobs.length === 0) return 0;
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    const recent = jobs.filter(j => {
-      const d = j.createdAt?.toDate ? j.createdAt.toDate() : new Date(j.createdAt);
-      return d >= sevenDaysAgo;
-    }).length;
-    const past = jobs.length - recent;
-    if (past === 0) return recent > 0 ? 100 : 0;
-    return Math.round((recent / past) * 100);
-  }, [jobs]);
-
-  const applicationsGrowth = useMemo(() => {
-    if (!applications || applications.length === 0) return 0;
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    const recent = applications.filter((app: any) => {
-      const createdAt = app.appliedAt || app.createdAt;
-      if (!createdAt) return false;
-      const d = createdAt.toDate ? createdAt.toDate() : new Date(createdAt);
-      return d >= sevenDaysAgo;
-    }).length;
-    const past = applications.length - recent;
-    if (past === 0) return recent > 0 ? 100 : 0;
-    return Math.round((recent / past) * 100);
-  }, [applications]);
-
-  const chartData = useMemo(() => {
-    const now = new Date();
-    const rangeLength = timeRange === '7d' ? 7 : 30;
-    const days = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
-    const months = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'];
-
-    const dataPoints = Array.from({ length: rangeLength }, (_, i) => {
-      const d = new Date();
-      d.setDate(now.getDate() - (rangeLength - 1 - i));
-      
-      const label = timeRange === '7d' 
-        ? days[d.getDay()] 
-        : `${d.getDate()} ${months[d.getMonth()]}`;
-
-      return {
-        name: label,
-        dateStr: d.toDateString(),
-        users: 0,
-        jobs: 0,
-        applications: 0
-      };
-    });
-
-    users.forEach(u => {
-      if (!u.createdAt) return;
-      const d = u.createdAt.toDate ? u.createdAt.toDate() : new Date(u.createdAt);
-      const idx = dataPoints.findIndex(day => day.dateStr === d.toDateString());
-      if (idx !== -1) dataPoints[idx].users++;
-    });
-
-    jobs.forEach(j => {
-      if (!j.createdAt) return;
-      const d = j.createdAt.toDate ? j.createdAt.toDate() : new Date(j.createdAt);
-      const idx = dataPoints.findIndex(day => day.dateStr === d.toDateString());
-      if (idx !== -1) dataPoints[idx].jobs++;
-    });
-
-    applications.forEach(app => {
-      const createdAt = app.appliedAt || app.createdAt;
-      if (!createdAt) return;
-      const d = createdAt.toDate ? createdAt.toDate() : new Date(createdAt);
-      const idx = dataPoints.findIndex(day => day.dateStr === d.toDateString());
-      if (idx !== -1) dataPoints[idx].applications++;
-    });
-
-    return dataPoints;
-  }, [users, jobs, applications, timeRange]);
-
-  const sectorsData = useMemo(() => {
-    const counts: { [key: string]: number } = {};
-    jobs.forEach(j => {
-      const field = j.field || 'Autre';
-      counts[field] = (counts[field] || 0) + 1;
-    });
-
-    const fields = Object.keys(counts);
-    if (fields.length === 0) {
-      return [];
-    }
-
-    const mapped = fields.map(field => ({
-      name: field,
-      value: counts[field]
-    })).sort((a, b) => b.value - a.value);
-
-    return mapped; 
-  }, [jobs]);
-
-  const SECTOR_COLORS = ["#ea580c", "#4f46e5", "#06b6d4", "#10b981", "#f59e0b", "#6366f1", "#8b5cf6"];
-
-  return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 md:gap-6">
-        {[
-          { label: "Candidats", value: stats.candidates, icon: UserCheck, color: "text-blue-600", bg: "bg-blue-50", growth: candidatesGrowth },
-          { label: "Recruteurs", value: stats.recruiters, icon: Building2, color: "text-purple-600", bg: "bg-purple-50", growth: recruitersGrowth },
-          { label: "Offres Actives", value: stats.jobs, icon: Briefcase, color: "text-orange-600", bg: "bg-orange-50", growth: jobsGrowth },
-          { label: "Candidatures", value: stats.applications || 0, icon: FileText, color: "text-emerald-600", bg: "bg-emerald-50", growth: applicationsGrowth },
-          { label: "Validations", value: stats.pendingApprovals, icon: AlertTriangle, color: "text-red-600", bg: "bg-red-50", growth: 0 },
-        ].map((stat, i) => (
-          <Card key={i} className="border-none shadow-sm rounded-[32px] overflow-hidden hover:shadow-md transition-shadow">
-            <CardContent className="p-6">
-              <div className="flex justify-between items-start">
-                <div>
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{stat.label}</p>
-                  <p className="text-2xl md:text-3xl font-black text-slate-900 mt-2">{stat.value}</p>
-                </div>
-                <div className={`p-3 rounded-2xl ${stat.bg} ${stat.color}`}>
-                  <stat.icon className="h-5 w-5 md:h-6 md:w-6" />
-                </div>
-              </div>
-              <div className="mt-4 flex items-center gap-1.5 text-[10px] font-bold text-emerald-600 bg-emerald-50 w-fit px-2 py-0.5 rounded-full">
-                <TrendingUp className="h-3 w-3" /> +{stat.growth}% cette semaine
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      <div className="grid lg:grid-cols-3 gap-6">
-        <Card className="lg:col-span-2 border-none shadow-sm rounded-[32px] p-6 bg-white overflow-hidden">
-          <div className="flex justify-between items-center mb-6">
-             <h3 className="font-black text-slate-900 text-sm md:text-base">Inscriptions, Offres & candidatures</h3>
-             <Select value={timeRange} onChange={(e: any) => setTimeRange(e.target.value)}>
-                 <option value="7d">7 derniers jours</option>
-                 <option value="30d">30 derniers jours</option>
-             </Select>
-          </div>
-          <div className="h-[250px] md:h-[300px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94A3B8', fontSize: 10}} />
-                <YAxis axisLine={false} tickLine={false} tick={{fill: '#94A3B8', fontSize: 10}} />
-                <Tooltip cursor={{fill: '#F1F5F9'}} contentStyle={{borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)'}} />
-                <Bar dataKey="users" name="Inscriptions" fill="#4f46e5" radius={[4, 4, 0, 0]} barSize={timeRange === '7d' ? 12 : 4} />
-                <Bar dataKey="jobs" name="Offres" fill="#ea580c" radius={[4, 4, 0, 0]} barSize={timeRange === '7d' ? 12 : 4} />
-                <Bar dataKey="applications" name="Candidatures" fill="#10b981" radius={[4, 4, 0, 0]} barSize={timeRange === '7d' ? 12 : 4} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </Card>
-
-        <Card className="border-none shadow-sm rounded-[32px] p-6 bg-white overflow-hidden">
-          <h3 className="font-black text-slate-900 text-sm md:text-base mb-6">Secteurs Porteurs</h3>
-          {sectorsData.length === 0 ? (
-            <div className="h-[250px] flex flex-col items-center justify-center text-slate-400 gap-2">
-              <span className="text-xs font-black uppercase tracking-widest text-slate-400">Aucune offre d'emploi</span>
-              <span className="text-[10px] font-bold text-slate-400 text-center px-4">Utilisez le bouton de recrutement pour publier et comptabiliser des offres.</span>
-            </div>
-          ) : (
-            <>
-              <div className="h-[200px] md:h-[250px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={sectorsData}
-                      innerRadius={50}
-                      outerRadius={70}
-                      paddingAngle={5}
-                      dataKey="value"
-                    >
-                      {sectorsData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={SECTOR_COLORS[index % SECTOR_COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-              <div className="space-y-3 mt-4">
-                 {sectorsData.map((sect, idx) => {
-                     const total = sectorsData.reduce((acc, curr) => acc + curr.value, 0);
-                     const pct = total > 0 ? Math.round((sect.value / total) * 100) : 0;
-                     return (
-                         <div key={sect.name} className="flex justify-between items-center text-xs">
-                             <div className="flex items-center gap-2">
-                                 <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: SECTOR_COLORS[idx % SECTOR_COLORS.length] }} />
-                                 <span className="font-bold text-slate-500 truncate max-w-[150px]">{sect.name}</span>
-                             </div>
-                             <span className="font-black text-slate-900">{sect.value} offre{sect.value > 1 ? 's' : ''} ({pct}%)</span>
-                         </div>
-                     );
-                 })}
-              </div>
-            </>
-          )}
-        </Card>
-      </div>
-    </div>
-  );
-}
-
-function UsersModule({ users, onAction, addLog }: { users: UserProfile[], onAction: any, addLog: any }) {
-  const [searchTerm, setSearchTerm] = useState("");
-  const [roleFilter, setRoleFilter] = useState("all");
-  const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
-  const [editData, setEditData] = useState<Partial<UserProfile> | null>(null);
-  const [isViewOpen, setIsViewOpen] = useState(false);
-  const [isEditOpen, setIsEditOpen] = useState(false);
-  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
-  const [userToDelete, setUserToDelete] = useState<UserProfile | null>(null);
-
-  const filteredUsers = useMemo(() => {
-    return users.filter(u => {
-      const name = u.displayName || u.companyName || u.email || "";
-      const matchSearch = name.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchRole = roleFilter === "all" || u.role === roleFilter;
-      return matchSearch && matchRole;
-    });
-  }, [users, searchTerm, roleFilter]);
-
-  return (
-    <>
-    <Card className="border-none shadow-sm rounded-[32px] overflow-hidden bg-white">
-      <CardHeader className="border-b border-slate-50 flex flex-col md:flex-row md:items-center justify-between gap-4 p-6 md:p-8">
-        <div>
-          <CardTitle className="text-lg md:text-xl font-black">Gestion des Comptes</CardTitle>
-          <CardDescription className="text-xs">Visualisez, modifiez ou suspendez les accès utilisateurs.</CardDescription>
-        </div>
-        <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
-          <div className="relative flex-1 sm:w-64">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-            <Input 
-              placeholder="Rechercher..." 
-              className="pl-10 h-11 rounded-xl border-slate-100 bg-slate-50 w-full"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-          <select 
-            className="h-11 px-4 rounded-xl border border-slate-100 bg-slate-50 text-xs font-bold text-slate-600 outline-none w-full sm:w-auto"
-            value={roleFilter}
-            onChange={(e) => setRoleFilter(e.target.value)}
-          >
-            <option value="all">Tous les rôles</option>
-            <option value="candidate">Candidats</option>
-            <option value="recruiter">Recruteurs</option>
-          </select>
-        </div>
-      </CardHeader>
-      <div className="overflow-x-auto min-h-[400px]">
-        <table className="w-full text-left border-collapse">
-          <thead>
-            <tr className="bg-slate-50/50">
-              <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Utilisateur</th>
-              <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Type</th>
-              <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Statut</th>
-              <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-50">
-            {filteredUsers.map((u) => (
-              <tr key={u.uid} className="hover:bg-slate-50/30 transition-colors group">
-                <td className="px-6 py-4">
-                  <div className="flex items-center gap-3 min-w-[200px]">
-                    <div className="h-10 w-10 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center font-bold shrink-0">
-                      {u.photoUrl ? <img src={u.photoUrl} className="w-full h-full object-cover rounded-xl" /> : (u.displayName?.[0] || u.companyName?.[0] || 'U')}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-black text-slate-900 leading-tight truncate">{u.displayName || u.companyName}</p>
-                      <p className="text-[10px] font-bold text-slate-400 truncate">{u.email}</p>
-                    </div>
-                  </div>
-                </td>
-                <td className="px-6 py-4">
-                  <span className={`text-[10px] font-black uppercase px-2 py-1 rounded-lg ${u.role === 'recruiter' ? 'bg-purple-50 text-purple-600' : 'bg-blue-50 text-blue-600'}`}>
-                    {u.role}
-                  </span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <Badge variant="outline" className={`text-[9px] font-black uppercase px-2 ${u.accountStatus === 'suspended' ? 'border-red-100 text-red-600 bg-red-50' : 'border-emerald-100 text-emerald-600 bg-emerald-50'}`}>
-                    {u.accountStatus || 'active'}
-                  </Badge>
-                </td>
-                  <td className="px-6 py-4 text-right space-x-1 shrink-0 whitespace-nowrap">
-                    <Dialog open={isEditOpen && editData?.uid === u.uid} onOpenChange={(open) => { if (!open) setIsEditOpen(false); }}>
-                      <DialogTrigger asChild nativeButton={true}>
-                        <Button 
-                          size="icon" 
-                          variant="ghost" 
-                          className="h-8 w-8 rounded-lg text-slate-400 hover:text-orange-600 transition-colors"
-                          onClick={() => { setEditData(u); setIsEditOpen(true); }}
-                        >
-                          <Settings className="h-4 w-4" />
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className="max-w-xl rounded-[32px] p-8 border-none shadow-2xl">
-                        <DialogHeader>
-                          <DialogTitle className="text-2xl font-black">Modifier le Profil</DialogTitle>
-                          <DialogDescription>Corrigez les informations de l'utilisateur.</DialogDescription>
-                        </DialogHeader>
-                        {editData && (
-                          <div className="py-6 space-y-6">
-                            <div className="grid grid-cols-1 gap-6">
-                              <div className="space-y-2">
-                                <Label className="text-sm font-bold text-slate-700 ml-1">Nom Complet / Responsable</Label>
-                                <Input 
-                                  value={editData.displayName || ""} 
-                                  onChange={e => setEditData({...editData, displayName: e.target.value})}
-                                  className="h-12 rounded-xl border-slate-200"
-                                />
-                              </div>
-                              
-                              {editData.role === 'recruiter' && (
-                                <>
-                                  <div className="space-y-2">
-                                    <Label className="text-sm font-bold text-slate-700 ml-1">Nom de l'entreprise</Label>
-                                    <Input 
-                                      value={editData.companyName || ""} 
-                                      onChange={e => setEditData({...editData, companyName: e.target.value})}
-                                      className="h-12 rounded-xl border-slate-200"
-                                    />
-                                  </div>
-                                  <div className="space-y-2">
-                                    <Label className="text-sm font-bold text-slate-700 ml-1">Nom Commercial</Label>
-                                    <Input 
-                                      value={editData.tradeName || ""} 
-                                      onChange={e => setEditData({...editData, tradeName: e.target.value})}
-                                      className="h-12 rounded-xl border-slate-200"
-                                    />
-                                  </div>
-                                </>
-                              )}
-
-                              <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                  <Label className="text-sm font-bold text-slate-700 ml-1">Ville</Label>
-                                  <Input 
-                                    value={editData.city || ""} 
-                                    onChange={e => setEditData({...editData, city: e.target.value})}
-                                    className="h-12 rounded-xl border-slate-200"
-                                  />
-                                </div>
-                                <div className="space-y-2">
-                                  <Label className="text-sm font-bold text-slate-700 ml-1">Téléphone</Label>
-                                  <Input 
-                                    value={editData.phone || ""} 
-                                    onChange={e => setEditData({...editData, phone: e.target.value})}
-                                    className="h-12 rounded-xl border-slate-200"
-                                  />
-                                </div>
-                              </div>
-                            </div>
-                            
-                            <div className="flex gap-3 pt-4">
-                              <Button variant="ghost" className="flex-1 rounded-xl h-12 font-bold" onClick={() => setIsEditOpen(false)}>
-                                Annuler
-                              </Button>
-                              <Button 
-                                className="flex-1 rounded-xl h-12 bg-orange-600 hover:bg-orange-700 text-white font-bold" 
-                                onClick={async () => {
-                                  try {
-                                    await updateDoc(doc(db, 'users', editData.uid!), {
-                                      displayName: editData.displayName,
-                                      companyName: editData.companyName || "",
-                                      tradeName: editData.tradeName || "",
-                                      city: editData.city || "",
-                                      phone: editData.phone || ""
-                                    });
-                                    setIsEditOpen(false);
-                                    addLog("Modification profil", `UID: ${editData.uid}`, "info");
-                                    alert("Profil mis à jour avec succès");
-                                  } catch (e) {
-                                    handleFirestoreError(e, OperationType.UPDATE, `users/${editData.uid}`);
-                                  }
-                                }}
-                              >
-                                Enregistrer
-                              </Button>
-                            </div>
-                          </div>
-                        )}
-                      </DialogContent>
-                    </Dialog>
-
-                    <Dialog open={isViewOpen && selectedUser?.uid === u.uid} onOpenChange={(open) => { if (!open) setIsViewOpen(false); }}>
-                      <DialogTrigger asChild nativeButton={true}>
-                        <Button 
-                          size="icon" 
-                          variant="ghost" 
-                          className="h-8 w-8 rounded-lg text-slate-400 hover:text-orange-600 transition-colors"
-                          onClick={() => { setSelectedUser(u); setIsViewOpen(true); }}
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className="max-w-xl rounded-[32px] p-8 border-none shadow-2xl">
-                        <DialogHeader>
-                          <DialogTitle className="text-2xl font-black">Profil Utilisateur</DialogTitle>
-                          <DialogDescription>Détails complets du compte.</DialogDescription>
-                        </DialogHeader>
-                        {selectedUser && (
-                          <div className="py-6 space-y-6">
-                            <div className="flex items-center gap-4">
-                              <div className="h-20 w-20 rounded-3xl bg-orange-100 text-orange-600 flex items-center justify-center text-3xl font-black">
-                                {selectedUser.photoUrl ? <img src={selectedUser.photoUrl} className="w-full h-full object-cover rounded-3xl" /> : (selectedUser.displayName?.[0] || selectedUser.companyName?.[0] || 'U')}
-                              </div>
-                              <div>
-                                <h3 className="text-xl font-black text-slate-900">{selectedUser.displayName || selectedUser.companyName}</h3>
-                                <p className="text-slate-500 font-bold">{selectedUser.email}</p>
-                                <Badge className="mt-2 text-[10px] font-black uppercase">{selectedUser.role}</Badge>
-                              </div>
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                              <div className="p-4 bg-slate-50 rounded-2xl">
-                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Localisation</p>
-                                <p className="font-bold">{selectedUser.city || selectedUser.location || 'Non spécifié'}</p>
-                              </div>
-                              <div className="p-4 bg-slate-50 rounded-2xl">
-                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Téléphone</p>
-                                <p className="font-bold">{selectedUser.phone || 'Non spécifié'}</p>
-                              </div>
-                              {selectedUser.role === 'recruiter' && (
-                                <div className="col-span-2 p-4 bg-slate-50 rounded-2xl">
-                                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Secteur d'Activité</p>
-                                  <p className="font-bold">{selectedUser.sectorActivity || 'Non spécifié'}</p>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        )}
-                      </DialogContent>
-                    </Dialog>
-
-                    <Button 
-                      size="icon" 
-                      variant="ghost" 
-                      className={`h-8 w-8 rounded-lg ${u.accountStatus === 'suspended' ? 'text-emerald-500 hover:bg-emerald-50' : 'text-slate-400 hover:text-slate-900'}`}
-                      onClick={async () => {
-                        const newAction = u.accountStatus === 'suspended' ? 'activate' : 'suspend';
-                        await onAction(u.uid!, newAction);
-                        alert(`Compte ${newAction === 'suspend' ? 'suspendu' : 'activé'} avec succès`);
-                      }}
-                    >
-                      {u.accountStatus === 'suspended' ? <Unlock className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
-                    </Button>
-
-                    <Dialog open={isDeleteOpen && userToDelete?.uid === u.uid} onOpenChange={(open) => { if (!open) setIsDeleteOpen(false); }}>
-                      <DialogTrigger asChild nativeButton={true}>
-                        <Button 
-                          size="icon" 
-                          variant="ghost" 
-                          className="h-8 w-8 rounded-lg text-red-400 hover:bg-red-50" 
-                          onClick={() => { setUserToDelete(u); setIsDeleteOpen(true); }}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className="max-w-md rounded-[32px] p-8 border-none shadow-2xl">
-                        <DialogHeader>
-                          <DialogTitle className="text-2xl font-black text-red-600">Suppression Définitive</DialogTitle>
-                          <DialogDescription className="font-bold">
-                            Êtes-vous sûr de vouloir supprimer <strong>{userToDelete?.displayName || userToDelete?.companyName}</strong> ? Cette action est irréversible.
-                          </DialogDescription>
-                        </DialogHeader>
-                        <DialogFooter className="gap-3 mt-6">
-                          <Button variant="ghost" className="rounded-xl font-black uppercase text-xs" onClick={() => setIsDeleteOpen(false)}>Annuler</Button>
-                          <Button 
-                            className="rounded-xl bg-red-600 hover:bg-red-700 font-black uppercase text-xs px-8" 
-                            onClick={async () => {
-                              if (userToDelete) {
-                                await onAction(userToDelete.uid, 'delete');
-                                setIsDeleteOpen(false);
-                                alert("Compte supprimé définitivement");
-                              }
-                            }}
-                          >
-                            Confirmer
-                          </Button>
-                        </DialogFooter>
-                      </DialogContent>
-                    </Dialog>
-                  </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </Card>
-    </>
-  );
-}
-
-function RecruiterReviewCard({ r, onAction }: { r: UserProfile, onAction: any, key?: string }) {
-    const [isReviewOpen, setIsReviewOpen] = useState(false);
-
-    const handleActionWithReason = (action: 'reject' | 'correction') => {
-        const promptMsg = action === 'reject' ? "Motif du refus ?" : "Motif de la correction ?";
-        const msg = window.prompt(promptMsg);
-        if (msg !== null) {
-            onAction(r.uid, action, msg || undefined);
-            setIsReviewOpen(false);
-        }
-    };
-
-    return (
-        <Card key={r.uid} className="border-none shadow-sm rounded-[32px] p-4 md:p-6 bg-white group hover:shadow-md transition-all">
-            <div className="flex flex-col lg:flex-row items-center lg:items-center justify-between gap-6">
-                <div className="flex items-center gap-4 flex-1 w-full text-slate-900">
-                    <div className="h-14 w-14 md:h-16 md:w-16 rounded-2xl bg-slate-50 border border-slate-100 p-2 flex items-center justify-center shrink-0">
-                       <Building2 className="h-7 w-7 md:h-8 md:w-8 text-slate-300" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                        <h4 className="text-base md:text-lg font-black truncate">{r.companyName}</h4>
-                        <p className="text-xs md:text-sm font-bold text-slate-500 mt-1 truncate">{r.sectorActivity} • {r.city}</p>
-                        <div className="flex flex-wrap gap-2 mt-3">
-                            <Badge variant="ghost" className="text-[9px] font-black uppercase text-orange-600 bg-orange-50 px-2 h-5">RCCM: {r.registrationNumber || 'N/A'}</Badge>
-                            <Badge variant="ghost" className="text-[9px] font-black uppercase text-blue-600 bg-blue-50 px-2 h-5">Validation Prioritaire</Badge>
-                        </div>
-                    </div>
-                </div>
-                <div className="flex items-center gap-3 w-full lg:w-auto">
-                    <Dialog open={isReviewOpen} onOpenChange={setIsReviewOpen}>
-                        <DialogTrigger asChild nativeButton={true}>
-                            <Button variant="outline" className="rounded-xl font-bold border-slate-200 px-6 h-11 flex-1 lg:flex-none">
-                                <Eye className="mr-2 h-4 w-4" /> Examiner
-                            </Button>
-                        </DialogTrigger>
-                        <DialogContent className="max-w-4xl w-full sm:w-[95vw] rounded-none sm:rounded-[40px] p-0 border-none shadow-2xl overflow-hidden flex flex-col h-full sm:h-[90vh] relative">
-                             <button 
-                                 onClick={() => setIsReviewOpen(false)}
-                                 className="absolute right-4 top-4 md:right-8 md:top-8 rounded-full p-2.5 text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-all z-50 focus:outline-none bg-white border border-slate-200 shadow-sm"
-                                 aria-label="Fermer la page"
-                                 type="button"
-                             >
-                                 <X className="h-5 w-5 stroke-[2.5]" />
-                             </button>
-                             <DialogHeader className="p-5 md:p-10 pb-0 shrink-0 pr-16">
-                                 <DialogTitle className="text-xl md:text-3xl font-black text-slate-900">Revue Recruteur</DialogTitle>
-                                 <DialogDescription className="font-bold text-xs md:text-base text-slate-500">Vérification approfondie du dossier : {r.companyName}</DialogDescription>
-                             </DialogHeader>
-                             
-                             <div className="flex-1 overflow-y-auto p-5 md:p-10 space-y-8 scrollbar-hide text-slate-900">
-                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                     <div className="p-5 bg-slate-50 rounded-3xl border border-slate-100">
-                                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Responsable / Manager</p>
-                                         <p className="text-sm font-black">
-                                           {r.manager?.firstName ? `${r.manager.firstName} ${r.manager.lastName}` : (r.displayName || 'Non renseigné')}
-                                         </p>
-                                         <p className="text-[10px] font-bold text-slate-500 mt-1">{r.manager?.role || 'Manager'}</p>
-                                     </div>
-                                     <div className="p-5 bg-slate-50 rounded-3xl border border-slate-100">
-                                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Email Contact</p>
-                                         <p className="text-sm font-black truncate">{r.email}</p>
-                                         <p className="text-[10px] font-bold text-slate-500 mt-1">Professionnel</p>
-                                     </div>
-                                     <div className="p-5 bg-slate-50 rounded-3xl border border-slate-100">
-                                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Localisation</p>
-                                         <p className="text-sm font-black">{r.city || 'N/A'}, {r.commune || 'N/A'}</p>
-                                         <p className="text-[10px] font-bold text-slate-500 mt-1 truncate">{r.location}</p>
-                                     </div>
-                                 </div>
-
-                                 <div className="space-y-4">
-                                     <h4 className="text-xs font-black uppercase tracking-widest flex items-center gap-2">
-                                         <FileText className="h-4 w-4 text-orange-600" />
-                                         Documents de Vérification
-                                     </h4>
-                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                        {r.legalDocuments?.rccmUrl ? (
-                                          <a 
-                                            href={r.legalDocuments.rccmUrl} 
-                                            target="_blank" 
-                                            rel="noopener"
-                                            className="flex items-center justify-between p-5 bg-white rounded-3xl group/doc border-2 border-orange-100 hover:border-orange-500 hover:shadow-lg hover:shadow-orange-100 transition-all cursor-pointer"
-                                          >
-                                              <div className="flex items-center gap-4">
-                                                  <div className="h-10 w-10 rounded-2xl bg-orange-50 flex items-center justify-center text-orange-600 font-bold italic text-xs">DOC</div>
-                                                  <div>
-                                                    <p className="font-black text-xs md:text-sm">Registre Commerce (RCCM)</p>
-                                                    <p className="text-[10px] font-bold text-slate-400">N° {r.registrationNumber || 'Non renseigné'}</p>
-                                                  </div>
-                                              </div>
-                                              <div className="h-10 w-10 rounded-full bg-slate-50 flex items-center justify-center group-hover/doc:bg-orange-600 group-hover/doc:text-white transition-colors">
-                                                <Eye className="h-5 w-5" />
-                                              </div>
-                                          </a>
-                                        ) : (
-                                          <div className="p-5 bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200 text-center flex flex-col items-center justify-center min-h-[80px]">
-                                            <p className="text-xs font-bold text-slate-400">RCCM non fourni</p>
-                                            <p className="text-[10px] text-slate-300">Indiqué: {r.registrationNumber || 'N/A'}</p>
-                                          </div>
-                                        )}
-
-                                        {r.legalDocuments?.taxStatusUrl ? (
-                                          <a 
-                                            href={r.legalDocuments.taxStatusUrl} 
-                                            target="_blank" 
-                                            rel="noopener"
-                                            className="flex items-center justify-between p-5 bg-white rounded-3xl group/doc border-2 border-blue-100 hover:border-blue-500 hover:shadow-lg hover:shadow-blue-100 transition-all cursor-pointer"
-                                          >
-                                              <div className="flex items-center gap-4">
-                                                  <div className="h-10 w-10 rounded-2xl bg-blue-50 flex items-center justify-center text-blue-600 font-bold italic text-xs">TAX</div>
-                                                  <div>
-                                                    <p className="font-black text-xs md:text-sm">Attestation Fiscale</p>
-                                                    <p className="text-[10px] font-bold text-slate-400">DGI / Impôts</p>
-                                                  </div>
-                                              </div>
-                                              <div className="h-10 w-10 rounded-full bg-slate-50 flex items-center justify-center group-hover/doc:bg-blue-600 group-hover/doc:text-white transition-colors">
-                                                <Eye className="h-5 w-5" />
-                                              </div>
-                                          </a>
-                                        ) : (
-                                          <div className="p-5 bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200 text-center flex flex-col items-center justify-center min-h-[80px]">
-                                            <p className="text-xs font-bold text-slate-400">Attestation DGI non fournie</p>
-                                          </div>
-                                        )}
-                                     </div>
-                                 </div>
-                             </div>
-
-                                 <div className="space-y-4">
-                                     <h4 className="text-xs font-black uppercase tracking-widest flex items-center gap-2">
-                                         <Building2 className="h-4 w-4 text-purple-600" />
-                                         Présentation & Profil
-                                     </h4>
-                                     <div className="bg-slate-50 rounded-3xl p-6 border border-slate-100 space-y-6">
-                                         <div>
-                                             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Description / Mission</p>
-                                             <p className="text-sm font-medium text-slate-700 leading-relaxed">
-                                               {r.companyDescription || r.branding?.mission || 'Aucune description disponible.'}
-                                             </p>
-                                         </div>
-                                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                                             <div>
-                                                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Secteur</p>
-                                                 <p className="text-sm font-bold">{r.sectorActivity || 'N/A'}</p>
-                                             </div>
-                                             <div>
-                                                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Taille / Employés</p>
-                                                 <p className="text-sm font-bold">{r.companySize || 'N/A'}</p>
-                                             </div>
-                                             <div>
-                                                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Site Web</p>
-                                                 {r.website ? (
-                                                   <a href={r.website} target="_blank" rel="noopener" className="text-sm font-bold text-blue-600 hover:underline flex items-center gap-2">{r.website.replace('https://', '')} <ExternalLink className="h-3 w-3" /></a>
-                                                 ) : <p className="text-sm font-bold text-slate-400 italic">Aucun site renseigné</p>}
-                                             </div>
-                                         </div>
-                                     </div>
-                                 </div>
-
-                             <DialogFooter className="p-4 md:p-8 pt-3 md:pt-4 bg-white border-t border-slate-100 gap-3 flex flex-col sm:flex-row items-stretch sm:items-center shrink-0 mt-auto">
-                                 <div className="flex gap-2 flex-1">
-                                   <Button 
-                                     variant="ghost" 
-                                     className="rounded-xl font-black text-[10px] text-slate-500 uppercase h-11 px-4 hover:bg-orange-50 hover:text-orange-600 flex-1 sm:flex-none"
-                                     onClick={() => handleActionWithReason('correction')}
-                                   >
-                                     <AlertCircle className="mr-2 h-4 w-4" /> CORRECTION
-                                   </Button>
-                                   <Button 
-                                     variant="outline" 
-                                     className="rounded-xl font-black text-[10px] text-red-600 border-red-100 hover:bg-red-50 uppercase h-11 flex-1 px-6 sm:ml-auto"
-                                     onClick={() => handleActionWithReason('reject')}
-                                   >
-                                     REFUSER
-                                   </Button>
-                                 </div>
-                                 <Button 
-                                   className="rounded-2xl font-black text-[10px] bg-slate-900 text-white hover:bg-slate-800 uppercase h-12 px-10 shadow-xl w-full sm:w-auto transition-all"
-                                   onClick={() => {
-                                       onAction(r.uid, 'approve');
-                                       setIsReviewOpen(false);
-                                   }}
-                                 >
-                                   APPROUVER LE COMPTE
-                                 </Button>
-                             </DialogFooter>
-                         </DialogContent>
-                    </Dialog>
-                </div>
-            </div>
-        </Card>
-    );
-}
-
-function ApprovalsModule({ pending, onAction }: { pending: UserProfile[], onAction: any }) {
-    return (
-        <div className="space-y-6">
-            <div className="grid grid-cols-1 gap-4">
-                {pending.length === 0 ? (
-                    <div className="bg-white rounded-[32px] p-10 md:p-20 text-center border-2 border-dashed border-slate-100">
-                        <ShieldCheck className="h-12 w-12 md:h-16 md:w-16 text-slate-200 mx-auto mb-4" />
-                        <h3 className="text-lg md:text-xl font-bold text-slate-800">Aucune demande en attente</h3>
-                        <p className="text-xs md:text-sm text-slate-400 mt-2">Tous les recruteurs sont à jour dans leurs validations.</p>
-                    </div>
-                ) : (
-                    pending.map(r => (
-                        <RecruiterReviewCard key={r.uid} r={r} onAction={onAction} />
-                    ))
-                )}
-            </div>
-        </div>
-    );
-}
-
-function JobsModule({ jobs, onAction, recruiterNames }: { jobs: Job[], onAction: any, recruiterNames: Record<string, string> }) {
-  const [selectedJob, setSelectedJob] = useState<Job | null>(null);
-  const [isViewOpen, setIsViewOpen] = useState(false);
-  const [isFormDialogOpen, setIsFormDialogOpen] = useState(false);
-  const [editingJob, setEditingJob] = useState<any | null>(null);
-
-  // Filters State
-  const [searchQuery, setSearchQuery] = useState("");
-  const [typeFilter, setTypeFilter] = useState("all");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [expiryFilter, setExpiryFilter] = useState("all");
-
-  // Form Fields State
-  const [formFields, setFormFields] = useState({
-    title: "",
-    companyName: "",
-    companyLogo: "",
-    description: "",
-    requirements: "",
-    location: "Sénégal",
-    type: "popular", // default to popular for admin convenience
-    contractType: "CDI",
-    field: "Technologie",
-    salary: "",
-    expiresAt: "",
-    status: "active",
-    isFeatured: true,
-    experienceLevel: "Junior",
-    experienceYears: "1-3 ans",
-    educationLevel: "Bac +3 (Licence)",
-    activityDomain: "Technologie / Télécoms",
-    applyMethod: "email",
-    companyEmail: "",
-    conditionsDocuments: ["CV uniquement"] as string[]
-  });
-
-  const [savingOffer, setSavingOffer] = useState(false);
-
-  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setFormFields(prev => ({ ...prev, companyLogo: reader.result as string }));
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  // Pre-populate fields on edit
-  const handleOpenEdit = (job: any) => {
-    setEditingJob(job);
-    let expDateStr = "";
-    if (job.expiresAt) {
-      try {
-        const d = job.expiresAt.toDate ? job.expiresAt.toDate() : new Date(job.expiresAt);
-        if (!isNaN(d.getTime())) {
-          expDateStr = d.toISOString().split('T')[0];
-        }
-      } catch (e) {
-        console.warn("Could not parse expiry date on edit", e);
-      }
-    }
-
-    setFormFields({
-      title: job.title || "",
-      companyName: job.companyName || "",
-      companyLogo: job.companyLogo || "",
-      description: job.description || "",
-      requirements: job.requirements || "",
-      location: job.location || "Sénégal",
-      type: job.type || "popular",
-      contractType: job.contractType || "CDI",
-      field: job.field || "Technologie",
-      salary: job.salary || "",
-      expiresAt: expDateStr,
-      status: job.status || "active",
-      isFeatured: job.isFeatured !== undefined ? job.isFeatured : (job.type === 'popular'),
-      experienceLevel: job.experienceLevel || "Junior",
-      experienceYears: job.experienceYears || "1-3 ans",
-      educationLevel: job.educationLevel || "Bac +3 (Licence)",
-      activityDomain: job.activityDomain || job.field || "Technologie / Télécoms",
-      applyMethod: job.applyMethod || "email",
-      companyEmail: job.companyEmail || "",
-      conditionsDocuments: job.conditionsDocuments || ["CV uniquement"]
-    });
-    setIsFormDialogOpen(true);
-  };
-
-  const handleOpenCreate = () => {
-    setEditingJob(null);
-    setFormFields({
-      title: "",
-      companyName: "Administration 2NG",
-      companyLogo: "",
-      description: "",
-      requirements: "",
-      location: "Dakar, Sénégal",
-      type: "popular",
-      contractType: "CDI",
-      field: "Gestion / Administration",
-      salary: "800k - 1.2M CFA / mois",
-      expiresAt: new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString().split('T')[0], // 30 days default
-      status: "active",
-      isFeatured: true,
-      experienceLevel: "Junior",
-      experienceYears: "1-3 ans",
-      educationLevel: "Bac +3 (Licence)",
-      activityDomain: "Gestion / Administration",
-      applyMethod: "email",
-      companyEmail: "support@2ngentreprises.com",
-      conditionsDocuments: ["CV uniquement"]
-    });
-    setIsFormDialogOpen(true);
-  };
-
-  const handleSaveOffer = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formFields.title.trim() || !formFields.companyName.trim()) {
-      alert("Veuillez remplir le titre et le nom de l'entreprise.");
-      return;
-    }
-
-    setSavingOffer(true);
-    try {
-      const expiresDate = formFields.expiresAt ? new Date(formFields.expiresAt) : null;
-      const parsedExpiresAt = expiresDate && !isNaN(expiresDate.getTime()) ? Timestamp.fromDate(expiresDate) : null;
-
-      let calculatedType = formFields.type;
-      if (expiresDate && !isNaN(expiresDate.getTime())) {
-        const diffHours = (expiresDate.getTime() - Date.now()) / (1000 * 60 * 60);
-        if (diffHours > 0 && diffHours <= 48) {
-          calculatedType = 'rapid';
-        }
-      }
-
-      const payload: any = {
-        title: formFields.title.trim(),
-        companyName: formFields.companyName.trim(),
-        companyLogo: formFields.companyLogo.trim(),
-        description: formFields.description.trim(),
-        requirements: formFields.requirements.trim(),
-        location: formFields.location.trim(),
-        type: calculatedType,
-        contractType: formFields.contractType.trim(),
-        field: formFields.activityDomain, // sync sector/field
-        salary: formFields.salary.trim(),
-        expiresAt: parsedExpiresAt,
-        status: formFields.status,
-        isFeatured: formFields.isFeatured,
-        experienceLevel: formFields.experienceLevel,
-        experienceYears: formFields.experienceYears,
-        educationLevel: formFields.educationLevel,
-        activityDomain: formFields.activityDomain,
-        applyMethod: formFields.applyMethod,
-        companyEmail: formFields.companyEmail.trim(),
-        conditionsDocuments: formFields.conditionsDocuments,
-        updatedAt: serverTimestamp()
-      };
-
-      if (editingJob) {
-        // Edit existing document
-        const ref = doc(db, 'offers', editingJob.id);
-        await updateDoc(ref, payload);
-      } else {
-        // Create new document
-        payload.createdAt = serverTimestamp();
-        payload.views = 0;
-        payload.createdBy = "admin"; // Identify as created by the administrator
-        await addDoc(collection(db, 'offers'), payload);
-      }
-
-      setIsFormDialogOpen(false);
-      setEditingJob(null);
-    } catch (err) {
-      console.error("Error saving offer in admin:", err);
-      alert("Erreur lors de la sauvegarde de l'offre: " + (err instanceof Error ? err.message : String(err)));
-    } finally {
-      setSavingOffer(false);
-    }
-  };
-
-  const handleQuickToggleFeature = async (job: any) => {
-    try {
-      const ref = doc(db, 'offers', job.id);
-      const newFeaturedValue = !job.isFeatured;
-      await updateDoc(ref, { 
-        isFeatured: newFeaturedValue,
-        // Aligns type automatically if toggling
-        type: newFeaturedValue ? 'popular' : (job.type === 'popular' ? 'standard' : job.type)
-      });
-    } catch (e) {
-      console.error("Error toggling popularity badge:", e);
-    }
-  };
-
-  const handleQuickToggleStatus = async (job: any) => {
-    try {
-      const ref = doc(db, 'offers', job.id);
-      const newStatus = job.status === 'active' ? 'suspended' : 'active';
-      await updateDoc(ref, { status: newStatus });
-    } catch (e) {
-      console.error("Error toggling visibility state:", e);
-    }
-  };
-
-  const handleDeleteOffer = async (jobId: string) => {
-    if (!confirm("Voulez-vous supprimer définitivement cette offre d'emploi ? Cette action est irréversible.")) return;
-    try {
-      const ref = doc(db, 'offers', jobId);
-      await deleteDoc(ref);
-    } catch (e) {
-      console.error("Error deleting offer:", e);
-    }
-  };
-
-  // Compute stats for current filter selection
-  const filteredJobs = useMemo(() => {
-    return jobs.filter(j => {
-      // 1. Search Query
-      const q = searchQuery.toLowerCase();
-      const matchesSearch = !q || 
-        (j.title || "").toLowerCase().includes(q) || 
-        (j.companyName || "").toLowerCase().includes(q) || 
-        (j.location || "").toLowerCase().includes(q);
-
-      // 2. Type Filter
-      let matchesType = true;
-      if (typeFilter !== "all") {
-        if (typeFilter === "featured") {
-          matchesType = !!(j as any).isFeatured || j.type === 'popular';
-        } else {
-          matchesType = j.type === typeFilter;
-        }
-      }
-
-      // 3. Status Filter
-      let matchesStatus = true;
-      if (statusFilter !== "all") {
-        matchesStatus = j.status === statusFilter;
-      }
-
-      // 4. Expiry Filter
-      let matchesExpiry = true;
-      if (expiryFilter !== "all" && j.expiresAt) {
-        try {
-          const exp = j.expiresAt.toDate ? j.expiresAt.toDate() : new Date(j.expiresAt);
-          const isExpired = Date.now() > exp.getTime();
-          matchesExpiry = expiryFilter === "expired" ? isExpired : !isExpired;
-        } catch (e) {}
-      }
-
-      return matchesSearch && matchesType && matchesStatus && matchesExpiry;
-    });
-  }, [jobs, searchQuery, typeFilter, statusFilter, expiryFilter]);
-
-  const getJobStatusBadge = (status?: string) => {
-    switch (status) {
-      case 'active':
-        return <Badge variant="outline" className="border-emerald-100 text-emerald-600 bg-emerald-50 text-[10px] font-black uppercase px-2 py-1 rounded-lg">Publié</Badge>;
-      case 'suspended':
-        return <Badge variant="outline" className="border-red-100 text-red-600 bg-red-50 text-[10px] font-black uppercase px-2 py-1 rounded-lg">Non publié / Brouillon</Badge>;
-      case 'pending_validation':
-      default:
-        return <Badge variant="outline" className="border-amber-100 text-amber-600 bg-amber-50 text-[10px] font-black uppercase px-2 py-1 rounded-lg">En attente de validation</Badge>;
-    }
-  };
-
-  return (
-    <>
-    <div className="space-y-6">
-      {/* 1. SECTION BAR ACTIONS */}
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-            <Briefcase className="h-6 w-6 text-orange-600" />
-            Gestion des Offres d'Emploi
-          </h2>
-          <p className="text-xs text-slate-500 font-bold mt-1">
-            Recherchez, créez, modifiez, désactivez ou configurez les offres d'emploi et "Offres Populaires" du site en temps réel.
-          </p>
-        </div>
-        <Button 
-          onClick={handleOpenCreate}
-          className="bg-orange-600 hover:bg-orange-700 text-white font-black text-xs uppercase h-11 px-6 rounded-2xl flex items-center gap-2 shadow-lg shadow-orange-600/15"
-        >
-          <Plus className="h-4 w-4" />
-          Créer une Offre d'Emploi
-        </Button>
-      </div>
-
-      {/* 2. STATS OVERVIEW DECK */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {[
-          { label: "Total Offres", value: jobs.length, bg: "bg-slate-50 text-slate-900 border-slate-100" },
-          { label: "Offres Populaires (Admin)", value: jobs.filter(j => (j as any).isFeatured || j.type === "popular").length, bg: "bg-indigo-50/50 text-indigo-700 border-indigo-100/30" },
-          { label: "Candidatures Express", value: jobs.filter(j => j.type === "rapid").length, bg: "bg-amber-50/50 text-amber-700 border-amber-100/30" },
-          { label: "Offres Actives", value: jobs.filter(j => j.status === "active").length, bg: "bg-emerald-50 text-emerald-700 border-emerald-100/50" }
-        ].map((stat, i) => (
-          <Card key={i} className={`p-4 border shadow-none rounded-2xl text-left ${stat.bg}`}>
-            <p className="text-[10px] uppercase font-bold tracking-widest text-slate-400">{stat.label}</p>
-            <p className="text-2xl font-black mt-1 leading-none">{stat.value}</p>
-          </Card>
-        ))}
-      </div>
-
-      {/* 3. FILTERS BAR */}
-      <Card className="border-none shadow-sm rounded-2xl p-4 bg-white flex flex-col md:flex-row gap-4 items-center justify-between">
-        <div className="relative w-full md:w-96">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-          <Input 
-            placeholder="Rechercher par poste, entreprise, lieu..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 h-10 border-slate-100 bg-slate-50/50 rounded-xl font-medium text-xs focus-visible:ring-orange-500"
-          />
-        </div>
-
-        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto justify-end">
-          {/* Category Type Filter */}
-          <div className="flex items-center gap-1.5">
-            <Filter className="h-3.5 w-3.5 text-slate-400" />
-            <select 
-              value={typeFilter}
-              onChange={(e) => setTypeFilter(e.target.value)}
-              className="border border-slate-100 rounded-xl bg-slate-50/50 h-10 px-3 text-xs font-bold text-slate-700 focus:outline-none focus:ring-1 focus:ring-orange-550"
-            >
-              <option value="all">Tous les types d'offres</option>
-              <option value="featured">✨ Offres Populaires/Featured</option>
-              <option value="rapid">⏱️ Offres Rapides</option>
-              <option value="unique">🏢 Offres Directes</option>
-              <option value="standard">Standard</option>
-            </select>
-          </div>
-
-          {/* Status Filter */}
-          <select 
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="border border-slate-100 rounded-xl bg-slate-50/50 h-10 px-3 text-xs font-bold text-slate-700 focus:outline-none focus:ring-1 focus:ring-orange-550"
-          >
-            <option value="all">Tous les statuts</option>
-            <option value="active">Actif / Publié</option>
-            <option value="suspended">Non publié / Brouillon</option>
-            <option value="pending_validation">En attente dev</option>
-          </select>
-
-          {/* Expiry Filter */}
-          <select 
-            value={expiryFilter}
-            onChange={(e) => setExpiryFilter(e.target.value)}
-            className="border border-slate-100 rounded-xl bg-slate-50/50 h-10 px-3 text-xs font-bold text-slate-700 focus:outline-none focus:ring-1 focus:ring-orange-550"
-          >
-            <option value="all">Validité: Toutes</option>
-            <option value="valid">Valides (En cours)</option>
-            <option value="expired">Expirées</option>
-          </select>
-        </div>
-      </Card>
-
-      {/* 4. TABLE GRID */}
-      <Card className="border-none shadow-sm rounded-[32px] overflow-hidden bg-white">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
-            <thead>
-              <tr className="bg-slate-50/60 border-b border-slate-100">
-                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Offre d'emploi</th>
-                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Entreprise</th>
-                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Type & Catégorie</th>
-                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Statut</th>
-                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Expiration / Stats</th>
-                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-50">
-              {filteredJobs.length > 0 ? (
-                filteredJobs.map((j) => {
-                  let isExpired = false;
-                  let expiryLabel = "Sans limite";
-                  if (j.expiresAt) {
-                    try {
-                      const exp = j.expiresAt.toDate ? j.expiresAt.toDate() : new Date(j.expiresAt);
-                      isExpired = Date.now() > exp.getTime();
-                      expiryLabel = exp.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
-                    } catch(e) {}
-                  }
-
-                  // Determine if company logo is available or fallback required
-                  const hasLogo = !!(j as any).companyLogo;
-
-                  return (
-                    <tr key={j.id} className="hover:bg-slate-50/30 transition-colors group">
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          {/* Logo displays */}
-                          <div className="w-10 h-10 shrink-0 rounded-xl bg-slate-950 text-white flex items-center justify-center font-black text-xs uppercase overflow-hidden border border-slate-800">
-                            {hasLogo ? (
-                              <img src={(j as any).companyLogo} alt={j.companyName} className="h-full w-full object-cover" referrerPolicy="no-referrer" />
-                            ) : (
-                              (j.companyName || "").substring(0, 2)
-                            )}
-                          </div>
-                          <div className="min-w-[150px]">
-                            <p className="text-sm font-black text-slate-900 leading-tight mb-1">{j.title}</p>
-                            <span className="text-[10px] font-medium text-slate-405 flex items-center gap-1 text-slate-400">
-                              <MapPin className="h-3 w-3 text-orange-600 shrink-0" /> {j.location}
-                            </span>
-                          </div>
-                        </div>
-                      </td>
-
-                      <td className="px-6 py-4">
-                        <div className="truncate max-w-[150px] font-bold text-xs text-slate-800">
-                          {/* Link info if recruiters map matches */}
-                          {recruiterNames[j.recruiterId] || j.companyName}
-                        </div>
-                        {j.createdBy === 'admin' ? (
-                          <span className="text-[8px] font-black uppercase tracking-wider text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded-md mt-0.5 inline-block">Créateur : Admin</span>
-                        ) : (
-                          <span className="text-[8px] font-bold uppercase text-slate-400 block mt-0.5">Recruteur Externe</span>
-                        )}
-                      </td>
-
-                      <td className="px-6 py-4 space-y-1">
-                        <div className="flex items-center gap-1.5">
-                          {j.type === 'popular' && (
-                            <Badge className="bg-indigo-100 text-indigo-700 border-none font-bold text-[9px] uppercase tracking-wide rounded-md px-1.5 py-0.5">⭐ Populaire</Badge>
-                          )}
-                          {j.type === 'rapid' && (
-                            <Badge className="bg-amber-100 text-amber-700 border-none font-bold text-[9px] uppercase tracking-wide rounded-md px-1.5 py-0.5">⏱️ Rapide</Badge>
-                          )}
-                          {j.type === 'unique' && (
-                            <Badge className="bg-emerald-100 text-emerald-700 border-none font-bold text-[9px] uppercase tracking-wide rounded-md px-1.5 py-0.5">🏢 Direct</Badge>
-                          )}
-                          {!['popular', 'rapid', 'unique'].includes(j.type) && (
-                            <Badge className="bg-slate-100 text-slate-600 border-none font-bold text-[9px] uppercase tracking-wide rounded-md px-1.5 py-0.5">Standard</Badge>
-                          )}
-                        </div>
-                        <p className="text-[10px] text-slate-500 font-bold capitalize">Type Contrat : {j.contractType || 'CDI'}</p>
-                      </td>
-
-                      <td className="px-6 py-4">
-                        {getJobStatusBadge(j.status)}
-                      </td>
-
-                      <td className="px-6 py-4 space-y-1">
-                        <div className="flex items-center gap-1 font-bold text-[10px]">
-                          <Calendar className="h-3.5 w-3.5 text-slate-400" />
-                          <span className={isExpired ? "text-red-600 font-black animate-pulse" : "text-slate-600"}>
-                            {expiryLabel} {isExpired && "(Expirée)"}
-                          </span>
-                        </div>
-                        <div className="text-[9px] font-bold text-slate-400 flex items-center gap-1">
-                          <Eye className="h-3 w-3 text-slate-400" /> {j.views || 0} vues • {j.salary || "Non spécifié"}
-                        </div>
-                      </td>
-
-                      <td className="px-6 py-4 text-right">
-                        <div className="flex justify-end items-center gap-1 text-slate-400">
-                          {/* 1. Toggle feature status directly */}
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className={`h-8 w-8 rounded-lg transition-colors ${ (j.isFeatured || j.type === 'popular') ? 'text-indigo-600 hover:bg-indigo-50 bg-indigo-50/20' : 'hover:text-amber-500' }`}
-                            onClick={() => handleQuickToggleFeature(j)}
-                            title={(j.isFeatured || j.type === 'popular') ? "Retirer des Offres Populaires" : "Marquer comme Offre Populaire"}
-                          >
-                            <Sparkles className="h-4 w-4" />
-                          </Button>
-
-                          {/* 2. Visual presentation */}
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-8 w-8 rounded-lg hover:text-slate-900"
-                            onClick={() => { setSelectedJob(j); setIsViewOpen(true); }}
-                            title="Aperçu rapide"
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-
-                          {/* 3. Edit */}
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-8 w-8 rounded-lg text-blue-600 hover:bg-blue-50"
-                            onClick={() => handleOpenEdit(j)}
-                            title="Modifier l'offre"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-
-                          {/* 4. Quick Visibility switch */}
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className={`h-8 w-8 rounded-lg ${j.status === 'active' ? 'text-emerald-600 hover:bg-emerald-50' : 'text-slate-400 hover:bg-slate-100'}`}
-                            onClick={() => handleQuickToggleStatus(j)}
-                            title={j.status === 'active' ? "Passer en Brouillon (Masquer)" : "Publier l'offre directement"}
-                          >
-                            <Check className="h-4 w-4" />
-                          </Button>
-
-                          {/* 5. Delete physically */}
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-8 w-8 rounded-lg text-red-500 hover:bg-red-50" 
-                            onClick={() => handleDeleteOffer(j.id!)}
-                            title="Supprimer définitivement"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              ) : (
-                <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center">
-                    <div className="h-12 w-12 bg-slate-50 text-slate-400 rounded-2xl flex items-center justify-center mx-auto mb-3">
-                      <Briefcase className="h-6 w-6" />
-                    </div>
-                    <p className="text-sm font-black text-slate-700">Aucune offre d'emploi trouvée</p>
-                    <p className="text-xs text-slate-400 font-bold mt-1">Essayez d'ajuster vos filtres ou créez une nouvelle offre ci-dessus.</p>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </Card>
-    </div>
-
-    {/* ========================================================= */}
-    {/* 5. CREATE AND EDIT FORM DIALOG                            */}
-    {/* ========================================================= */}
-    <Dialog open={isFormDialogOpen} onOpenChange={setIsFormDialogOpen}>
-      <DialogContent className="max-w-xl rounded-[32px] p-8 border-none shadow-2xl overflow-y-auto max-h-[90vh]">
-        <DialogHeader>
-          <DialogTitle className="text-2xl font-black text-slate-950 flex items-center gap-2">
-            <Briefcase className="h-5 w-5 text-orange-600" />
-            {editingJob ? "Modifier l'offre" : "Créer une nouvelle offre d'emploi"}
-          </DialogTitle>
-          <DialogDescription className="text-xs">
-            {editingJob ? "Ajustez les détails de la publication pour l'offre active." : "Publiez une offre directement en tant qu'administrateur. Remplissez tous les champs ci-dessous."}
-          </DialogDescription>
-        </DialogHeader>
-
-        <form onSubmit={handleSaveOffer} className="p-1 space-y-5 mt-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-1 text-left">
-              <Label htmlFor="of-title" className="text-[10px] font-black uppercase text-slate-500 tracking-wider">Titre du poste *</Label>
-              <Input 
-                id="of-title"
-                required
-                placeholder="Ex: Architecte de Solutions Cloud" 
-                value={formFields.title}
-                onChange={(e) => setFormFields({...formFields, title: e.target.value})}
-                className="h-11 rounded-xl border-slate-100 bg-slate-50 focus-visible:ring-orange-500 font-medium text-xs"
-              />
-            </div>
-
-            <div className="space-y-1 text-left">
-              <Label htmlFor="of-company" className="text-[10px] font-black uppercase text-slate-500 tracking-wider">Nom de l'entreprise *</Label>
-              <Input 
-                id="of-company"
-                required
-                placeholder="Ex: Administration 2NG ou Nom d'entreprise cliente" 
-                value={formFields.companyName}
-                onChange={(e) => setFormFields({...formFields, companyName: e.target.value})}
-                className="h-11 rounded-xl border-slate-100 bg-slate-50 focus-visible:ring-orange-500 font-medium text-xs"
-              />
-            </div>
-          </div>
-
-          <div className="space-y-4 text-left p-4 bg-slate-50/50 rounded-2xl border border-slate-100">
-            <Label className="text-[10px] font-black uppercase text-slate-500 tracking-wider">Logo de l'entreprise (Optionnel)</Label>
-            <div className="flex flex-col sm:flex-row gap-4 items-center mt-1">
-              {formFields.companyLogo ? (
-                <div className="relative w-16 h-16 shrink-0 rounded-2xl bg-slate-950 text-white flex items-center justify-center font-black text-sm uppercase overflow-hidden border border-slate-800">
-                  <img src={formFields.companyLogo} className="h-full w-full object-cover" alt="Selected Logo" referrerPolicy="no-referrer" />
-                  <button 
-                    type="button"
-                    onClick={() => setFormFields({...formFields, companyLogo: ""})}
-                    className="absolute inset-0 bg-black/60 text-white font-bold text-[10px] flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity"
-                  >
-                    Retirer
-                  </button>
-                </div>
-              ) : (
-                <div className="w-16 h-16 shrink-0 rounded-2xl bg-slate-100 border-2 border-dashed border-slate-305 flex items-center justify-center font-bold text-slate-400 text-xs text-center p-1">
-                  Pas de logo
-                </div>
-              )}
-              
-              <div className="flex-1 w-full space-y-2">
-                <Input 
-                  type="file"
-                  accept="image/*"
-                  onChange={handleLogoUpload}
-                  className="h-10 text-xs rounded-xl bg-white border-slate-200 cursor-pointer"
-                />
-                <div className="flex items-center gap-2">
-                  <span className="text-[9px] text-slate-400 font-bold whitespace-nowrap">OU URL directe :</span>
-                  <Input 
-                    value={formFields.companyLogo}
-                    onChange={(e) => setFormFields({...formFields, companyLogo: e.target.value})}
-                    placeholder="https://images.unsplash.com/..."
-                    className="h-8 text-[11px] rounded-lg bg-white border-slate-100 flex-1 py-0 px-2"
-                  />
-                </div>
-              </div>
-            </div>
-            <p className="text-[9px] text-slate-400 font-bold">Sélectionnez une image logo pour cette offre d'emploi, ou indiquez une URL directe. L'upload se fait instantanément.</p>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-1 text-left">
-              <Label htmlFor="of-loc" className="text-[10px] font-black uppercase text-slate-500 tracking-wider">Localisation *</Label>
-              <Input 
-                id="of-loc"
-                required
-                placeholder="Ex: Dakar, Sénégal (Hybride)" 
-                value={formFields.location}
-                onChange={(e) => setFormFields({...formFields, location: e.target.value})}
-                className="h-11 rounded-xl border-slate-100 bg-slate-50 focus-visible:ring-orange-500 font-medium text-xs"
-              />
-            </div>
-
-            <div className="space-y-1 text-left">
-              <Label htmlFor="of-salary" className="text-[10px] font-black uppercase text-slate-500 tracking-wider">Salaire (Optionnel)</Label>
-              <Input 
-                id="of-salary"
-                placeholder="Ex: 1.5M - 2.0M CFA" 
-                value={formFields.salary}
-                onChange={(e) => setFormFields({...formFields, salary: e.target.value})}
-                className="h-11 rounded-xl border-slate-100 bg-slate-50 focus-visible:ring-orange-500 font-medium text-xs"
-              />
-            </div>
-          </div>
-
-          {/* 1. Niveau d'expérience & Années d'expérience */}
-          <div className="space-y-3 p-4 bg-slate-50/50 rounded-2xl border border-slate-100 text-left">
-            <div>
-              <Label className="text-[10px] font-black uppercase text-slate-500 tracking-wider">Niveau d'expérience requis *</Label>
-              <div className="flex flex-wrap gap-2 mt-1.5">
-                {["Stagiaire", "Junior", "Intermédiaire", "Senior", "Expert / Dirigeant"].map((lvl) => {
-                  const isSelected = formFields.experienceLevel === lvl;
-                  return (
-                    <button
-                      key={lvl}
-                      type="button"
-                      onClick={() => setFormFields(prev => ({ ...prev, experienceLevel: lvl }))}
-                      className={`px-3 py-1.5 rounded-xl border text-xs font-black transition-all ${
-                        isSelected 
-                          ? "bg-orange-600 border-orange-600 text-white shadow-sm" 
-                          : "bg-white border-slate-200 text-slate-700 hover:border-slate-300"
-                      }`}
-                    >
-                      {lvl}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div>
-              <Label className="text-[10px] font-black uppercase text-slate-500 tracking-wider">Nombre d'années d'expérience *</Label>
-              <div className="flex flex-wrap gap-2 mt-1.5">
-                {["0-1 an", "1-3 ans", "3-5 ans", "5-10 ans", "10 ans +"].map((yrs) => {
-                  const isSelected = formFields.experienceYears === yrs;
-                  return (
-                    <button
-                      key={yrs}
-                      type="button"
-                      onClick={() => setFormFields(prev => ({ ...prev, experienceYears: yrs }))}
-                      className={`px-3 py-1.5 rounded-xl border text-xs font-black transition-all ${
-                        isSelected 
-                          ? "bg-orange-600 border-orange-600 text-white shadow-sm" 
-                          : "bg-white border-slate-200 text-slate-700 hover:border-slate-300"
-                      }`}
-                    >
-                      {yrs}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-
-          {/* 2. Niveau d'études requis */}
-          <div className="p-4 bg-slate-50/50 rounded-2xl border border-slate-100 text-left">
-            <Label className="text-[10px] font-black uppercase text-slate-500 tracking-wider font-bold">Niveau d'études requis *</Label>
-            <div className="flex flex-wrap gap-2 mt-1.5">
-              {["Bac", "Bac + 2 (BTS/DUT)", "Bac + 3 (Licence)", "Bac + 5 (Master/Ingénieur)", "Doctorat / Autre"].map((edu) => {
-                const isSelected = formFields.educationLevel === edu;
-                return (
-                  <button
-                    key={edu}
-                    type="button"
-                    onClick={() => setFormFields(prev => ({ ...prev, educationLevel: edu }))}
-                    className={`px-3 py-1.5 rounded-xl border text-xs font-black transition-all ${
-                      isSelected 
-                        ? "bg-orange-600 border-orange-600 text-white shadow-sm" 
-                        : "bg-white border-slate-200 text-slate-700 hover:border-slate-300"
-                    }`}
-                  >
-                    {edu}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* 3. Domaines d'activité */}
-          <div className="p-4 bg-slate-50/50 rounded-2xl border border-slate-100 text-left">
-            <Label className="text-[10px] font-black uppercase text-slate-500 tracking-wider">Domaine d'activité principal *</Label>
-            <p className="text-[9px] text-slate-400 font-bold mb-2">Sélectionnez le secteur d'activité auquel l'offre est rattachée :</p>
-            <div className="grid grid-cols-2 gap-2 mt-1.5 max-h-48 overflow-y-auto pr-1">
-              {[
-                "Audit / Conseil",
-                "Banque / Assurance",
-                "Commerce / Vente",
-                "Comptabilité / Finance",
-                "Énergie / Mines",
-                "Enseignement / Formation",
-                "Gestion / Administration",
-                "Graphisme / Design",
-                "Humanitaire / ONG",
-                "Immobilier / BTP",
-                "Logistique / Transport",
-                "Marketing / Com",
-                "Ressources Humaines",
-                "Santé / Médical",
-                "Service Public",
-                "Technologie / Télécoms"
-              ].map((domain) => {
-                const isSelected = formFields.activityDomain === domain;
-                return (
-                  <button
-                    key={domain}
-                    type="button"
-                    onClick={() => setFormFields(prev => ({ ...prev, activityDomain: domain }))}
-                    className={`px-3 py-2 rounded-xl border text-[11px] font-black transition-all text-left truncate ${
-                      isSelected 
-                        ? "bg-orange-600 border-orange-600 text-white shadow-sm" 
-                        : "bg-white border-slate-200 text-slate-700 hover:border-slate-300"
-                    }`}
-                  >
-                    {domain}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Type de contrat explicitly needed */}
-          <div className="space-y-1 text-left">
-            <Label htmlFor="of-contract" className="text-[10px] font-black uppercase text-slate-500 tracking-wider">Type de contrat (Ex: CDI, CDD, Stage...)</Label>
-            <Input 
-              id="of-contract"
-              placeholder="Ex: CDI, CDD, Freelance, Stage" 
-              value={formFields.contractType}
-              onChange={(e) => setFormFields({...formFields, contractType: e.target.value})}
-              className="h-11 rounded-xl border-slate-100 bg-slate-50 focus-visible:ring-orange-500 font-medium text-xs"
-            />
-          </div>
-
-          {/* 4. Méthode de candidature & Dossier de candidature */}
-          <div className="p-4 bg-slate-50/50 rounded-2xl border border-slate-100 text-left space-y-4">
-            <div>
-              <Label className="text-[10px] font-black uppercase text-slate-500 tracking-wider">Mode de réception des candidatures *</Label>
-              <div className="flex gap-3 mt-1.5">
-                {[
-                  { id: "email", label: "📧 Par E-mail" },
-                  { id: "platform", label: "✨ Via Plateforme 2NG" }
-                ].map((mode) => {
-                  const isSelected = formFields.applyMethod === mode.id;
-                  return (
-                    <button
-                      key={mode.id}
-                      type="button"
-                      onClick={() => setFormFields(prev => ({ ...prev, applyMethod: mode.id }))}
-                      className={`flex-1 py-1.5 rounded-xl border text-xs font-black transition-all ${
-                        isSelected 
-                          ? "bg-orange-600 border-orange-600 text-white shadow-sm" 
-                          : "bg-white border-slate-200 text-slate-700 hover:border-slate-300"
-                      }`}
-                    >
-                      {mode.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="of-company-email" className="text-[10px] font-black uppercase text-slate-500 tracking-wider">Email de l'entreprise pour réception *</Label>
-              <Input 
-                id="of-company-email"
-                type="email"
-                required
-                placeholder="Ex: recrutement@entreprise.com" 
-                value={formFields.companyEmail}
-                onChange={(e) => setFormFields({...formFields, companyEmail: e.target.value})}
-                className="h-11 rounded-xl border-slate-100 bg-white focus-visible:ring-orange-500 font-medium text-xs"
-              />
-            </div>
-
-            <div>
-              <Label className="text-[10px] font-black uppercase text-slate-500 tracking-wider">Pièces requises pour le dossier *</Label>
-              <p className="text-[9px] text-slate-400 font-bold mb-2">Sélectionnez les documents exigés pour postuler :</p>
-              <div className="flex flex-wrap gap-2">
-                {[
-                  "CV uniquement",
-                  "CV + Lettre de motivation",
-                  "Portfolio / Réalisations",
-                  "Copie de diplômes",
-                  "Pièce d'identité"
-                ].map((docItem) => {
-                  const isChecked = formFields.conditionsDocuments.includes(docItem);
-                  return (
-                    <button
-                      key={docItem}
-                      type="button"
-                      onClick={() => {
-                        const currentDocs = [...formFields.conditionsDocuments];
-                        if (currentDocs.includes(docItem)) {
-                          setFormFields(prev => ({ ...prev, conditionsDocuments: currentDocs.filter(d => d !== docItem) }));
-                        } else {
-                          setFormFields(prev => ({ ...prev, conditionsDocuments: [...currentDocs, docItem] }));
-                        }
-                      }}
-                      className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition-all ${
-                        isChecked 
-                          ? "bg-slate-900 border-slate-900 text-white shadow-sm" 
-                          : "bg-white border-slate-200 text-slate-700 hover:border-slate-300"
-                      }`}
-                    >
-                      {isChecked ? "✓ " : ""}{docItem}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="space-y-1 text-left">
-              <Label htmlFor="of-type" className="text-[10px] font-black uppercase text-slate-500 tracking-wider">Format d'offre</Label>
-              <select
-                id="of-type"
-                value={formFields.type}
-                onChange={(e) => setFormFields({...formFields, type: e.target.value, isFeatured: e.target.value === 'popular' ? true : formFields.isFeatured})}
-                className="w-full h-11 border border-slate-100 rounded-xl bg-slate-50 px-3 text-xs font-bold text-slate-700 focus:outline-none focus:ring-1 focus:ring-orange-550"
-              >
-                <option value="popular">⭐ Populaire</option>
-                <option value="unique">🏢 Directe (Partenaire)</option>
-                <option value="standard">Standard d'Entreprise</option>
-              </select>
-            </div>
-
-            <div className="space-y-1 text-left">
-              <Label htmlFor="of-status" className="text-[10px] font-black uppercase text-slate-500 tracking-wider">Statut de publication</Label>
-              <select
-                id="of-status"
-                value={formFields.status}
-                onChange={(e) => setFormFields({...formFields, status: e.target.value})}
-                className="w-full h-11 border border-slate-100 rounded-xl bg-slate-50 px-3 text-xs font-bold text-slate-700 focus:outline-none focus:ring-1 focus:ring-orange-550"
-              >
-                <option value="active">Actif (Publié et visible)</option>
-                <option value="suspended">Désactivé (Brouillon/Masqué)</option>
-              </select>
-            </div>
-
-            <div className="space-y-1 text-left">
-              <Label htmlFor="of-expiry" className="text-[10px] font-black uppercase text-slate-500 tracking-wider">Date limite d'expiration</Label>
-              <input 
-                id="of-expiry"
-                type="date"
-                value={formFields.expiresAt}
-                onChange={(e) => setFormFields({...formFields, expiresAt: e.target.value})}
-                className="w-full h-11 border border-slate-100 rounded-xl bg-slate-50 px-3 text-xs font-bold text-slate-700 focus:outline-none focus:ring-1 focus:ring-orange-550"
-              />
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-100 text-left">
-            <input 
-              id="of-featured"
-              type="checkbox"
-              checked={formFields.isFeatured}
-              onChange={(e) => setFormFields({...formFields, isFeatured: e.target.checked})}
-              className="h-4.5 w-4.5 text-orange-600 focus:ring-orange-500 border-slate-200 rounded shrink-0 cursor-pointer"
-            />
-            <div>
-              <Label htmlFor="of-featured" className="text-xs font-black text-slate-900 cursor-pointer">Marquer comme offre "Populaire / Vedette"</Label>
-              <p className="text-[10px] text-slate-400 font-bold leading-normal">L'offre apparaîtra automatiquement et de manière prioritaire dans la section "Offres Populaires" de la page d'accueil.</p>
-            </div>
-          </div>
-
-          <div className="space-y-1 text-left">
-            <Label htmlFor="of-desc" className="text-[10px] font-black uppercase text-slate-500 tracking-wider">Description de l'offre *</Label>
-            <Textarea 
-              id="of-desc"
-              required
-              rows={5}
-              placeholder="Décrivez les objectifs, responsabilités, le contexte de la mission..."
-              value={formFields.description}
-              onChange={(e) => setFormFields({...formFields, description: e.target.value})}
-              className="rounded-xl border-slate-100 bg-slate-50 focus-visible:ring-orange-500 font-medium text-xs leading-relaxed"
-            />
-          </div>
-
-          <div className="space-y-1 text-left">
-            <Label htmlFor="of-req" className="text-[10px] font-black uppercase text-slate-500 tracking-wider">Exigences / Profil recherché (Optionnel)</Label>
-            <Textarea 
-              id="of-req"
-              rows={4}
-              placeholder="Ex: Bac+5 en Informatique, 3 ans d'expérience React & Node, Maîtrise de l'anglais technique..."
-              value={formFields.requirements}
-              onChange={(e) => setFormFields({...formFields, requirements: e.target.value})}
-              className="rounded-xl border-slate-100 bg-slate-50 focus-visible:ring-orange-500 font-medium text-xs leading-relaxed"
-            />
-          </div>
-
-          <DialogFooter className="pt-4 flex gap-3">
-            <Button 
-              type="button" 
-              variant="outline"
-              className="rounded-xl font-black uppercase text-xs h-12 flex-1"
-              onClick={() => setIsFormDialogOpen(false)}
-            >
-              Annuler
-            </Button>
-            <Button 
-              type="submit"
-              disabled={savingOffer}
-              className="rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-black uppercase text-xs h-12 flex-1 shadow-lg shadow-orange-650/15"
-            >
-              {savingOffer ? "Sauvegarde en cours..." : (editingJob ? "Enregistrer les modifications" : "Créer et Publier")}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
-
-    {/* ========================================================= */}
-    {/* 6. APERÇU RAPIDE DIALOG                                   */}
-    {/* ========================================================= */}
-    <Dialog open={isViewOpen} onOpenChange={setIsViewOpen}>
-      <DialogContent className="max-w-2xl rounded-[32px] p-8 border-none shadow-2xl">
-        <DialogHeader>
-          <DialogTitle className="text-2xl font-black">Aperçu de l'Offre</DialogTitle>
-          <DialogDescription>Détails de l'opportunité d'emploi.</DialogDescription>
-        </DialogHeader>
-        {selectedJob && (
-          <div className="py-6 space-y-6 max-h-[60vh] overflow-y-auto pr-2 text-left">
-            <div className="flex gap-4 items-start justify-between">
-              <div className="flex gap-3 items-center">
-                <div className="w-12 h-12 rounded-2xl bg-slate-950 text-white flex items-center justify-center font-black text-sm uppercase overflow-hidden border border-slate-850 shadow-sm">
-                  {(selectedJob as any).companyLogo ? (
-                    <img src={(selectedJob as any).companyLogo} alt={selectedJob.companyName} className="h-full w-full object-cover" referrerPolicy="no-referrer" />
-                  ) : (
-                    selectedJob.companyName.substring(0, 2)
-                  )}
-                </div>
-                <div>
-                  <h3 className="text-xl font-black text-slate-900 leading-tight">{selectedJob.title}</h3>
-                  <p className="text-slate-500 font-bold text-xs">{selectedJob.companyName} • {selectedJob.location}</p>
-                </div>
-              </div>
-              <div className="flex flex-col items-end gap-1.5 shrink-0">
-                <Badge variant="outline" className="font-extrabold uppercase tracking-wide text-[9px]">{selectedJob.type}</Badge>
-                {getJobStatusBadge(selectedJob.status)}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-               <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100/50">
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Salaire proposé</p>
-                  <p className="font-bold text-xs text-slate-800">{selectedJob.salary || 'Non spécifié'}</p>
-               </div>
-               <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100/50">
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Secteur / Domaine</p>
-                  <p className="font-bold text-[11px] text-slate-800 truncate">{selectedJob.activityDomain || selectedJob.field || selectedJob.category || 'Non spécifié'}</p>
-               </div>
-               <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100/50">
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Expérience</p>
-                  <p className="font-bold text-[11px] text-slate-800 truncate">{(selectedJob as any).experienceLevel || 'Intermédiaire'} ({(selectedJob as any).experienceYears || '1-3 ans'})</p>
-               </div>
-               <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100/50">
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Études max</p>
-                  <p className="font-bold text-[11px] text-slate-800 truncate">{(selectedJob as any).educationLevel || 'Bac +3'}</p>
-               </div>
-            </div>
-
-            <div className="p-5 bg-orange-50/50 border border-orange-100 rounded-[28px] space-y-3">
-              <h4 className="text-[10px] font-black uppercase text-orange-700 tracking-wider">📁 Dossier & Candidature</h4>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                <div>
-                  <span className="text-slate-400 font-bold block mb-0.5">Mode de candidature :</span>
-                  <span className="font-black text-slate-800 uppercase bg-white border px-2 py-0.5 rounded-lg inline-block text-[10px]">
-                    {(selectedJob as any).applyMethod === 'platform' ? '🔥 Plateforme 2NG' : '✉️ E-mail de l\'entreprise'}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-slate-400 font-bold block mb-0.5">Contact de réception :</span>
-                  <p className="font-black text-slate-900 truncate">{(selectedJob as any).companyEmail || 'Non spécifié'}</p>
-                </div>
-              </div>
-              
-              {(selectedJob as any).conditionsDocuments && (selectedJob as any).conditionsDocuments.length > 0 && (
-                <div className="pt-2 border-t border-orange-100/60">
-                  <span className="text-[10px] text-slate-400 font-black uppercase block tracking-wider mb-1.5">Pièces à fournir :</span>
-                  <div className="flex flex-wrap gap-1.5">
-                    {(selectedJob as any).conditionsDocuments.map((docItem: string, idx: number) => (
-                      <span key={idx} className="bg-white border text-slate-700 font-bold text-[9px] px-2 py-0.5 rounded-md">
-                        ✓ {docItem}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="space-y-3">
-              <h4 className="text-xs font-black text-slate-950 uppercase tracking-wider flex items-center gap-1.5">Description</h4>
-              <p className="text-sm text-slate-600 leading-relaxed font-medium bg-slate-50/30 p-4 rounded-2xl border border-slate-100/30">{selectedJob.description}</p>
-            </div>
-
-            {selectedJob.requirements && (
-              <div className="space-y-3">
-                <h4 className="text-xs font-black text-slate-950 uppercase tracking-wider flex items-center gap-1.5">Profil recherché & Exigences</h4>
-                <p className="text-sm text-slate-600 leading-relaxed font-medium bg-slate-50/30 p-4 rounded-2xl border border-slate-100/30 whitespace-pre-line">{selectedJob.requirements}</p>
-              </div>
-            )}
-          </div>
-        )}
-        <DialogFooter className="mt-6">
-          <Button className="w-full rounded-xl bg-slate-900 hover:bg-slate-950 text-white font-black uppercase text-xs h-12" onClick={() => setIsViewOpen(false)}>Fermer l'aperçu</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-    </>
-  );
-}
-
-function CMSModule({ currentData, onSave }: any) {
-    const [localData, setLocalData] = useState(currentData);
-    const [saving, setSaving] = useState(false);
-
-    useEffect(() => {
-        setLocalData(currentData);
-    }, [currentData]);
-
-    const handleSave = async () => {
-        const path = 'site_config/home';
-        setSaving(true);
-        try {
-            const configRef = doc(db, 'site_config', 'home');
-            await setDoc(configRef, localData);
-            onSave(localData);
-            alert("Contenu du site mis à jour avec succès !");
-        } catch (error) {
-            handleFirestoreError(error, OperationType.WRITE, path);
-        } finally {
-            setSaving(false);
-        }
-    };
-
-    const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, field: 'logoUrl' | 'iconUrl' | 'founderPhotoUrl') => {
-        const file = e.target.files?.[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                setLocalData({ ...localData, [field]: reader.result as string });
-            };
-            reader.readAsDataURL(file);
-        }
-    };
-
-    return (
-        <Card className="border-none shadow-sm rounded-[32px] overflow-hidden bg-white">
-            <CardHeader className="p-6 md:p-8 border-b border-slate-50">
-                <CardTitle className="text-lg md:text-xl font-black">Identité & Contenu</CardTitle>
-                <CardDescription className="text-xs">Personnalisez le nom, le logo et les textes de votre plateforme.</CardDescription>
-            </CardHeader>
-            <CardContent className="p-6 md:p-8 space-y-8">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-                    <div className="space-y-6">
-                         <div className="space-y-4">
-                            <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Identité du Site</h4>
-                            <div className="space-y-1.5">
-                                <label className="text-[10px] font-black text-slate-900 ml-1 uppercase">Nom de la plateforme</label>
-                                <Input 
-                                    value={localData.siteName || ""} 
-                                    onChange={(e) => setLocalData({...localData, siteName: e.target.value})}
-                                    placeholder="Ex: 2NG Groupe Entreprises"
-                                    className="h-12 rounded-xl border-slate-100 bg-slate-50 font-black text-base"
-                                />
-                            </div>
-                         </div>
-
-                         <div className="space-y-4">
-                            <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Section Hero</h4>
-                            <div className="space-y-1.5">
-                                <label className="text-[10px] font-black text-slate-900 ml-1 uppercase">Titre Principal</label>
-                                <Input 
-                                    value={localData.heroTitle} 
-                                    onChange={(e) => setLocalData({...localData, heroTitle: e.target.value})}
-                                    className="h-12 rounded-xl border-slate-100 bg-slate-50 font-black text-base"
-                                />
-                            </div>
-                            <div className="space-y-1.5">
-                                <label className="text-[10px] font-black text-slate-900 ml-1 uppercase">Description</label>
-                                <textarea 
-                                    rows={3}
-                                    className="w-full p-4 rounded-xl border border-slate-100 bg-slate-50 text-sm font-bold text-slate-600 outline-none focus:border-orange-500"
-                                    value={localData.heroSubtitle}
-                                    onChange={(e) => setLocalData({...localData, heroSubtitle: e.target.value})}
-                                />
-                            </div>
-                         </div>
-
-                         <div className="space-y-4 pt-6 border-t border-slate-50">
-                            <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Le Fondateur & La Vision</h4>
-                            <div className="space-y-1.5">
-                                <label className="text-[10px] font-black text-slate-900 ml-1 uppercase">Nom du Fondateur</label>
-                                <Input 
-                                    value={localData.founderName || ""} 
-                                    onChange={(e) => setLocalData({...localData, founderName: e.target.value})}
-                                    placeholder="Ex: Jean Dupont"
-                                    className="h-12 rounded-xl border-slate-100 bg-slate-50 font-black text-base"
-                                />
-                            </div>
-                            <div className="space-y-1.5">
-                                <label className="text-[10px] font-black text-slate-900 ml-1 uppercase">Titre / Rôle du Fondateur</label>
-                                <Input 
-                                    value={localData.founderTitle || ""} 
-                                    onChange={(e) => setLocalData({...localData, founderTitle: e.target.value})}
-                                    placeholder="Ex: Fondateur & CEO"
-                                    className="h-12 rounded-xl border-slate-100 bg-slate-50 font-black text-base"
-                                />
-                            </div>
-                            <div className="space-y-3">
-                                <label className="text-[10px] font-black text-slate-900 ml-1 uppercase">Photo du Fondateur (Upload ou Fichier)</label>
-                                <div 
-                                    onClick={() => document.getElementById('founder-image-upload-input')?.click()}
-                                    className="relative group aspect-square max-w-[180px] h-[180px] bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center overflow-hidden hover:border-orange-500 hover:bg-slate-50/50 transition-all cursor-pointer p-3"
-                                >
-                                    {localData.founderPhotoUrl ? (
-                                        <img src={localData.founderPhotoUrl} className="max-h-full max-w-full object-cover rounded-xl" alt="Founder preview" />
-                                    ) : (
-                                        <div className="text-center space-y-2 p-3">
-                                            <ImageIcon className="h-8 w-8 text-slate-300 mx-auto" />
-                                            <p className="text-[10px] font-black uppercase text-slate-400">Sélectionner une photo</p>
-                                        </div>
-                                    )}
-                                    <input 
-                                        id="founder-image-upload-input"
-                                        type="file" 
-                                        accept="image/*" 
-                                        className="hidden" 
-                                        onChange={(e) => handleImageUpload(e, 'founderPhotoUrl')}
-                                    />
-                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                                        <span className="text-[10px] font-black text-white uppercase bg-orange-600 px-3 py-1.5 rounded-lg shadow-xl">Changer la photo</span>
-                                    </div>
-                                </div>
-                                <div className="flex gap-2">
-                                    <Button 
-                                        type="button"
-                                        variant="outline"
-                                        className="h-10 rounded-xl font-bold text-xs px-4"
-                                        onClick={() => document.getElementById('founder-image-upload-input')?.click()}
-                                    >
-                                        Sélectionner un fichier
-                                    </Button>
-                                    {localData.founderPhotoUrl && (
-                                        <Button 
-                                            type="button"
-                                            variant="ghost"
-                                            className="h-10 rounded-xl font-bold text-xs text-red-500 hover:text-red-600 hover:bg-red-50"
-                                            onClick={() => setLocalData({ ...localData, founderPhotoUrl: "" })}
-                                        >
-                                            Effacer
-                                        </Button>
-                                    )}
-                                </div>
-                            </div>
-                            <div className="space-y-1.5">
-                                <label className="text-[10px] font-black text-slate-900 ml-1 uppercase">Ou URL directe de la photo</label>
-                                <Input 
-                                    value={localData.founderPhotoUrl || ""} 
-                                    onChange={(e) => setLocalData({...localData, founderPhotoUrl: e.target.value})}
-                                    placeholder="Ex: https://2ngentreprises.com/images/fondateur.jpg"
-                                    className="h-12 rounded-xl border-slate-100 bg-slate-50 font-black text-sm"
-                                />
-                            </div>
-                            <div className="space-y-1.5">
-                                <label className="text-[10px] font-black text-slate-900 ml-1 uppercase">Petite description de la Vision</label>
-                                <textarea 
-                                    rows={4}
-                                    placeholder="Décrivez votre vision pour la plateforme..."
-                                    className="w-full p-4 rounded-xl border border-slate-100 bg-slate-50 text-sm font-bold text-slate-600 outline-none focus:border-orange-500"
-                                    value={localData.founderVision || ""}
-                                    onChange={(e) => setLocalData({...localData, founderVision: e.target.value})}
-                                />
-                            </div>
-                         </div>
-                    </div>
-
-                    <div className="space-y-6">
-                         <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Branding Visual</h4>
-                         
-                         <div className="space-y-3">
-                             <label className="text-[10px] font-black text-slate-900 ml-1 uppercase">Logo Principal</label>
-                                <div 
-                                    onClick={() => document.getElementById('logo-upload-input')?.click()}
-                                    className="relative group aspect-video bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center overflow-hidden hover:border-orange-500 hover:bg-slate-50/50 transition-all cursor-pointer p-4"
-                                >
-                                    {localData.logoUrl ? (
-                                        <img src={localData.logoUrl} className="max-h-full max-w-full object-contain" alt="Logo preview" />
-                                    ) : (
-                                        <div className="text-center space-y-2">
-                                            <ImageIcon className="h-8 w-8 text-slate-300 mx-auto" />
-                                            <p className="text-[10px] font-black uppercase text-slate-400">Importer un logo JPEG/PNG</p>
-                                        </div>
-                                    )}
-                                    <input 
-                                        id="logo-upload-input"
-                                        type="file" 
-                                        accept="image/*" 
-                                        className="hidden" 
-                                        onChange={(e) => handleImageUpload(e, 'logoUrl')}
-                                    />
-                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                                        <span className="text-[10px] font-black text-white uppercase bg-orange-600 px-3 py-1.5 rounded-lg shadow-xl">Changer le logo</span>
-                                    </div>
-                                </div>
-                                <Button 
-                                    type="button"
-                                    variant="outline"
-                                    className="w-full h-10 rounded-xl font-bold text-xs"
-                                    onClick={() => document.getElementById('logo-upload-input')?.click()}
-                                >
-                                    Sélectionner un fichier
-                                </Button>
-                            </div>
-
-                            <div className="space-y-3">
-                                <label className="text-[10px] font-black text-slate-900 ml-1 uppercase">Favicon / Icône</label>
-                                <div 
-                                    onClick={() => document.getElementById('icon-upload-input')?.click()}
-                                    className="relative group aspect-square bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center overflow-hidden hover:border-orange-500 hover:bg-slate-50/50 transition-all cursor-pointer p-4"
-                                >
-                                    {localData.iconUrl ? (
-                                        <img src={localData.iconUrl} className="h-16 w-16 object-contain" alt="Icon preview" />
-                                    ) : (
-                                        <div className="h-10 w-10 bg-orange-100 rounded-xl flex items-center justify-center text-orange-600 font-bold text-xl">A</div>
-                                    )}
-                                    <input 
-                                        id="icon-upload-input"
-                                        type="file" 
-                                        accept="image/*" 
-                                        className="hidden" 
-                                        onChange={(e) => handleImageUpload(e, 'iconUrl')}
-                                    />
-                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                                        <span className="text-[10px] font-black text-white uppercase bg-orange-600 px-2 py-1 rounded-lg">Changer</span>
-                                    </div>
-                                </div>
-                                <Button 
-                                    type="button"
-                                    variant="outline"
-                                    className="w-full h-10 rounded-xl font-bold text-xs"
-                                    onClick={() => document.getElementById('icon-upload-input')?.click()}
-                                >
-                                    Sélectionner un fichier
-                                </Button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="flex items-center justify-between p-5 bg-white border border-slate-100 rounded-2xl shadow-sm">
-                             <div className="space-y-0.5">
-                                <span className="text-[10px] font-black text-slate-900 uppercase tracking-widest">Thème Visuel</span>
-                                <p className="text-[9px] font-bold text-slate-400">Couleur d'accentuation globale</p>
-                             </div>
-                             <div className="flex items-center gap-3">
-                                 <span className="text-[9px] font-mono text-slate-400 bg-slate-50 px-2 py-0.5 rounded">#EA580C</span>
-                                 <div className="h-8 w-8 rounded-xl bg-orange-600 shadow-lg shadow-orange-600/20 cursor-pointer border-2 border-white ring-1 ring-slate-100" />
-                             </div>
-                         </div>
-
-                    <div className="pt-8 border-t border-slate-50 flex justify-end">
-                    <Button 
-                        disabled={saving}
-                        onClick={handleSave}
-                        className="w-full sm:w-auto h-14 px-12 rounded-[22px] bg-slate-900 text-white font-black hover:bg-slate-800 shadow-xl shadow-slate-900/10 uppercase text-[10px] tracking-widest transition-all hover:not-disabled:-translate-y-1"
-                    >
-                         {saving ? "PUBLICATION..." : "Enregistrer les modifications"}
-                    </Button>
-                    </div>
-            </CardContent>
-        </Card>
-    );
-}
-
-function AnalyticsModule({ stats, jobs, users, applications = [], goals }: { stats: any, jobs: any[], users: any[], applications?: any[], goals?: any }) {
-    const goalsConfig = goals || { subscribersTarget: 100, applicationsTarget: 50, viewsTarget: 500 };
-
-    const cityData = useMemo(() => {
-        const counts: { [key: string]: number } = {};
-        let totalCount = 0;
-        
-        jobs.forEach(j => {
-            if (j.location) {
-                const city = j.location.split(',')[0].trim();
-                if (city) {
-                    counts[city] = (counts[city] || 0) + 1;
-                    totalCount++;
-                }
-            }
-        });
-        
-        users.forEach(u => {
-            const city = u.city || u.location;
-            if (city) {
-                const cleaned = city.split(',')[0].trim();
-                if (cleaned) {
-                    counts[cleaned] = (counts[cleaned] || 0) + 1;
-                    totalCount++;
-                }
-            }
-        });
-        
-        const keys = Object.keys(counts);
-        if (keys.length === 0) {
-            return [];
-        }
-        
-        let sorted = keys.map(city => ({
-            city,
-            count: counts[city]
-        })).sort((a, b) => b.count - a.count);
-        
-        const top4 = sorted.slice(0, 4);
-        const top4Total = top4.reduce((sum, curr) => sum + curr.count, 0);
-        
-        const colors = ['bg-orange-600', 'bg-indigo-600', 'bg-emerald-600', 'bg-slate-300'];
-        
-        return top4.map((item, idx) => ({
-            city: item.city,
-            count: top4Total > 0 ? Math.round((item.count / top4Total) * 100) : 0,
-            color: colors[idx % colors.length]
-        }));
-    }, [jobs, users]);
-
-    const currentSubscribers = users.length;
-    const currentApplications = applications.length;
-    const currentViews = jobs.reduce((acc, curr) => acc + (curr.views || 0), 0);
-
-    const subscribersPct = Math.min(100, Math.round((currentSubscribers / goalsConfig.subscribersTarget) * 100)) || 0;
-    const applicationsPct = Math.min(100, Math.round((currentApplications / goalsConfig.applicationsTarget) * 100)) || 0;
-    const viewsPct = Math.min(100, Math.round((currentViews / goalsConfig.viewsTarget) * 100)) || 0;
-
-    const monthlyGoalProgress = Math.round((subscribersPct + applicationsPct + viewsPct) / 3);
-
-    return (
-        <div className="space-y-6">
-            <div className="grid md:grid-cols-2 gap-6">
-                <Card className="border-none shadow-sm rounded-3xl p-8 bg-white">
-                     <h3 className="font-black text-slate-900 mb-6">Répartition par Villes Actives</h3>
-                     <div className="space-y-5">
-                        {cityData.length === 0 ? (
-                            <div className="text-center py-10 text-slate-400 font-bold text-xs uppercase tracking-wider">
-                                Aucune ville active enregistrée
-                            </div>
-                        ) : (
-                            cityData.map(c => (
-                                <div key={c.city} className="space-y-2">
-                                    <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-slate-400">
-                                        <span>{c.city}</span>
-                                        <span className="text-slate-900">{c.count}%</span>
-                                    </div>
-                                    <div className="h-2.5 w-full bg-slate-50 rounded-full overflow-hidden">
-                                         <motion.div 
-                                             initial={{ width: 0 }}
-                                             animate={{ width: `${c.count}%` }}
-                                             transition={{ duration: 1 }}
-                                             className={`h-full ${c.color}`} 
-                                         />
-                                    </div>
-                                </div>
-                            ))
-                        )}
-                     </div>
-                </Card>
-                <Card className="border-none shadow-sm rounded-3xl p-8 bg-white flex flex-col md:flex-row gap-6 items-center">
-                     <div className="flex-1 space-y-4 w-full">
-                         <h3 className="font-black text-slate-900 text-lg">Objectifs Mensuels</h3>
-                         <p className="text-slate-400 text-xs font-bold uppercase tracking-wider">Indicateurs de Performance en temps réel</p>
-                         
-                         <div className="space-y-3 pt-2">
-                             <div className="space-y-1">
-                                 <div className="flex justify-between text-[10px] font-black uppercase tracking-wider text-slate-400">
-                                     <span>Abonnés: {currentSubscribers}/{goalsConfig.subscribersTarget}</span>
-                                     <span className="text-orange-600">{subscribersPct}%</span>
-                                 </div>
-                                 <div className="h-2 w-full bg-slate-50 rounded-full overflow-hidden">
-                                     <div className="h-full bg-orange-600 rounded-full" style={{ width: `${subscribersPct}%` }} />
-                                 </div>
-                             </div>
-
-                             <div className="space-y-1">
-                                 <div className="flex justify-between text-[10px] font-black uppercase tracking-wider text-slate-400">
-                                     <span>Candidatures: {currentApplications}/{goalsConfig.applicationsTarget}</span>
-                                     <span className="text-indigo-600">{applicationsPct}%</span>
-                                 </div>
-                                 <div className="h-2 w-full bg-slate-50 rounded-full overflow-hidden">
-                                     <div className="h-full bg-indigo-600 rounded-full" style={{ width: `${applicationsPct}%` }} />
-                                 </div>
-                             </div>
-
-                             <div className="space-y-1">
-                                 <div className="flex justify-between text-[10px] font-black uppercase tracking-wider text-slate-400">
-                                     <span>Consultations: {currentViews}/{goalsConfig.viewsTarget}</span>
-                                     <span className="text-emerald-600">{viewsPct}%</span>
-                                 </div>
-                                 <div className="h-2 w-full bg-slate-50 rounded-full overflow-hidden">
-                                     <div className="h-full bg-emerald-600 rounded-full" style={{ width: `${viewsPct}%` }} />
-                                 </div>
-                             </div>
-                         </div>
-                     </div>
-                     <div className="flex justify-center items-center w-full md:w-auto p-4 shrink-0">
-                          <div className="relative h-44 w-44 flex items-center justify-center">
-                              <svg className="h-full w-full rotate-[-90deg]">
-                                  <circle cx="88" cy="88" r="70" stroke="currentColor" strokeWidth="12" fill="transparent" className="text-slate-50" />
-                                  <circle cx="88" cy="88" r="70" stroke="currentColor" strokeWidth="12" fill="transparent" strokeDasharray="440" strokeDashoffset={440 * (1 - monthlyGoalProgress / 100)} className="text-orange-600 transition-all duration-1000" />
-                              </svg>
-                              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                                  <span className="text-3xl font-black text-slate-900">{monthlyGoalProgress}%</span>
-                                  <span className="text-[9px] font-black text-slate-450 uppercase tracking-widest">Global atteint</span>
-                              </div>
-                          </div>
-                     </div>
-                </Card>
-            </div>
-        </div>
-    );
-}
-
-function SupportModule({ addLog }: { addLog: (action: string, details: string, type: 'info' | 'success' | 'warning' | 'error') => Promise<void> }) {
-  const [tickets, setTickets] = useState<SupportTicket[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedTicket, setSelectedTicket] = useState<SupportTicket | null>(null);
-  const [replyText, setReplyText] = useState('');
-  const [isReplying, setIsReplying] = useState(false);
-
-  useEffect(() => {
-    const unsub = onSnapshot(
-      query(collection(db, 'support_tickets'), orderBy('createdAt', 'desc')),
-      (snapshot) => {
-        const list: SupportTicket[] = [];
-        snapshot.forEach((doc) => {
-          list.push({ id: doc.id, ...doc.data() } as SupportTicket);
-        });
-        setTickets(list);
-        setLoading(false);
-      },
-      (error) => {
-        console.error("Error loading support tickets:", error);
-        setLoading(false);
-      }
-    );
-    return unsub;
-  }, []);
-
-  const handleSendReply = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedTicket || !replyText.trim()) return;
-    setIsReplying(true);
-    try {
-      const ticketRef = doc(db, 'support_tickets', selectedTicket.id);
-      await updateDoc(ticketRef, {
-        response: replyText,
-        repliedAt: serverTimestamp(),
-        status: 'closed'
-      });
-      await addLog(
-        "Réponse au support",
-        `Réponse envoyée à ${selectedTicket.userEmail} pour le sujet : "${selectedTicket.subject}"`,
-        "success"
-      );
-      setSelectedTicket(null);
-      setReplyText('');
-    } catch (err) {
-      console.error("Error updating support ticket:", err);
-    } finally {
-      setIsReplying(false);
-    }
-  };
-
-  return (
-    <div className="space-y-6">
-      <Card className="border-none shadow-sm rounded-3xl overflow-hidden bg-white">
-        <CardHeader className="p-8 border-b border-slate-50">
-          <CardTitle className="text-xl font-black">Tickets & Support Technique</CardTitle>
-          <CardDescription>Consultez et répondez en temps réel aux messages d'assistance des candidats et recruteurs d'Afrique.</CardDescription>
-        </CardHeader>
-        
-        <div className="p-8 space-y-4">
-          {loading ? (
-            <div className="text-center py-10 font-bold text-slate-400">Chargement de la file d'assistance...</div>
-          ) : tickets.length === 0 ? (
-            <div className="text-center py-12 border-2 border-dashed border-slate-100 rounded-3xl">
-              <MessageSquare className="h-10 w-10 text-slate-300 mx-auto mb-3" />
-              <p className="font-bold text-slate-500">Aucun ticket d'assistance pour le moment</p>
-              <p className="text-slate-400 text-xs mt-1">Les messages de détresse de vos utilisateurs apparaîtront ici.</p>
-            </div>
-          ) : (
-            tickets.map(t => (
-              <div key={t.id} className="flex flex-col md:flex-row items-start md:items-center justify-between p-6 border border-slate-100 rounded-[28px] bg-white hover:border-orange-500 hover:shadow-lg transition-all gap-4 group animate-in fade-in duration-300">
-                <div className="flex items-start gap-4 flex-1">
-                  <div className={`p-4 rounded-2xl shrink-0 ${t.status === 'open' ? 'bg-orange-50 text-orange-600' : 'bg-slate-50 text-slate-400'}`}>
-                    <MessageSquare className="h-6 w-6" />
-                  </div>
-                  <div className="space-y-1 my-1 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h5 className="font-black text-slate-900 text-lg group-hover:text-orange-600 transition-colors leading-tight">{t.subject}</h5>
-                      <Badge variant="outline" className={`text-[9px] font-black uppercase rounded-full ${t.userRole === 'recruiter' ? 'border-indigo-200 text-indigo-700 bg-indigo-50' : 'border-emerald-200 text-emerald-700 bg-emerald-50'}`}>
-                        {t.userRole === 'recruiter' ? 'Recruteur' : 'Candidat'}
-                      </Badge>
-                    </div>
-                    
-                    <p className="text-sm text-slate-600 font-medium leading-relaxed bg-slate-50/50 p-3 rounded-xl border border-slate-50 mt-1 max-w-2xl whitespace-pre-wrap">
-                      "{t.message}"
-                    </p>
-
-                    {t.response && (
-                      <div className="p-3 bg-emerald-50/40 border border-emerald-100 rounded-xl max-w-2xl mt-2 space-y-1">
-                        <p className="text-[10px] font-black uppercase text-emerald-700 tracking-wide flex items-center gap-1">
-                          <Check className="h-3 w-3" /> Votre Réponse :
-                        </p>
-                        <p className="text-xs text-slate-705 font-bold whitespace-pre-wrap">"{t.response}"</p>
-                        {t.repliedAt && (
-                          <p className="text-[9px] font-bold text-slate-400">
-                            Répondu le {new Date(t.repliedAt.seconds ? t.repliedAt.seconds * 1000 : t.repliedAt).toLocaleString('fr-FR')}
-                          </p>
-                        )}
-                      </div>
-                    )}
-                    
-                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest pt-1">
-                      Émis par <span className="text-slate-900 font-extrabold">{t.userName} ({t.userEmail})</span> • ID: #{t.id.slice(0, 8)} • {t.createdAt ? new Date(t.createdAt.seconds ? t.createdAt.seconds * 1000 : t.createdAt).toLocaleString('fr-FR') : 'Date inconnue'}
-                    </p>
-                  </div>
-                </div>
-                
-                <div className="flex items-center gap-3 shrink-0 self-stretch md:self-auto justify-end">
-                  <Badge className={`px-4 h-7 rounded-full font-black text-[10px] uppercase ${t.status === 'open' ? 'bg-orange-100 text-orange-600' : 'bg-slate-100 text-slate-400'}`}>
-                    {t.status === 'open' ? 'En attente' : 'Traité'}
-                  </Badge>
-                  <Button 
-                    className={`rounded-xl font-black text-[10px] px-5 h-10 uppercase tracking-widest ${t.status === 'open' ? 'bg-slate-900 hover:bg-slate-800 text-white' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}`} 
-                    onClick={() => {
-                      setSelectedTicket(t);
-                      setReplyText(t.response || '');
-                    }}
-                  >
-                    {t.status === 'open' ? 'Répondre' : 'Modifier Réponse'}
-                  </Button>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      </Card>
-
-      {/* Reply Dialog */}
-      <Dialog open={selectedTicket !== null} onOpenChange={(open) => { if (!open) setSelectedTicket(null); }}>
-        <DialogContent className="max-w-lg rounded-[32px] p-8 border-none shadow-2xl bg-white">
-          <DialogHeader>
-            <DialogTitle className="text-xl font-black text-slate-950">
-              {selectedTicket?.status === 'open' ? "Répondre au ticket d'assistance" : "Modifier la réponse"}
-            </DialogTitle>
-            <DialogDescription className="text-slate-500 font-bold text-sm">
-              La réponse sera immédiatement disponible pour l'utilisateur sur son espace d'assistance.
-            </DialogDescription>
-          </DialogHeader>
-
-          {selectedTicket && (
-            <form onSubmit={handleSendReply} className="space-y-4 pt-4">
-              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Message de {selectedTicket.userName} :</span>
-                  <Badge className="bg-slate-200 text-slate-700 border-none text-[8px] font-black">{selectedTicket.userRole === 'recruiter' ? 'Recruteur' : 'Candidat'}</Badge>
-                </div>
-                <p className="text-xs font-bold text-slate-700 whitespace-pre-wrap leading-relaxed">"{selectedTicket.message}"</p>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="replyContent" className="font-black text-slate-700 uppercase text-xs tracking-wider">Votre Message de Réponse</Label>
-                <Textarea
-                  id="replyContent"
-                  placeholder="Rédigez votre réponse ici..."
-                  className="min-h-[140px] rounded-2xl border-slate-200 font-bold text-sm focus-visible:ring-emerald-600"
-                  value={replyText}
-                  onChange={(e) => setReplyText(e.target.value)}
-                  required
-                />
-              </div>
-
-              <DialogFooter className="pt-2 flex gap-3">
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  className="rounded-xl font-bold text-xs h-12 uppercase" 
-                  onClick={() => setSelectedTicket(null)}
-                >
-                  Annuler
-                </Button>
-                <Button 
-                  type="submit" 
-                  className="rounded-xl font-black text-xs px-6 h-12 uppercase tracking-widest bg-emerald-600 hover:bg-emerald-700 text-white border-none"
-                  disabled={isReplying}
-                >
-                  {isReplying ? "Traitement..." : "Envoyer & Clôturer"}
-                </Button>
-              </DialogFooter>
-            </form>
-          )}
-        </DialogContent>
-      </Dialog>
-    </div>
-  );
-}
-
-function SettingsModule() {
-  return (
-    <div className="max-w-2xl space-y-6">
-        <Card className="border-none shadow-sm rounded-[32px] overflow-hidden bg-white p-8">
-            <h3 className="font-black text-slate-900 mb-6 text-lg">Disponibilité du Service</h3>
-            <div className="space-y-8">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <p className="text-sm font-black text-slate-900 uppercase tracking-tight">Active le Mode Maintenance</p>
-                        <p className="text-[11px] font-bold text-slate-400 mt-0.5">Le site affichera une page d'attente pour tous les publics.</p>
-                    </div>
-                    <Switch />
-                </div>
-                <div className="flex items-center justify-between">
-                    <div>
-                        <p className="text-sm font-black text-slate-900 uppercase tracking-tight">Inscriptions Publiques</p>
-                        <p className="text-[11px] font-bold text-slate-400 mt-0.5">Autoriser la création de nouveaux comptes Candidat/Recruteur.</p>
-                    </div>
-                    <Switch defaultChecked={true} />
-                </div>
-            </div>
-        </Card>
-
-        <Card className="border-none shadow-sm rounded-[32px] overflow-hidden bg-white p-8">
-            <h3 className="font-black text-slate-900 mb-6 text-lg">Audit & Sécurité</h3>
-            <div className="space-y-4">
-                <div className="p-6 bg-slate-50 rounded-[24px] border border-slate-100 flex items-center justify-between hover:bg-white transition-colors">
-                    <div className="flex items-center gap-4">
-                        <div className="h-10 w-10 bg-white rounded-xl flex items-center justify-center shadow-sm">
-                            <ShieldCheck className="h-5 w-5 text-emerald-500" />
-                        </div>
-                        <div>
-                            <span className="text-sm font-black text-slate-900 uppercase">Signature Numérique Admin</span>
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Activé • Sécurisé par Gemini Guard</p>
-                        </div>
-                    </div>
-                    <Button variant="outline" size="sm" className="rounded-lg font-black text-[10px] uppercase px-4">Paramètres</Button>
-                </div>
-            </div>
-        </Card>
-    </div>
-  );
-}
-
-function GoalsModule({ 
-  users, 
-  jobs, 
-  applications, 
-  goals, 
-  onSave 
-}: { 
-  users: any[], 
-  jobs: any[], 
-  applications: any[], 
-  goals: any, 
-  onSave: (newGoals: any) => Promise<void> 
-}) {
-  const [subTarget, setSubTarget] = useState(goals?.subscribersTarget || 100);
-  const [appTarget, setAppTarget] = useState(goals?.applicationsTarget || 50);
-  const [viewTarget, setViewTarget] = useState(goals?.viewsTarget || 500);
-  const [isSaving, setIsSaving] = useState(false);
-  const [saveSuccess, setSaveSuccess] = useState(false);
-
-  useEffect(() => {
-    if (goals) {
-      setSubTarget(goals.subscribersTarget);
-      setAppTarget(goals.applicationsTarget);
-      setViewTarget(goals.viewsTarget);
-    }
-  }, [goals]);
-
-  const currentSubscribers = users.length;
-  const currentApplications = applications.length;
-  const currentViews = jobs.reduce((acc, curr) => acc + (curr.views || 0), 0);
-
-  const subPct = Math.min(100, Math.round((currentSubscribers / subTarget) * 100)) || 0;
-  const appPct = Math.min(100, Math.round((currentApplications / appTarget) * 100)) || 0;
-  const viewPct = Math.min(100, Math.round((currentViews / viewTarget) * 100)) || 0;
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSaving(true);
-    setSaveSuccess(false);
-    try {
-      await onSave({
-        subscribersTarget: Number(subTarget),
-        applicationsTarget: Number(appTarget),
-        viewsTarget: Number(viewTarget)
-      });
-      setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 4000);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  return (
-    <div className="space-y-6">
-      <div className="bg-slate-900 rounded-[32px] p-8 text-white relative overflow-hidden shadow-xl">
-        <div className="relative z-10 max-w-xl">
-          <Badge className="bg-orange-500 hover:bg-orange-600 text-white border-none font-black text-[10px] uppercase px-3 py-1 rounded-full mb-4">MODULATEUR D'OBJECTIFS</Badge>
-          <h2 className="text-3xl font-black tracking-tight mb-2 font-sans">Configurez vos indicateurs de performance</h2>
-          <p className="text-slate-300 font-medium text-sm leading-relaxed">
-            Suivez en temps réel le taux de croissance et d'activité de la plateforme en Afrique. Définissez des objectifs mensuels précis à plusieurs niveaux afin d'évaluer concrètement l'impact et la visibilité de vos offres d'emploi.
-          </p>
-        </div>
-        <div className="absolute right-0 bottom-0 opacity-10 transform translate-x-10 translate-y-10">
-          <Target className="h-64 w-64 text-white" />
-        </div>
-      </div>
-
-      {saveSuccess && (
-        <motion.div 
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="p-5 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-3xl font-bold text-sm flex items-center justify-between"
-        >
-          <span>✨ Les objectifs de performance ont été enregistrés avec succès et sont synchronisés !</span>
-          <button onClick={() => setSaveSuccess(false)} className="text-emerald-500 hover:text-emerald-700 ml-4">Fermer</button>
-        </motion.div>
-      )}
-
-      <div className="grid md:grid-cols-3 gap-6">
-        {/* Subscriber/Subscriber Target Card */}
-        <Card className="border-none shadow-sm rounded-3xl p-6 bg-white space-y-4">
-          <div className="flex justify-between items-start">
-            <div className="p-3 bg-orange-50 text-orange-600 rounded-2xl">
-              <Users className="h-6 w-6" />
-            </div>
-            <Badge variant="outline" className="text-[10px] font-black uppercase text-orange-600 border-orange-100 bg-orange-50 px-2 py-0.5">{subPct}% atteint</Badge>
-          </div>
-          <div>
-            <h4 className="font-extrabold text-slate-805 text-xs uppercase tracking-wider">Abonnés & Inscriptions</h4>
-            <div className="flex items-baseline gap-2 mt-2">
-              <span className="text-3xl font-black text-slate-900">{currentSubscribers}</span>
-              <span className="text-slate-400 font-bold text-xs">/ {subTarget} inscrits</span>
-            </div>
-          </div>
-          <div className="h-2 w-full bg-slate-50 rounded-full overflow-hidden">
-            <motion.div initial={{ width: 0 }} animate={{ width: `${subPct}%` }} className="h-full bg-orange-500 rounded-full" />
-          </div>
-        </Card>
-
-        {/* Application Target Card */}
-        <Card className="border-none shadow-sm rounded-3xl p-6 bg-white space-y-4">
-          <div className="flex justify-between items-start">
-            <div className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl">
-              <FileText className="h-6 w-6" />
-            </div>
-            <Badge variant="outline" className="text-[10px] font-black uppercase text-indigo-600 border-indigo-100 bg-indigo-50 px-2 py-0.5">{appPct}% atteint</Badge>
-          </div>
-          <div>
-            <h4 className="font-extrabold text-slate-805 text-xs uppercase tracking-wider">Candidatures Envoyées</h4>
-            <div className="flex items-baseline gap-2 mt-2">
-              <span className="text-3xl font-black text-slate-900">{currentApplications}</span>
-              <span className="text-slate-400 font-bold text-xs">/ {appTarget} soumissions</span>
-            </div>
-          </div>
-          <div className="h-2 w-full bg-slate-50 rounded-full overflow-hidden">
-            <motion.div initial={{ width: 0 }} animate={{ width: `${appPct}%` }} className="h-full bg-indigo-600 rounded-full" />
-          </div>
-        </Card>
-
-        {/* Views Target Card */}
-        <Card className="border-none shadow-sm rounded-3xl p-6 bg-white space-y-4">
-          <div className="flex justify-between items-start">
-            <div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl">
-              <Eye className="h-6 w-6" />
-            </div>
-            <Badge variant="outline" className="text-[10px] font-black uppercase text-emerald-600 border-emerald-100 bg-emerald-50 px-2 py-0.5">{viewPct}% atteint</Badge>
-          </div>
-          <div>
-            <h4 className="font-extrabold text-slate-805 text-xs uppercase tracking-wider">Vues de la plateforme</h4>
-            <div className="flex items-baseline gap-2 mt-2">
-              <span className="text-3xl font-black text-slate-900">{currentViews}</span>
-              <span className="text-slate-400 font-bold text-xs">/ {viewTarget} consultations</span>
-            </div>
-          </div>
-          <div className="h-2 w-full bg-slate-50 rounded-full overflow-hidden">
-            <motion.div initial={{ width: 0 }} animate={{ width: `${viewPct}%` }} className="h-full bg-emerald-600 rounded-full" />
-          </div>
-        </Card>
-      </div>
-
-      <div className="grid md:grid-cols-3 gap-6">
-        <Card className="md:col-span-2 border-none shadow-sm rounded-[32px] bg-white p-8">
-          <h3 className="font-black text-slate-950 text-base mb-6 flex items-center gap-2 uppercase tracking-wide">
-            <Settings className="h-5 w-5 text-orange-600" />
-            Ajuster vos Objectifs Mensuels
-          </h3>
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="grid sm:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <Label htmlFor="subTargetInput" className="font-black text-slate-700 uppercase text-xs tracking-wider">Objectif Mensuel d'Abonnés</Label>
-                <div className="relative">
-                  <Input 
-                    id="subTargetInput"
-                    type="number"
-                    min="1"
-                    className="h-12 pl-4 pr-16 rounded-xl border-slate-200 font-bold focus-visible:ring-orange-600 text-sm"
-                    value={subTarget}
-                    onChange={(e) => setSubTarget(Number(e.target.value))}
-                    required
-                  />
-                  <span className="absolute right-4 top-1/2 transform -translate-y-1/2 text-[10px] font-black uppercase text-slate-400 pointer-events-none">inscrits</span>
-                </div>
-                <p className="text-[10px] text-slate-400 font-bold leading-normal">Inscriptions cumulées (Candidats et Recruteurs).</p>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="appTargetInput" className="font-black text-slate-700 uppercase text-xs tracking-wider">Objectif Mensuel de Candidatures</Label>
-                <div className="relative">
-                  <Input 
-                    id="appTargetInput"
-                    type="number"
-                    min="1"
-                    className="h-12 pl-4 pr-16 rounded-xl border-slate-200 font-bold focus-visible:ring-orange-600 text-sm"
-                    value={appTarget}
-                    onChange={(e) => setAppTarget(Number(e.target.value))}
-                    required
-                  />
-                  <span className="absolute right-4 top-1/2 transform -translate-y-1/2 text-[10px] font-black uppercase text-slate-400 pointer-events-none">dossiers</span>
-                </div>
-                <p className="text-[10px] text-slate-400 font-bold leading-normal">Nombre total de Cv/Candidatures envoyés par les candidats.</p>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="viewTargetInput" className="font-black text-slate-700 uppercase text-xs tracking-wider">Objectif Mensuel de consultations / vues</Label>
-                <div className="relative">
-                  <Input 
-                    id="viewTargetInput"
-                    type="number"
-                    min="1"
-                    className="h-12 pl-4 pr-16 rounded-xl border-slate-200 font-bold focus-visible:ring-orange-600 text-sm"
-                    value={viewTarget}
-                    onChange={(e) => setViewTarget(Number(e.target.value))}
-                    required
-                  />
-                  <span className="absolute right-4 top-1/2 transform -translate-y-1/2 text-[10px] font-black uppercase text-slate-400 pointer-events-none">clics</span>
-                </div>
-                <p className="text-[10px] text-slate-400 font-bold leading-normal">Vues générées sur l'ensemble de vos offres d'emploi publiques d'Afrique.</p>
-              </div>
-            </div>
-
-            <hr className="border-slate-100 my-4" />
-
-            <div className="flex justify-end">
-              <Button 
-                type="submit" 
-                className="rounded-xl h-12 px-8 bg-orange-600 hover:bg-orange-700 text-white font-black uppercase text-xs tracking-wider"
-                disabled={isSaving}
-              >
-                {isSaving ? "Enregistrement..." : "Enregistrer les Objectifs"}
-              </Button>
-            </div>
-          </form>
-        </Card>
-
-        <Card className="border-none shadow-sm rounded-[32px] bg-[#FCFDFF] border border-slate-100 p-8 space-y-6">
-          <h4 className="font-black text-slate-900 text-base uppercase tracking-wider flex items-center gap-2 font-sans">
-            <HelpCircle className="h-5 w-5 text-orange-600" />
-            Explications
-          </h4>
-          <div className="space-y-4 text-xs font-bold text-slate-500 leading-relaxed">
-            <div>
-              <p className="text-slate-900 font-black uppercase mb-1 flex items-center gap-1">
-                <span className="w-1.5 h-1.5 bg-orange-500 rounded-full" />
-                Abonnés (Inscriptions)
-              </p>
-              <p>Comptabilise la croissance brute de l'audience de la plateforme : à la fois les chercheurs d'emploi et les entreprises recruteuses.</p>
-            </div>
-            <div>
-              <p className="text-slate-900 font-black uppercase mb-1 flex items-center gap-1">
-                <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full" />
-                Candidatures Soumises
-              </p>
-              <p>Reflète le niveau de conversion et d'intérêt : l'interaction concrète de postulation aux opportunités.</p>
-            </div>
-            <div>
-              <p className="text-slate-900 font-black uppercase mb-1 flex items-center gap-1">
-                <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
-                Consultations (Vues)
-              </p>
-              <p>Mesure l'activité d'exposition : la portée totale du trafic et l'attention captée par toutes les annonces.</p>
-            </div>
-          </div>
-        </Card>
-      </div>
-    </div>
-  );
-}
-
-function LogsModule({ logs }: { logs: any[] }) {
-    return (
-        <Card className="border-none shadow-sm rounded-[32px] overflow-hidden bg-white">
-            <div className="p-10 border-b border-slate-50 bg-[#FCFDFF]">
-                <h3 className="text-xl font-black text-slate-900">Journal d'Audit Système</h3>
-                <p className="text-xs font-bold text-slate-400 mt-2 uppercase tracking-widest">Tracking complet des actions administratives majeures</p>
-            </div>
-            <div className="divide-y divide-slate-50">
-                {logs.map(log => (
-                    <div key={log.id} className="p-8 flex items-center justify-between hover:bg-slate-50/40 transition-all group">
-                        <div className="flex items-center gap-5">
-                            <div className="h-12 w-12 bg-white border border-slate-100 rounded-2xl flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform">
-                                <Clock className="h-5 w-5 text-slate-400" />
-                            </div>
-                            <div>
-                                <p className="text-base font-bold text-slate-800 tracking-tight leading-none mb-1.5">
-                                    <span className="text-orange-600 font-black">{log.user}</span> <span className="font-medium text-slate-400 lowercase">a exécuté</span> {log.action.toLowerCase()} <span className="font-black text-slate-900 italic">"{log.target}"</span>
-                                </p>
-                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{log.time} • IP: 192.168.1.XX</p>
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-4">
-                             <Badge variant="ghost" className="text-[10px] uppercase font-black bg-slate-50 text-slate-500 px-3 h-6 border-slate-100">LOG-ID-0{log.id*1024}</Badge>
-                             <div className={`h-2 w-2 rounded-full ${log.type === 'danger' ? 'bg-red-500' : log.type === 'success' ? 'bg-emerald-500' : 'bg-blue-500'}`} />
-                        </div>
-                    </div>
-                ))}
-            </div>
-        </Card>
-    );
-}
-
-function Switch({ defaultChecked = false }: { defaultChecked?: boolean }) {
-    const [checked, setChecked] = useState(defaultChecked);
-    return (
-        <button 
-            onClick={() => setChecked(!checked)}
-            className={`w-14 h-7 rounded-full transition-all duration-300 relative cursor-pointer outline-none focus:ring-4 focus:ring-orange-100 ${checked ? 'bg-orange-600' : 'bg-slate-200'}`}
-        >
-            <div className={`absolute top-1 left-1 h-5 w-5 rounded-full bg-white shadow-md transition-all duration-300 ${checked ? 'translate-x-7' : 'translate-x-0'}`} />
-        </button>
-    );
-}
-
-function Select({ defaultValue, value, onChange, children }: any) {
-    return (
-        <select 
-            defaultValue={defaultValue} 
-            value={value} 
-            onChange={onChange} 
-            className="bg-slate-50 border border-slate-100 rounded-xl px-5 py-2.5 text-[10px] font-black uppercase text-slate-600 outline-none focus:border-orange-600 cursor-pointer transition-colors shadow-sm"
-        >
-            {children}
-        </select>
-    );
 }

@@ -18,6 +18,7 @@ import PendingApproval from './pages/PendingApproval';
 import ForgotPassword from './pages/ForgotPassword';
 import RecruiterOnboarding from './pages/RecruiterOnboarding';
 import CompanyProfile from './pages/CompanyProfile';
+import CompaniesRegistry from './pages/CompaniesRegistry';
 import Suspended from './pages/Suspended';
 import NotFound from './pages/NotFound';
 import Maintenance from './pages/Maintenance';
@@ -105,7 +106,7 @@ function AppLayout() {
           {/* Mapping user requested canonical SaaS routing aliases */}
           <Route path="/services" element={<Home />} />
           <Route path="/opportunites" element={<Jobs />} />
-          <Route path="/entreprises" element={<Home />} />
+          <Route path="/entreprises" element={<CompaniesRegistry />} />
           <Route path="/contact" element={<Home />} />
           <Route path="/about" element={<About />} />
 

@@ -119,122 +119,24 @@ export default function Navbar() {
                 </div>
               ) : (
                 <div className="flex items-center space-x-4">
-                  {/* Connexion Dropdown */}
-                  <div 
-                    className="relative"
-                    onMouseEnter={() => setActiveDropdown('login')}
-                    onMouseLeave={() => setActiveDropdown(null)}
-                  >
+                  {/* Connexion Button */}
+                  <Link to="/login">
                     <Button 
-                      onClick={() => setActiveDropdown(activeDropdown === 'login' ? null : 'login')}
                       variant="ghost" 
                       className="px-5 py-2.5 text-sm font-extrabold text-slate-700 bg-slate-100 hover:bg-slate-200/80 rounded-2xl h-11 border-none shadow-none flex items-center gap-1.5 transition-all duration-300 hover:scale-[1.02]"
                     >
                       Connexion
-                      <ChevronDown className={`h-4 w-4 transition-transform duration-300 ${activeDropdown === 'login' ? 'rotate-180' : ''}`} />
                     </Button>
+                  </Link>
 
-                    <AnimatePresence>
-                      {activeDropdown === 'login' && (
-                        <div className="absolute right-0 pt-2 z-50">
-                          <motion.div
-                            initial={{ opacity: 0, y: 15, scale: 0.95 }}
-                            animate={{ opacity: 1, y: 0, scale: 1 }}
-                            exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                            transition={{ duration: 0.15, ease: 'easeOut' }}
-                            className="w-68 bg-white border border-slate-100/80 rounded-3xl p-3 shadow-xl backdrop-blur-xl transform origin-top-right"
-                          >
-                            <div className="flex flex-col gap-1">
-                              <Link 
-                                to="/auth/login/member"
-                                onClick={() => setActiveDropdown(null)}
-                                className="flex items-center gap-3 p-3 rounded-2xl hover:bg-slate-50 transition-colors group/item"
-                              >
-                                <div className="w-10 h-10 rounded-xl bg-orange-50 flex items-center justify-center text-orange-600 group-hover/item:bg-orange-100 transition-colors">
-                                  <Briefcase className="h-5 w-5" />
-                                </div>
-                                <div className="text-left">
-                                  <p className="text-xs font-black text-slate-800 uppercase tracking-wider">Connexion Adhérent</p>
-                                  <p className="text-[10px] text-slate-400">Accéder à mon espace candidat</p>
-                                </div>
-                              </Link>
-                              <Link 
-                                to="/auth/login/company"
-                                onClick={() => setActiveDropdown(null)}
-                                className="flex items-center gap-3 p-3 rounded-2xl hover:bg-slate-50 transition-colors group/item"
-                              >
-                                <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-slate-600 group-hover/item:bg-slate-200 transition-colors">
-                                  <Building className="h-5 w-5" />
-                                </div>
-                                <div className="text-left">
-                                  <p className="text-xs font-black text-slate-800 uppercase tracking-wider">Connexion Entreprise</p>
-                                  <p className="text-[10px] text-slate-400">Gérer mes offres et candidats</p>
-                                </div>
-                              </Link>
-                            </div>
-                          </motion.div>
-                        </div>
-                      )}
-                    </AnimatePresence>
-                  </div>
-
-                  {/* Inscription Dropdown */}
-                  <div 
-                    className="relative"
-                    onMouseEnter={() => setActiveDropdown('signup')}
-                    onMouseLeave={() => setActiveDropdown(null)}
-                  >
+                  {/* Inscription Button */}
+                  <Link to="/signup">
                     <Button 
-                      onClick={() => setActiveDropdown(activeDropdown === 'signup' ? null : 'signup')}
                       className="px-5 py-2.5 text-sm font-extrabold text-white bg-orange-600 rounded-2xl hover:bg-orange-700 shadow-lg shadow-orange-600/20 hover:shadow-orange-600/30 h-11 border-none flex items-center gap-1.5 transition-all duration-300 hover:scale-[1.02]"
                     >
                       Inscription
-                      <ChevronDown className={`h-4 w-4 transition-transform duration-300 ${activeDropdown === 'signup' ? 'rotate-180' : ''}`} />
                     </Button>
-
-                    <AnimatePresence>
-                      {activeDropdown === 'signup' && (
-                        <div className="absolute right-0 pt-2 z-50">
-                          <motion.div
-                            initial={{ opacity: 0, y: 15, scale: 0.95 }}
-                            animate={{ opacity: 1, y: 0, scale: 1 }}
-                            exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                            transition={{ duration: 0.15, ease: 'easeOut' }}
-                            className="w-68 bg-white border border-slate-100/80 rounded-3xl p-3 shadow-xl backdrop-blur-xl transform origin-top-right"
-                          >
-                            <div className="flex flex-col gap-1">
-                              <Link 
-                                to="/auth/register/member"
-                                onClick={() => setActiveDropdown(null)}
-                                className="flex items-center gap-3 p-3 rounded-2xl hover:bg-slate-50 transition-colors group/item"
-                              >
-                                <div className="w-10 h-10 rounded-xl bg-orange-50 flex items-center justify-center text-orange-600 group-hover/item:bg-orange-100 transition-colors">
-                                  <Sparkles className="h-5 w-5" />
-                                </div>
-                                <div className="text-left">
-                                  <p className="text-xs font-black text-slate-800 uppercase tracking-wider">Créer un profil Adhérent</p>
-                                  <p className="text-[10px] text-slate-400">Pour trouver un emploi rapidement</p>
-                                </div>
-                              </Link>
-                              <Link 
-                                to="/auth/register/company"
-                                onClick={() => setActiveDropdown(null)}
-                                className="flex items-center gap-3 p-3 rounded-2xl hover:bg-slate-50 transition-colors group/item"
-                              >
-                                <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-slate-600 group-hover/item:bg-slate-200 transition-colors">
-                                  <Building className="h-5 w-5" />
-                                </div>
-                                <div className="text-left">
-                                  <p className="text-xs font-black text-slate-800 uppercase tracking-wider">Espace Entreprise</p>
-                                  <p className="text-[10px] text-slate-400">Pour publier et recruter</p>
-                                </div>
-                              </Link>
-                            </div>
-                          </motion.div>
-                        </div>
-                      )}
-                    </AnimatePresence>
-                  </div>
+                  </Link>
                 </div>
               )}
             </div>
