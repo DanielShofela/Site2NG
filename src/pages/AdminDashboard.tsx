@@ -2401,7 +2401,7 @@ function CMSModule({ currentData, onSave }: any) {
         }
     };
 
-    const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, field: 'logoUrl' | 'iconUrl') => {
+    const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, field: 'logoUrl' | 'iconUrl' | 'founderPhotoUrl') => {
         const file = e.target.files?.[0];
         if (file) {
             const reader = new FileReader();
@@ -2451,6 +2451,93 @@ function CMSModule({ currentData, onSave }: any) {
                                     className="w-full p-4 rounded-xl border border-slate-100 bg-slate-50 text-sm font-bold text-slate-600 outline-none focus:border-orange-500"
                                     value={localData.heroSubtitle}
                                     onChange={(e) => setLocalData({...localData, heroSubtitle: e.target.value})}
+                                />
+                            </div>
+                         </div>
+
+                         <div className="space-y-4 pt-6 border-t border-slate-50">
+                            <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Le Fondateur & La Vision</h4>
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-black text-slate-900 ml-1 uppercase">Nom du Fondateur</label>
+                                <Input 
+                                    value={localData.founderName || ""} 
+                                    onChange={(e) => setLocalData({...localData, founderName: e.target.value})}
+                                    placeholder="Ex: Jean Dupont"
+                                    className="h-12 rounded-xl border-slate-100 bg-slate-50 font-black text-base"
+                                />
+                            </div>
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-black text-slate-900 ml-1 uppercase">Titre / Rôle du Fondateur</label>
+                                <Input 
+                                    value={localData.founderTitle || ""} 
+                                    onChange={(e) => setLocalData({...localData, founderTitle: e.target.value})}
+                                    placeholder="Ex: Fondateur & CEO"
+                                    className="h-12 rounded-xl border-slate-100 bg-slate-50 font-black text-base"
+                                />
+                            </div>
+                            <div className="space-y-3">
+                                <label className="text-[10px] font-black text-slate-900 ml-1 uppercase">Photo du Fondateur (Upload ou Fichier)</label>
+                                <div 
+                                    onClick={() => document.getElementById('founder-image-upload-input')?.click()}
+                                    className="relative group aspect-square max-w-[180px] h-[180px] bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center overflow-hidden hover:border-orange-500 hover:bg-slate-50/50 transition-all cursor-pointer p-3"
+                                >
+                                    {localData.founderPhotoUrl ? (
+                                        <img src={localData.founderPhotoUrl} className="max-h-full max-w-full object-cover rounded-xl" alt="Founder preview" />
+                                    ) : (
+                                        <div className="text-center space-y-2 p-3">
+                                            <ImageIcon className="h-8 w-8 text-slate-300 mx-auto" />
+                                            <p className="text-[10px] font-black uppercase text-slate-400">Sélectionner une photo</p>
+                                        </div>
+                                    )}
+                                    <input 
+                                        id="founder-image-upload-input"
+                                        type="file" 
+                                        accept="image/*" 
+                                        className="hidden" 
+                                        onChange={(e) => handleImageUpload(e, 'founderPhotoUrl')}
+                                    />
+                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                                        <span className="text-[10px] font-black text-white uppercase bg-orange-600 px-3 py-1.5 rounded-lg shadow-xl">Changer la photo</span>
+                                    </div>
+                                </div>
+                                <div className="flex gap-2">
+                                    <Button 
+                                        type="button"
+                                        variant="outline"
+                                        className="h-10 rounded-xl font-bold text-xs px-4"
+                                        onClick={() => document.getElementById('founder-image-upload-input')?.click()}
+                                    >
+                                        Sélectionner un fichier
+                                    </Button>
+                                    {localData.founderPhotoUrl && (
+                                        <Button 
+                                            type="button"
+                                            variant="ghost"
+                                            className="h-10 rounded-xl font-bold text-xs text-red-500 hover:text-red-600 hover:bg-red-50"
+                                            onClick={() => setLocalData({ ...localData, founderPhotoUrl: "" })}
+                                        >
+                                            Effacer
+                                        </Button>
+                                    )}
+                                </div>
+                            </div>
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-black text-slate-900 ml-1 uppercase">Ou URL directe de la photo</label>
+                                <Input 
+                                    value={localData.founderPhotoUrl || ""} 
+                                    onChange={(e) => setLocalData({...localData, founderPhotoUrl: e.target.value})}
+                                    placeholder="Ex: https://2ngentreprises.com/images/fondateur.jpg"
+                                    className="h-12 rounded-xl border-slate-100 bg-slate-50 font-black text-sm"
+                                />
+                            </div>
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-black text-slate-900 ml-1 uppercase">Petite description de la Vision</label>
+                                <textarea 
+                                    rows={4}
+                                    placeholder="Décrivez votre vision pour la plateforme..."
+                                    className="w-full p-4 rounded-xl border border-slate-100 bg-slate-50 text-sm font-bold text-slate-600 outline-none focus:border-orange-500"
+                                    value={localData.founderVision || ""}
+                                    onChange={(e) => setLocalData({...localData, founderVision: e.target.value})}
                                 />
                             </div>
                          </div>

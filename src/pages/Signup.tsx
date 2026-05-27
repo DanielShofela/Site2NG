@@ -17,6 +17,7 @@ import { Briefcase, Building2, User, Mail, Lock, Phone, MapPin, Upload, ArrowRig
 import { motion } from 'motion/react';
 import { UserRole, UserProfile } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
+import { getFirebaseFriendlyError } from '@/lib/utils';
 
 export default function Signup() {
   const [searchParams] = useSearchParams();
@@ -125,7 +126,7 @@ export default function Signup() {
       await signupWithEmail(formData.email, formData.password, userData);
     } catch (error: any) {
       console.error(error);
-      setError(error.message || "Une erreur est survenue lors de l'inscription");
+      setError(getFirebaseFriendlyError(error));
     } finally {
       setIsLoading(false);
     }
@@ -137,14 +138,14 @@ export default function Signup() {
       await loginWithGoogle(role);
     } catch (error: any) {
       console.error(error);
-      setError(error.message || "Erreur lors de l'authentification Google");
+      setError(getFirebaseFriendlyError(error));
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="container relative min-h-[calc(100vh-64px)] flex items-center justify-center py-12 px-4 text-slate-900">
+    <div className="container relative min-h-[calc(100vh-88px)] flex items-center justify-center py-12 px-4 text-slate-900 mx-auto">
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
@@ -156,8 +157,18 @@ export default function Signup() {
         </div>
 
         {error && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-100 text-red-600 rounded-2xl text-sm font-bold animate-in fade-in slide-in-from-top-2">
-            {error}
+          <div className="mb-6 p-4 bg-red-50 border border-red-100 text-red-600 rounded-2xl text-sm font-bold animate-in fade-in slide-in-from-top-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <span className="flex-1">{error}</span>
+            {(error.includes("déjà") || error.includes("enregistrée") || error.includes("associée")) && (
+              <Button 
+                type="button" 
+                variant="outline" 
+                className="bg-white border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 font-black text-xs h-10 rounded-xl px-4 whitespace-nowrap self-start sm:self-auto shadow-sm"
+                onClick={() => navigate('/login')}
+              >
+                Se connecter
+              </Button>
+            )}
           </div>
         )}
 

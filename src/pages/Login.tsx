@@ -13,6 +13,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Briefcase, Lock, Mail, ArrowRight, Eye, EyeOff } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useAuth } from '@/contexts/AuthContext';
+import { getFirebaseFriendlyError } from '@/lib/utils';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -48,7 +49,7 @@ export default function Login() {
       await loginWithGoogle();
     } catch (error: any) {
       console.error(error);
-      setError(error.message || "Erreur lors de la connexion Google");
+      setError(getFirebaseFriendlyError(error));
     } finally {
       setIsLoading(false);
     }
@@ -62,14 +63,14 @@ export default function Login() {
       await loginWithEmail(email, password);
     } catch (error: any) {
       console.error(error);
-      setError("Email ou mot de passe incorrect");
+      setError(getFirebaseFriendlyError(error));
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="container relative min-h-[calc(100vh-64px)] flex items-center justify-center py-12 text-slate-900">
+    <div className="container relative min-h-[calc(100vh-88px)] flex items-center justify-center py-12 text-slate-900 mx-auto">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}

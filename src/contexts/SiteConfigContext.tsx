@@ -9,6 +9,10 @@ interface SiteConfig {
   heroTitle: string;
   heroSubtitle: string;
   primaryColor: string;
+  founderPhotoUrl?: string;
+  founderName?: string;
+  founderTitle?: string;
+  founderVision?: string;
 }
 
 const defaultContent: SiteConfig = {
@@ -17,7 +21,11 @@ const defaultContent: SiteConfig = {
   iconUrl: "",
   heroTitle: "Trouvez le talent qui propulsera votre entreprise",
   heroSubtitle: "La plateforme de recrutement nouvelle génération pour l'Afrique.",
-  primaryColor: "#ea580c"
+  primaryColor: "#ea580c",
+  founderPhotoUrl: "",
+  founderName: "",
+  founderTitle: "",
+  founderVision: ""
 };
 
 const SiteConfigContext = createContext<{

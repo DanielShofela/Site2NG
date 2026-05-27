@@ -49,6 +49,50 @@ export default function About() {
         </motion.div>
       </div>
 
+      {/* SECTION FONDATEUR & VISION */}
+      {(config.founderName || config.founderTitle || config.founderVision || config.founderPhotoUrl) && (
+        <motion.div 
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          className="bg-white rounded-[40px] border border-slate-100 shadow-sm p-8 md:p-12 lg:p-16 mb-24 grid md:grid-cols-12 gap-8 md:gap-12 items-center"
+        >
+          {config.founderPhotoUrl && (
+            <div className="md:col-span-4 flex justify-center">
+              <div className="relative aspect-square w-full max-w-[280px] rounded-3xl overflow-hidden shadow-lg border border-slate-100">
+                <img 
+                  src={config.founderPhotoUrl} 
+                  alt={config.founderName || "Fondateur"} 
+                  className="w-full h-full object-cover"
+                  referrerPolicy="no-referrer"
+                />
+              </div>
+            </div>
+          )}
+          <div className={config.founderPhotoUrl ? "md:col-span-8 space-y-6" : "md:col-span-12 space-y-6 max-w-3xl mx-auto text-center"}>
+            <div className="space-y-2">
+              <span className="text-[11px] font-black text-orange-600 uppercase tracking-widest inline-block mb-1">Mot du Fondateur</span>
+              {config.founderName && (
+                <h2 className="text-3xl font-black text-slate-900 tracking-tight">
+                  {config.founderName}
+                </h2>
+              )}
+              {config.founderTitle && (
+                <p className="text-sm font-bold text-slate-400 uppercase tracking-wider">{config.founderTitle}</p>
+              )}
+            </div>
+            {config.founderVision && (
+              <div className="relative">
+                <span className="absolute -top-6 -left-4 text-7xl text-orange-200/50 font-serif pointer-events-none select-none">“</span>
+                <p className="text-slate-600 leading-relaxed font-semibold italic text-base md:text-lg relative z-10 pl-2">
+                  {config.founderVision}
+                </p>
+              </div>
+            )}
+          </div>
+        </motion.div>
+      )}
+
       <section className="bg-orange-600 rounded-[40px] p-12 text-center text-white relative overflow-hidden">
         <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -mr-32 -mt-32" />
         <HeartHandshake className="h-16 w-16 text-white/90 mx-auto mb-8" />

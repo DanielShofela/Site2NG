@@ -326,7 +326,7 @@ export default function Home() {
   };
 
   return (
-    <div className="flex flex-col min-h-screen bg-[#fcfbf9] text-slate-900 pt-20 overflow-x-hidden">
+    <div className="flex flex-col min-h-screen bg-[#fcfbf9] text-slate-900 pt-0 overflow-x-hidden">
       
       {/* 1. HERO SECTION */}
       <section className="relative px-6 md:px-10 py-12 lg:py-24 bg-gradient-to-b from-orange-50/15 via-[#fcfbf9] to-transparent overflow-hidden">
@@ -357,7 +357,7 @@ export default function Home() {
               className="text-4xl md:text-5xl lg:text-6xl font-black text-slate-900 leading-[1.05] tracking-tighter"
             >
               Des opportunités <br />
-              professionnelles, du <br />
+              professionnelles, <br />
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-600 to-orange-500 underline decoration-orange-200/60 decoration-wavy underline-offset-8">
                 recrutement intelligent
               </span> <br />

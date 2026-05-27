@@ -94,7 +94,7 @@ function AppLayout() {
   return (
     <div className="min-h-screen bg-background font-sans antialiased overflow-x-hidden">
       {!isDashboardPage && <Navbar />}
-      <main>
+      <main className={!isDashboardPage ? "pt-[88px]" : ""}>
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/landing" element={<Home />} />

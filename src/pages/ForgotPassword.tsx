@@ -36,7 +36,7 @@ export default function ForgotPassword() {
   };
 
   return (
-    <div className="container relative min-h-[calc(100vh-64px)] flex items-center justify-center py-12 px-4 text-slate-900">
+    <div className="container relative min-h-[calc(100vh-88px)] flex items-center justify-center py-12 px-4 text-slate-900 mx-auto">
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
