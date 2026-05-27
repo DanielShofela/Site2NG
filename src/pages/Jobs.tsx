@@ -1,13 +1,25 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Search, MapPin, Briefcase, Clock, Filter, ChevronRight, CheckCircle2, ExternalLink } from 'lucide-react';
-import { motion } from 'motion/react';
-import { Job, Application } from '@/types';
+import { 
+  Search, 
+  MapPin, 
+  Briefcase, 
+  Clock, 
+  Filter, 
+  CheckCircle2, 
+  SlidersHorizontal, 
+  Building2, 
+  DollarSign, 
+  ChevronRight,
+  ArrowRight,
+  Sparkles,
+  Heart
+} from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { Job } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { 
   collection, 
@@ -16,28 +28,38 @@ import {
   getDocs, 
   addDoc, 
   serverTimestamp,
-  orderBy,
   doc,
   updateDoc,
   increment,
   documentId
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { formatDistanceToNow } from 'date-fns';
-import { fr } from 'date-fns/locale';
+import JobCard from '@/components/JobCard';
 
 export default function Jobs() {
-  const [searchTerm, setSearchTerm] = useState('');
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  
+  // Data State
   const [jobs, setJobs] = useState<Job[]>([]);
   const [companyNames, setCompanyNames] = useState<Record<string, string>>({});
-  const [selectedJob, setSelectedJob] = useState<Job | null>(null);
-  const [isApplying, setIsApplying] = useState(false);
-  const [hasApplied, setHasApplied] = useState(false);
+  const [companyDetails, setCompanyDetails] = useState<Record<string, any>>({});
+  const [appliedJobIds, setAppliedJobIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
-  const { user } = useAuth();
+  const [isApplying, setIsApplying] = useState(false);
 
+  // Search & Filter State
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedContract, setSelectedContract] = useState('all');
+  const [selectedLocation, setSelectedLocation] = useState('all');
+  const [selectedExperience, setSelectedExperience] = useState('all');
+  const [selectedType, setSelectedType] = useState('all');
+  const [salaryFilter, setSalaryFilter] = useState('all'); // 'all', 'specified', 'unspecified'
+  const [showMobileFilters, setShowMobileFilters] = useState(false);
+
+  // Load All Active Jobs on mount
   useEffect(() => {
-    const fetchJobs = async () => {
+    const fetchJobsAndRecruiters = async () => {
       try {
         const q = query(
           collection(db, 'offers'),
@@ -49,7 +71,7 @@ export default function Jobs() {
           ...doc.data()
         })) as Job[];
         
-        // Sort in memory to avoid missing index errors
+        // Sort chronologically in memory (most recent first)
         jobsData.sort((a: any, b: any) => {
           const timeA = a.createdAt?.seconds || (a.createdAt instanceof Date ? a.createdAt.getTime() / 1000 : 0);
           const timeB = b.createdAt?.seconds || (b.createdAt instanceof Date ? b.createdAt.getTime() / 1000 : 0);
@@ -58,17 +80,15 @@ export default function Jobs() {
 
         setJobs(jobsData);
 
-        // Fetch company names for these jobs to ensure we display the latest ones
+        // Fetch registered recruiter names and details (logos, companyName)
         const recruiterIds = Array.from(new Set(jobsData.map(j => j.recruiterId || (j as any).companyId).filter(Boolean)));
         if (recruiterIds.length > 0) {
           const namesMap: Record<string, string> = {};
+          const detailsMap: Record<string, any> = {};
           
-          // Batch fetch recruiters (limit 10 for 'in' query)
           for (let i = 0; i < recruiterIds.length; i += 10) {
             const batch = recruiterIds.slice(i, i + 10);
             try {
-              // Using documentId() to match the doc ID (which is the recruiter's UID)
-              // Added where('role', '==', 'recruiter') to satisfy Firestore security rules for unauthenticated users
               const recruitersQ = query(
                 collection(db, 'users'), 
                 where(documentId(), 'in', batch),
@@ -77,14 +97,16 @@ export default function Jobs() {
               const recruitersSnap = await getDocs(recruitersQ);
               recruitersSnap.forEach(docSnap => {
                 const data = docSnap.data();
-                // Prioritization: Registered Company Name > Trade/Commercial Name > Display Name
-                namesMap[docSnap.id] = data.companyName || data.tradeName || data.displayName || "Entreprise";
+                const name = data.companyName || data.tradeName || data.displayName || "Entreprise Partenaire";
+                namesMap[docSnap.id] = name;
+                detailsMap[docSnap.id] = data;
               });
             } catch (err) {
-              console.error("Error fetching batch of recruiters:", err);
+              console.error("Error fetching recruiters batch:", err);
             }
           }
           setCompanyNames(prev => ({ ...prev, ...namesMap }));
+          setCompanyDetails(prev => ({ ...prev, ...detailsMap }));
         }
       } catch (error) {
         console.error('Error fetching jobs:', error);
@@ -93,21 +115,51 @@ export default function Jobs() {
       }
     };
 
-    fetchJobs();
+    fetchJobsAndRecruiters();
   }, []);
 
-  const handleApply = async () => {
-    if (!user || !selectedJob) return;
+  // Fetch applicant's applications to toggle correct postulé status in the list
+  useEffect(() => {
+    if (user && user.role === 'candidate') {
+      const fetchApplications = async () => {
+        try {
+          const appsQ = query(
+            collection(db, 'applications'),
+            where('candidateId', '==', user.uid)
+          );
+          const snap = await getDocs(appsQ);
+          const ids = new Set<string>();
+          snap.forEach(docSnap => {
+            ids.add(docSnap.data().jobId);
+          });
+          setAppliedJobIds(ids);
+        } catch (err) {
+          console.error("Error loading user applications:", err);
+        }
+      };
+      fetchApplications();
+    }
+  }, [user]);
+
+  // Handle immediate direct application
+  const handleApplyJob = async (job: Job) => {
+    if (!user) {
+      navigate('/login');
+      return;
+    }
+    if (user.role !== 'candidate') return;
 
     setIsApplying(true);
     try {
-      const rId = selectedJob.recruiterId || (selectedJob as any).companyId || 'admin_popular';
+      const rId = job.recruiterId || (job as any).companyId || 'admin_popular';
+      const companyNameStr = companyNames[rId] || job.companyName || 'Entreprise Partenaire';
+
       const applicationData = {
-        jobId: selectedJob.id,
+        jobId: job.id,
         candidateId: user.uid,
         recruiterId: rId,
-        jobTitle: selectedJob.title,
-        companyName: companyNames[rId] || selectedJob.companyName || 'Entreprise Partenaire',
+        jobTitle: job.title,
+        companyName: companyNameStr,
         status: 'pending',
         appliedAt: serverTimestamp(),
         candidateProfile: {
@@ -115,7 +167,7 @@ export default function Jobs() {
           displayName: user.displayName || '',
           email: user.email || '',
           photoUrl: user.photoUrl || '',
-          jobTitle: user.jobTitle || '',
+          jobTitle: job.title || '',
           skills: user.skills || [],
           cvUrl: user.cvUrl || '',
           cvName: user.cvName || ''
@@ -123,330 +175,402 @@ export default function Jobs() {
       };
 
       await addDoc(collection(db, 'applications'), applicationData);
-      setHasApplied(true);
+      setAppliedJobIds(prev => {
+        const next = new Set(prev);
+        next.add(job.id);
+        return next;
+      });
+
+      // Increment views count in parallel
+      try {
+        const jobRef = doc(db, 'offers', job.id);
+        await updateDoc(jobRef, {
+          views: increment(1)
+        });
+      } catch (e) {
+        console.error('Error incrementing job views:', e);
+      }
     } catch (error) {
-      console.error('Error applying:', error);
+      console.error('Error applying to job:', error);
     } finally {
       setIsApplying(false);
     }
   };
 
-  const getCompanyName = (job: Job) => {
+  const currentCompanyName = (job: Job) => {
     const rId = job.recruiterId || (job as any).companyId;
-    return companyNames[rId || ''] || job.companyName;
+    return companyNames[rId || ''] || job.companyName || 'Entreprise Partenaire';
   };
 
-  const filteredJobs = jobs.filter(job => 
-    job.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    getCompanyName(job).toLowerCase().includes(searchTerm.toLowerCase()) ||
-    job.location.toLowerCase().includes(searchTerm.toLowerCase())
+  // Highly responsive 5-dimension filter mechanism
+  const filteredJobs = jobs.filter(job => {
+    // 1. Search query
+    const queryStr = searchTerm.toLowerCase();
+    const docName = currentCompanyName(job).toLowerCase();
+    const fieldMatch = (job.field || '').toLowerCase();
+    const titleMatch = job.title.toLowerCase();
+    const locMatch = job.location.toLowerCase();
+
+    const matchesSearch = titleMatch.includes(queryStr) || 
+                          docName.includes(queryStr) || 
+                          fieldMatch.includes(queryStr) || 
+                          locMatch.includes(queryStr);
+
+    if (!matchesSearch) return false;
+
+    // 2. Contract Type
+    if (selectedContract !== 'all') {
+      const currentContract = (job.contractType || 'CDI').toLowerCase();
+      if (currentContract !== selectedContract.toLowerCase()) return false;
+    }
+
+    // 3. Location Filter
+    if (selectedLocation !== 'all') {
+      const rawLoc = job.location.toLowerCase();
+      if (!rawLoc.includes(selectedLocation.toLowerCase())) return false;
+    }
+
+    // 4. Experience Filter
+    if (selectedExperience !== 'all') {
+      const expLevel = (job.experienceLevel || 'intermédiaire').toLowerCase();
+      if (selectedExperience === 'débutant') {
+        if (!expLevel.includes('débutant') && !expLevel.includes('junior') && !expLevel.includes('sans')) return false;
+      } else if (selectedExperience === 'intermédiaire') {
+        if (!expLevel.includes('intermédiaire') && !expLevel.includes('moyen')) return false;
+      } else if (selectedExperience === 'senior') {
+        if (!expLevel.includes('senior') && !expLevel.includes('expert') && !expLevel.includes('chef') && !expLevel.includes('dirigeant')) return false;
+      }
+    }
+
+    // 5. Special Offer Type Filter
+    if (selectedType !== 'all') {
+      if (selectedType === 'rapid' && job.type !== 'rapid') return false;
+      if (selectedType === 'popular' && (job.type !== 'popular' && !job.isFeatured)) return false;
+      if (selectedType === 'unique' && job.type !== 'unique') return false;
+    }
+
+    // 6. Salary Filter
+    if (salaryFilter !== 'all') {
+      const sal = (job.salary || '').toLowerCase();
+      const isNegotiable = !sal || sal.includes('non') || sal.includes('discuter') || sal.includes('précisé');
+      if (salaryFilter === 'specified' && isNegotiable) return false;
+      if (salaryFilter === 'unspecified' && !isNegotiable) return false;
+    }
+
+    return true;
+  });
+
+  const clearAllFilters = () => {
+    setSelectedContract('all');
+    setSelectedLocation('all');
+    setSelectedExperience('all');
+    setSelectedType('all');
+    setSalaryFilter('all');
+    setSearchTerm('');
+  };
+
+  const activeFiltersCount = 
+    (selectedContract !== 'all' ? 1 : 0) +
+    (selectedLocation !== 'all' ? 1 : 0) +
+    (selectedExperience !== 'all' ? 1 : 0) +
+    (selectedType !== 'all' ? 1 : 0) +
+    (salaryFilter !== 'all' ? 1 : 0);
+
+  // Render the inner filters content (reused in desktop sidebar and mobile drawer)
+  const renderFiltersContent = () => (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-black uppercase text-slate-400 tracking-wider flex items-center gap-2">
+          <SlidersHorizontal className="h-4 w-4 text-orange-600" />
+          Filtres de recherche
+        </h3>
+        {activeFiltersCount > 0 && (
+          <button 
+            onClick={clearAllFilters}
+            className="text-[10px] text-orange-600 hover:text-orange-700 font-extrabold uppercase bg-orange-50 px-2 py-0.5 rounded-md"
+          >
+            Réinitialiser
+          </button>
+        )}
+      </div>
+
+      {/* Contract type */}
+      <div className="space-y-2">
+        <label className="text-[11px] font-black uppercase text-slate-500 tracking-wide">Type de contrat</label>
+        <div className="flex flex-wrap gap-1.5">
+          {['all', 'CDI', 'CDD', 'Stage', 'Freelance'].map(type => (
+            <button
+              key={type}
+              onClick={() => setSelectedContract(type.toLowerCase() === 'all' ? 'all' : type)}
+              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                (type.toLowerCase() === 'all' ? selectedContract === 'all' : selectedContract.toLowerCase() === type.toLowerCase())
+                  ? 'bg-slate-900 text-white'
+                  : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              {type === 'all' ? 'Tous' : type}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Location */}
+      <div className="space-y-2">
+        <label className="text-[11px] font-black uppercase text-slate-500 tracking-wide">Localisation</label>
+        <div className="flex flex-wrap gap-1.5">
+          {[
+            { id: 'all', name: 'Partout' },
+            { id: 'sénégal', name: 'Sénégal' },
+            { id: 'côte', name: 'Côte d\'Ivoire' },
+            { id: 'france', name: 'France' },
+            { id: 'remote', name: 'Télétravail' }
+          ].map(loc => (
+            <button
+              key={loc.id}
+              onClick={() => setSelectedLocation(loc.id)}
+              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                selectedLocation === loc.id
+                  ? 'bg-slate-900 text-white'
+                  : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              {loc.name}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Experience level */}
+      <div className="space-y-2">
+        <label className="text-[11px] font-black uppercase text-slate-500 tracking-wide">Niveau d'expérience</label>
+        <div className="flex flex-wrap gap-1.5">
+          {[
+            { id: 'all', name: 'Indifférent' },
+            { id: 'débutant', name: 'Débutant / Junior' },
+            { id: 'intermédiaire', name: 'Intermédiaire' },
+            { id: 'senior', name: 'Senior / Expert' }
+          ].map(exp => (
+            <button
+              key={exp.id}
+              onClick={() => setSelectedExperience(exp.id)}
+              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                selectedExperience === exp.id
+                  ? 'bg-slate-900 text-white'
+                  : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              {exp.name}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Job category categories */}
+      <div className="space-y-2">
+        <label className="text-[11px] font-black uppercase text-slate-500 tracking-wide">Catégorie d'offres</label>
+        <div className="flex flex-wrap gap-1.5">
+          {[
+            { id: 'all', name: 'Toutes' },
+            { id: 'rapid', name: 'Express (Urgent)' },
+            { id: 'popular', name: 'Élite 2NG' },
+            { id: 'unique', name: 'Direct (Partenaire)' }
+          ].map(cat => (
+            <button
+              key={cat.id}
+              onClick={() => setSelectedType(cat.id)}
+              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                selectedType === cat.id
+                  ? 'bg-slate-900 text-white animate-pulse-once'
+                  : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              {cat.name}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Salary selection */}
+      <div className="space-y-2">
+        <label className="text-[11px] font-black uppercase text-slate-500 tracking-wide">Salaire</label>
+        <div className="flex flex-wrap gap-1.5">
+          {[
+            { id: 'all', name: 'Tous les salaires' },
+            { id: 'specified', name: 'Salaire spécifié' },
+            { id: 'unspecified', name: 'Négociable / Non précisé' }
+          ].map(sal => (
+            <button
+              key={sal.id}
+              onClick={() => setSalaryFilter(sal.id)}
+              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                salaryFilter === sal.id
+                  ? 'bg-slate-900 text-white'
+                  : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              {sal.name}
+            </button>
+          ))}
+        </div>
+      </div>
+
+    </div>
   );
 
   if (loading) {
     return (
-      <div className="container py-12 flex justify-center items-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-orange-600"></div>
+      <div className="container min-h-screen py-16 flex justify-center items-center">
+        <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-orange-600"></div>
       </div>
     );
   }
 
   return (
-    <div className="container py-12 px-6 mx-auto">
-      <div className="max-w-7xl mx-auto">
-        <div className="flex flex-col md:flex-row items-center justify-between gap-6 mb-12">
-          <div className="text-center md:text-left">
-            <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">Opportunités Ouvertes</h1>
-            <p className="text-slate-500 font-semibold text-sm mt-1">Trouvez le poste qui correspond à vos ambitions.</p>
-          </div>
-          <div className="relative w-full md:w-[400px]">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
-            <Input 
-              placeholder="Poste, ville, entreprise..." 
-              className="pl-12 h-14 bg-white border-slate-200 rounded-2xl shadow-sm focus:ring-orange-500 focus:border-orange-500"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
+    <div className="min-h-screen bg-[#fcfbf9]/60 px-4 sm:px-6 md:px-12 py-10 max-w-7xl mx-auto">
+      
+      {/* 1. HEADER HERO BANNER & SEARCH */}
+      <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6 mb-10">
+        <div className="text-left">
+          <Badge variant="outline" className="border-orange-200/80 text-orange-600 bg-orange-50 font-black uppercase text-[9px] px-3 py-1 rounded-full mb-3">
+            Recrutement 2NG Groupe
+          </Badge>
+          <h1 className="text-2xl sm:text-4xl font-black tracking-tight text-slate-905 leading-none">
+            Opportunités Actives
+          </h1>
+          <p className="text-slate-500 font-bold text-xs sm:text-sm mt-2 leading-relaxed">
+            Consultez toutes nos catégories d'emplois, filtrez à la carte, et postulez instantanément.
+          </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {filteredJobs.map((job, i) => (
-            <motion.div
-              key={job.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.05 }}
-            >
-              <Dialog onOpenChange={async (open) => {
-                if (open) {
-                  setSelectedJob(job);
-                  setHasApplied(false);
-                  
-                  // Increment job views
-                  try {
-                    const jobRef = doc(db, 'offers', job.id);
-                    await updateDoc(jobRef, {
-                      views: increment(1)
-                    });
-                  } catch (e) {
-                    console.error('Error incrementing job views:', e);
-                  }
-                }
-              }}>
-                <DialogTrigger asChild nativeButton={false}>
-                  <Card className="hover:border-orange-500/50 transition-all cursor-pointer group rounded-[28px] border-slate-100 shadow-sm hover:shadow-xl hover:shadow-orange-100/5 overflow-hidden bg-white h-full">
-                    <div className="md:flex h-full">
-                      <CardHeader className="flex-1 pb-6 text-left flex flex-col justify-between">
-                        <div>
-                          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
-                            <div className="space-y-1 flex-1">
-                              <CardTitle className="text-xl md:text-2xl font-black text-slate-800 group-hover:text-orange-600 transition-colors leading-snug">
-                                {job.title}
-                              </CardTitle>
-                              <div className="flex flex-wrap items-center text-xs md:text-sm font-semibold text-slate-400">
-                                {(job.type !== 'popular' && (job.recruiterId || (job as any).companyId)) ? (
-                                  <Link 
-                                    to={`/company/${job.recruiterId || (job as any).companyId}`} 
-                                    className="text-slate-700 hover:text-orange-600 transition-colors flex items-center gap-1 group/company relative z-10"
-                                    onClick={(e) => e.stopPropagation()}
-                                  >
-                                    {getCompanyName(job)}
-                                    <ExternalLink className="h-3 w-3 opacity-0 group-hover/company:opacity-100 transition-opacity" />
-                                  </Link>
-                                ) : (
-                                  <span className="text-slate-700">{getCompanyName(job)}</span>
-                                )}
-                                <span className="mx-2 opacity-35">•</span>
-                                <div className="flex items-center gap-1">
-                                  <MapPin className="h-3.5 w-3.5 text-orange-600" /> {job.location}
-                                </div>
-                              </div>
-                            </div>
-                            <div className="flex flex-wrap gap-1.5 shrink-0">
-                              {job.type === 'rapid' && (
-                                <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100 border-none font-black text-[9px] uppercase tracking-wider px-2 py-0.5 animate-pulse flex items-center gap-1 rounded-lg">
-                                  <span className="h-1 w-1 rounded-full bg-amber-500 animate-ping" />
-                                  Urgent
-                                </Badge>
-                              )}
-                              {job.type === 'popular' && (
-                                <Badge className="bg-indigo-100 text-indigo-700 hover:bg-indigo-100 border-none font-black text-[9px] uppercase tracking-wider px-2 py-0.5 flex items-center gap-1 rounded-lg">
-                                  Élite
-                                </Badge>
-                              )}
-                              {job.type === 'unique' && (
-                                <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-none font-black text-[9px] uppercase tracking-wider px-2 py-0.5 flex items-center gap-1 rounded-lg">
-                                  Direct
-                                </Badge>
-                              )}
-                              <Badge variant="secondary" className="bg-slate-100 text-slate-700 border-none font-extrabold px-2.5 py-0.5 rounded-lg text-[10px] uppercase">
-                                {(job as any).contractType || (job.type !== 'rapid' && job.type !== 'popular' && job.type !== 'unique' ? job.type : 'CDI')}
-                              </Badge>
-                            </div>
-                          </div>
-                          <div className="mt-4">
-                             <p className="text-sm font-semibold text-slate-500 line-clamp-3 leading-relaxed">
-                              {job.description}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="flex flex-wrap gap-2 mt-6">
-                          <Badge variant="outline" className="flex items-center gap-1.5 border-slate-100 bg-slate-50 text-slate-600 px-3 py-1.5 rounded-xl text-xs font-semibold">
-                            <Briefcase className="h-3.5 w-3.5 text-orange-500" /> {job.field}
-                          </Badge>
-                          {job.salary && (
-                            <Badge variant="outline" className="text-emerald-700 border-emerald-150 bg-emerald-50 px-3 py-1.5 rounded-xl text-xs font-bold">
-                              {job.salary}
-                            </Badge>
-                          )}
-                          <Badge variant="outline" className="flex items-center gap-1.5 border-slate-100 bg-slate-50 text-slate-600 px-3 py-1.5 rounded-xl text-xs font-semibold">
-                            <Clock className="h-3.5 w-3.5 text-blue-500" /> 
-                            {(() => {
-                              try {
-                                if (!job.createdAt) return "Récemment";
-                                const date = job.createdAt.seconds 
-                                  ? new Date(job.createdAt.seconds * 1000) 
-                                  : new Date(job.createdAt);
-                                if (isNaN(date.getTime())) return "Récemment";
-                                return formatDistanceToNow(date, { addSuffix: true, locale: fr });
-                              } catch (e) {
-                                return "Récemment";
-                              }
-                            })()}
-                          </Badge>
-
-                          {/* Beautiful expiration badge */}
-                          {(() => {
-                            const expiresAt = (job as any).expiresAt;
-                            let expDate: Date | null = null;
-                            if (expiresAt) {
-                              try {
-                                expDate = expiresAt.seconds ? new Date(expiresAt.seconds * 1000) : new Date(expiresAt);
-                              } catch (e) {}
-                            }
-                            if (!expDate || isNaN(expDate.getTime())) {
-                              // If none exists, calculate 30 days fallback from createdAt
-                              if (job.createdAt) {
-                                try {
-                                  const cDate = job.createdAt.seconds ? new Date(job.createdAt.seconds * 1000) : new Date(job.createdAt);
-                                  expDate = new Date(cDate.getTime() + 30 * 24 * 60 * 60 * 1000);
-                                } catch (e) {}
-                              }
-                            }
-                            if (expDate && !isNaN(expDate.getTime())) {
-                              return (
-                                <Badge variant="outline" className="flex items-center gap-1.5 border-rose-100 bg-rose-50/70 text-rose-700 px-3 py-1.5 rounded-xl text-xs font-bold shadow-sm">
-                                  <Clock className="h-3.5 w-3.5 text-rose-500" />
-                                  Exp: {expDate.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
-                                </Badge>
-                              );
-                            }
-                            return (
-                              <Badge variant="outline" className="flex items-center gap-1.5 border-rose-100 bg-rose-50/70 text-rose-700 px-3 py-1.5 rounded-xl text-xs font-bold">
-                                <Clock className="h-3.5 w-3.5 text-rose-500" />
-                                Exp: 30 jours
-                              </Badge>
-                            );
-                          })()}
-                        </div>
-                      </CardHeader>
-                      <div className="bg-slate-50 md:w-14 flex items-center justify-center p-3 border-t md:border-t-0 md:border-l border-slate-100 group-hover:bg-orange-50 group-hover:border-orange-100 transition-colors shrink-0">
-                        <ChevronRight className="h-6 w-6 text-slate-300 group-hover:text-orange-600 group-hover:translate-x-1 transition-all" />
-                      </div>
-                    </div>
-                  </Card>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-[550px] rounded-[32px] p-0 overflow-hidden border-none shadow-2xl">
-                  {selectedJob && (
-                    <div className="bg-white">
-                      <div className="bg-slate-900 p-4 md:p-8 text-white">
-                        <DialogHeader>
-                          <DialogTitle className="text-xl md:text-3xl font-extrabold tracking-tight">{selectedJob.title}</DialogTitle>
-                          <DialogDescription className="flex flex-wrap items-center gap-2 mt-3 text-slate-300 text-xs md:text-sm font-medium">
-                            {(selectedJob.type !== 'popular' && (selectedJob.recruiterId || (selectedJob as any).companyId)) ? (
-                              <Link 
-                                to={`/company/${selectedJob.recruiterId || (selectedJob as any).companyId}`}
-                                className="text-white bg-white/10 px-3 py-1 rounded-lg hover:bg-white/20 transition-all flex items-center gap-2"
-                              >
-                                {getCompanyName(selectedJob)}
-                                <ExternalLink className="h-3 w-3" />
-                              </Link>
-                            ) : (
-                              <span className="bg-white/5 px-2 py-1 rounded overflow-hidden truncate max-w-[150px]">
-                                {getCompanyName(selectedJob)}
-                              </span>
-                            )}
-                            <span className="opacity-50">•</span>
-                            <span className="flex items-center gap-1.5"><MapPin className="h-4 w-4 text-orange-500" /> {selectedJob.location}</span>
-                          </DialogDescription>
-                        </DialogHeader>
-                      </div>
-                      
-                      <div className="p-4 space-y-4">
-                        <div className="flex gap-3">
-                          <Badge variant="secondary" className="bg-orange-50 text-orange-600">{(selectedJob as any).contractType || (selectedJob.type !== 'rapid' && selectedJob.type !== 'popular' && selectedJob.type !== 'unique' ? selectedJob.type : 'CDI')}</Badge>
-                          <Badge variant="secondary" className="bg-slate-100 text-slate-600">{selectedJob.field}</Badge>
-                        </div>
-
-                        <div className="space-y-2 text-left">
-                          <h4 className="text-base font-bold text-slate-900 border-l-4 border-orange-600 pl-4">Description du poste</h4>
-                          <p className="text-slate-500 leading-relaxed text-xs font-medium">
-                            {selectedJob.description}
-                          </p>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-3 text-left">
-                          <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100/60">
-                            <span className="text-[10px] font-black uppercase text-slate-400 block mb-0.5">Expérience</span>
-                            <span className="text-xs font-bold text-slate-800">
-                              {(selectedJob as any).experienceLevel || "Intermédiaire"} ({(selectedJob as any).experienceYears || "1-3 ans"})
-                            </span>
-                          </div>
-                          <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100/60">
-                            <span className="text-[10px] font-black uppercase text-slate-400 block mb-0.5">Niveau d'études</span>
-                            <span className="text-xs font-bold text-slate-800">
-                              {(selectedJob as any).educationLevel || "Bac +3 (Licence)"}
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Dossier de candidature */}
-                        <div className="bg-orange-50/50 p-3 rounded-2xl border border-orange-100 text-left space-y-2">
-                          <h4 className="text-[11px] font-black text-orange-900 uppercase tracking-wider">Dossier de Candidature</h4>
-                          <div className="text-xs space-y-1.5 text-slate-700 font-medium">
-                            <p>
-                              <span className="text-slate-400 font-bold">Mode de dépôt :</span>{" "}
-                              <span className="font-extrabold uppercase text-slate-800 bg-white border px-2 py-0.5 rounded text-[10px]">
-                                {(selectedJob as any).applyMethod === 'platform' ? 'Plateforme 2NG' : 'E-mail de l\'entreprise'}
-                              </span>
-                            </p>
-                            {(selectedJob as any).companyEmail && (
-                              <p>
-                                <span className="text-slate-400 font-bold">Adresse d'envoi :</span>{" "}
-                                <span className="font-extrabold text-slate-900 select-all">{(selectedJob as any).companyEmail}</span>
-                              </p>
-                            )}
-                            {(selectedJob as any).conditionsDocuments && (selectedJob as any).conditionsDocuments.length > 0 && (
-                              <div className="pt-1.5 border-t border-orange-100/50">
-                                <span className="text-[10px] text-slate-400 font-black uppercase block tracking-wider mb-0.5">Pièces exigées :</span>
-                                <div className="flex flex-wrap gap-1 mt-0.5">
-                                  {(selectedJob as any).conditionsDocuments.map((docItem: string, idx: number) => (
-                                    <span key={idx} className="bg-white border text-slate-700 font-bold text-[9px] px-2 py-0.5 rounded-md">
-                                      ✓ {docItem}
-                                    </span>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100">
-                          <h4 className="text-xs font-bold text-slate-900 mb-1 uppercase tracking-wider">Détails financiers</h4>
-                          <div className="flex items-center gap-2 text-emerald-700 font-bold text-base">
-                            {selectedJob.salary || "Salaire non précisé"}
-                          </div>
-                        </div>
-
-                        {!user && (
-                          <div className="p-5 bg-orange-50 text-orange-800 rounded-2xl text-sm font-bold italic flex items-center gap-3">
-                            <span className="w-2 h-2 bg-orange-600 rounded-full animate-bounce" />
-                            Connectez-vous en tant que candidat pour postuler.
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="p-4 md:p-8 pt-0">
-                        {hasApplied ? (
-                          <div className="w-full flex flex-col items-center gap-2 py-4 md:py-6 bg-emerald-50 rounded-[20px] md:rounded-[24px]">
-                            <div className="bg-emerald-600 text-white p-2.5 rounded-full shadow-lg shadow-emerald-200">
-                              <CheckCircle2 className="h-6 w-6 md:h-8 md:w-8" />
-                            </div>
-                            <div className="text-center">
-                              <p className="font-extrabold text-emerald-800 text-base md:text-lg">Candidature envoyée !</p>
-                              <p className="text-xs md:text-sm text-emerald-600 font-medium">L'entreprise a bien reçu votre profil.</p>
-                            </div>
-                          </div>
-                        ) : (
-                          <Button 
-                            className="w-full h-11 md:h-16 rounded-xl md:rounded-[20px] bg-orange-600 hover:bg-orange-700 text-white font-extrabold text-xs md:text-lg shadow-xl shadow-orange-600/20 uppercase tracking-wider" 
-                            disabled={!user || user.role !== 'candidate' || isApplying}
-                            onClick={handleApply}
-                          >
-                            {isApplying ? "Transmission..." : "Envoyer ma candidature"}
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </DialogContent>
-              </Dialog>
-            </motion.div>
-          ))}
+        {/* Input Bar */}
+        <div className="relative w-full md:w-[380px]">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <Input 
+            placeholder="Rechercher par poste, entreprise, ville..." 
+            className="pl-11 pr-4 h-12 bg-white border-slate-150 rounded-2xl shadow-sm focus:ring-2 focus:ring-orange-500 focus:border-orange-500 font-medium text-xs sm:text-sm"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
         </div>
       </div>
+
+      {/* 2. MAIN LAYOUT CONTAINER */}
+      <div className="mx-auto flex flex-col lg:flex-row gap-8 items-start">
+        
+        {/* DESKTOP SIDEBAR FILTERS (Visible only on lg and above) */}
+        <div className="hidden lg:block w-[280px] shrink-0 bg-white border border-slate-100 p-6 rounded-[28px] shadow-sm sticky top-24">
+          {renderFiltersContent()}
+        </div>
+
+        {/* MOBILE INSTANT CONTROL STRIP (Visible only below lg) */}
+        <div className="w-full lg:hidden flex items-center justify-between bg-white border border-slate-100/80 px-4 py-3 rounded-2xl shadow-sm mb-4">
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-black uppercase text-slate-500">
+              {filteredJobs.length} {filteredJobs.length > 1 ? 'postes trouvés' : 'poste trouvé'}
+            </span>
+            {activeFiltersCount > 0 && (
+              <Badge className="bg-orange-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full">
+                {activeFiltersCount}
+              </Badge>
+            )}
+          </div>
+          
+          <Button 
+            variant="outline" 
+            onClick={() => setShowMobileFilters(!showMobileFilters)}
+            className="h-9 px-4 rounded-xl text-xs font-black uppercase flex items-center gap-1.5 border-slate-200"
+          >
+            <Filter className="h-3.5 w-3.5 text-orange-600" />
+            <span>Filtres</span>
+          </Button>
+        </div>
+
+        {/* MOBILE COLLAPSIBLE DRAWER DRAWER */}
+        <AnimatePresence>
+          {showMobileFilters && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="lg:hidden w-full bg-white border border-slate-100 p-5 rounded-2xl shadow-lg overflow-hidden mb-6 text-left"
+            >
+              {renderFiltersContent()}
+              <Button 
+                onClick={() => setShowMobileFilters(false)}
+                className="w-full mt-6 h-10 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-extrabold uppercase"
+              >
+                Appliquer les filtres
+              </Button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* 3. JOB LISTING GRID */}
+        <div className="flex-1 w-full">
+          
+          {/* Header context count */}
+          <div className="hidden lg:flex items-center justify-between mb-6">
+            <span className="text-xs font-black text-slate-400 uppercase tracking-widest">
+              Recherche approfondie ➔ {filteredJobs.length} {filteredJobs.length > 1 ? 'Opportunités' : 'Opportunité'}
+            </span>
+          </div>
+
+          {filteredJobs.length > 0 ? (
+            /* Halved sizes layout: Dual Columns Grid on wide screen, and vertically stacked scroll feeds on mobile */
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {filteredJobs.map((job) => {
+                const partnerProfile = job.recruiterId ? companyDetails[job.recruiterId] : null;
+                const isRegistered = partnerProfile && partnerProfile.role === 'recruiter' && partnerProfile.companyName;
+                const finalLogo = isRegistered ? (partnerProfile.photoUrl || job.companyLogo) : job.companyLogo;
+                const finalName = isRegistered ? (partnerProfile.companyName || job.companyName) : job.companyName;
+
+                return (
+                  <motion.div
+                    key={job.id}
+                    layout="position"
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ type: "spring", stiffness: 300, damping: 26 }}
+                    className="w-full"
+                  >
+                    <JobCard
+                      job={{
+                        ...job,
+                        companyLogo: finalLogo,
+                        companyName: finalName
+                      }}
+                      companyName={finalName}
+                      isApplied={appliedJobIds.has(job.id)}
+                      onApply={() => handleApplyJob(job)}
+                      isApplying={isApplying}
+                      loggedIn={!!user}
+                      userRole={user?.role}
+                      showNextArrow={false}
+                    />
+                  </motion.div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="text-center py-20 bg-white border border-slate-100 rounded-[32px] shadow-sm max-w-lg mx-auto">
+              <Briefcase className="h-10 w-10 text-slate-300 mx-auto mb-3" />
+              <p className="text-slate-700 font-extrabold text-base">Aucun poste trouvé</p>
+              <p className="text-slate-400 font-semibold text-xs mt-1.5 px-6">
+                Essayez de modifier vos filtres ou de réinitialiser la recherche pour découvrir d'autres offres d'emploi.
+              </p>
+              <Button 
+                onClick={clearAllFilters}
+                className="mt-6 h-9 px-4.5 rounded-full bg-orange-600 hover:bg-orange-700 text-white text-[11px] font-black uppercase tracking-wider"
+              >
+                Réinitialiser les filtres
+              </Button>
+            </div>
+          )}
+
+        </div>
+
+      </div>
+
     </div>
   );
 }
-

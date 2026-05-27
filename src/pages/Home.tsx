@@ -32,8 +32,9 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSiteConfig } from '@/contexts/SiteConfigContext';
-import { collection, query, limit, getDocs, where, orderBy } from 'firebase/firestore';
+import { collection, query, limit, getDocs, where, orderBy, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import JobCard from '@/components/JobCard';
 
 interface Job {
   id: string;
@@ -51,6 +52,12 @@ export default function Home() {
   const navigate = useNavigate();
 
   // Offers Query State
+  const [allHomeOffers, setAllHomeOffers] = useState<any[]>([]);
+  const [currentOfferIndex, setCurrentOfferIndex] = useState(0);
+  const [direction, setDirection] = useState(0);
+  const [appliedJobIds, setAppliedJobIds] = useState<Set<string>>(new Set());
+  const [isApplying, setIsApplying] = useState(false);
+
   const [rapidOffers, setRapidOffers] = useState<any[]>([]);
   const [popularOffers, setPopularOffers] = useState<any[]>([]);
   const [uniqueOffers, setUniqueOffers] = useState<any[]>([]);
@@ -171,6 +178,9 @@ export default function Home() {
         setPopularOffers(popular);
         setUniqueOffers(unique);
 
+        const combined = [...fetchedOffers].sort((a, b) => getOfferCreatedAtTime(b) - getOfferCreatedAtTime(a));
+        setAllHomeOffers(combined);
+
         // 4. Fallback for partner logos - we now use the actual registered recruiters!
         // But also check 'partner_logos' collection just as a backup
         try {
@@ -189,6 +199,77 @@ export default function Home() {
     }
     loadFeaturedJobs();
   }, []);
+
+  // Fetch candidate's applications to display "Applied / Postulé" real state on the homepage
+  useEffect(() => {
+    if (user && user.role === 'candidate') {
+      const fetchUserApplications = async () => {
+        try {
+          const appsQ = query(
+            collection(db, 'applications'),
+            where('candidateId', '==', user.uid)
+          );
+          const snap = await getDocs(appsQ);
+          const ids = new Set<string>();
+          snap.forEach(docSnap => {
+            ids.add(docSnap.data().jobId);
+          });
+          setAppliedJobIds(ids);
+        } catch (err) {
+          console.error("Error loading user applications:", err);
+        }
+      };
+      fetchUserApplications();
+    }
+  }, [user]);
+
+  // Handle Apply execution from the homepage carousel card
+  const handleApplyHomeJob = async (job: any) => {
+    if (!user) {
+      navigate('/login');
+      return;
+    }
+    if (user.role !== 'candidate') {
+      return;
+    }
+    
+    setIsApplying(true);
+    try {
+      const rId = job.recruiterId || job.companyId || 'admin_popular';
+      const companyNameStr = job.companyName || (rId && companiesMap[rId]?.companyName) || 'Entreprise Partenaire';
+
+      const applicationData = {
+        jobId: job.id,
+        candidateId: user.uid,
+        recruiterId: rId,
+        jobTitle: job.title,
+        companyName: companyNameStr,
+        status: 'pending',
+        appliedAt: serverTimestamp(),
+        candidateProfile: {
+          uid: user.uid,
+          displayName: user.displayName || '',
+          email: user.email || '',
+          photoUrl: user.photoUrl || '',
+          jobTitle: job.title || '',
+          skills: user.skills || [],
+          cvUrl: user.cvUrl || '',
+          cvName: user.cvName || ''
+        }
+      };
+
+      await addDoc(collection(db, 'applications'), applicationData);
+      setAppliedJobIds(prev => {
+        const next = new Set(prev);
+        next.add(job.id);
+        return next;
+      });
+    } catch (error) {
+      console.error('Error applying from carousel:', error);
+    } finally {
+      setIsApplying(false);
+    }
+  };
 
   // Filter based on selected tag for segments
   const filteredPopularOffers = popularOffers.filter(offer => {
@@ -649,264 +730,169 @@ export default function Home() {
         </div>
       </section>
 
-      {/* 4. OTHER SEGMENTED OFFERS (POPULAR & UNIQUE) SECTION */}
-      <section className="px-6 md:px-10 py-20 max-w-7xl mx-auto" id="jobs">
-        <div className="flex flex-col lg:flex-row items-start lg:items-end justify-between gap-8 mb-12">
-          <div className="text-left max-w-xl">
-            <Badge variant="outline" className="border-orange-200/80 text-orange-600 bg-orange-50 font-black uppercase tracking-widest text-[10px] px-3 py-1.5 rounded-full mb-4">
-              Réseau d'Opportunités 2NG
-            </Badge>
-            <h2 className="text-3xl md:text-5xl font-black tracking-tight text-slate-900 leading-none">
-              Explorez nos Secteurs Élite
-            </h2>
-            <p className="text-slate-500 font-bold text-sm mt-3 leading-relaxed">
-              Basculez entre les offres certifiées par l'administration 2NG et les offres publiées instantanément par nos entreprises partenaires directes.
-            </p>
-          </div>
-
-          {/* Tab switches & Filters */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full lg:w-auto">
-            {/* Segment switch */}
-            <div className="bg-slate-100 p-1.5 rounded-2xl flex w-full sm:w-auto">
-              <button 
-                onClick={() => setActiveSegmentFilter('popular')}
-                className={`flex-1 sm:flex-none px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-300 ${activeSegmentFilter === 'popular' ? 'bg-white text-slate-900 shadow' : 'text-slate-500 hover:text-slate-900'}`}
-              >
-                Offres Populaires
-              </button>
-              <button 
-                onClick={() => setActiveSegmentFilter('unique')}
-                className={`flex-1 sm:flex-none px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-300 ${activeSegmentFilter === 'unique' ? 'bg-white text-slate-900 shadow' : 'text-slate-500 hover:text-slate-900'}`}
-              >
-                Offres Directes
-              </button>
-            </div>
-
-            {/* Contract type filter */}
-            <div className="flex flex-wrap gap-1.5">
-              {[
-                { label: "Tous", id: "all" },
-                { label: "CDI", id: "cdi" },
-                { label: "Stage", id: "stage" }
-              ].map((f) => (
-                <button
-                  key={f.id}
-                  onClick={() => setSelectedContractFilter(f.id)}
-                  className={`px-3 py-2 text-[11px] font-black rounded-xl transition-all ${
-                    selectedContractFilter === f.id
-                      ? 'bg-orange-600 text-white shadow-lg'
-                      : 'bg-slate-50 border border-slate-100 text-slate-600 hover:bg-slate-100'
-                  }`}
-                >
-                  {f.label}
-                </button>
-              ))}
-            </div>
-          </div>
+      {/* 4. PREMIUM SINGLE-CARD OPPORTUNITIES CAROUSEL */}
+      <section className="px-4 sm:px-6 md:px-10 py-16 max-w-4xl mx-auto text-center" id="jobs" style={{ contentVisibility: 'auto' }}>
+        <div className="max-w-xl mx-auto mb-8">
+          <Badge variant="outline" className="border-orange-200/80 text-orange-600 bg-orange-50 font-black uppercase tracking-widest text-[9px] px-3 py-1.5 rounded-full mb-3">
+            Recrutement Agile 2NG
+          </Badge>
+          <h2 className="text-2xl sm:text-4xl font-black tracking-tight text-slate-900 leading-none">
+            Opportunités du Moment
+          </h2>
+          <p className="text-slate-500 font-bold text-xs sm:text-sm mt-3 leading-relaxed">
+            Consultez les dernières offres d'emploi certifiées en exclusivité. Glissez d'un poste à l'autre pour trouver votre futur emploi.
+          </p>
         </div>
 
-        {/* Instagram-style Sectors Carousel */}
-        <div className="w-full relative mb-12 bg-white/40 border border-slate-100/50 p-6 rounded-[32px] shadow-sm">
-          {/* Subtle fade overlay for scroll indicators */}
-          <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-[#fcfbf9]/50 to-transparent z-10 pointer-events-none md:hidden" />
-          <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-[#fcfbf9]/50 to-transparent z-10 pointer-events-none md:hidden" />
-          
-          <div className="flex flex-wrap items-center justify-between gap-2 mb-6">
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-black uppercase tracking-widest text-orange-600 bg-orange-50 px-3 py-1.5 rounded-full">
-                Secteurs d'activité ➔
-              </span>
-              <span className="text-xs text-slate-400 font-bold">Faites défiler vers la droite</span>
-            </div>
-            {selectedSectorFilter !== 'all' && (
-              <button 
-                onClick={() => setSelectedSectorFilter('all')}
-                className="text-[10px] font-black uppercase text-orange-600 hover:text-orange-700 bg-orange-50 hover:bg-orange-100/60 px-2.5 py-1 rounded-lg transition-colors"
-              >
-                Tout afficher x
-              </button>
-            )}
+        {loadingJobs ? (
+          <div className="flex justify-center items-center py-20">
+            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-600"></div>
           </div>
-
-          <div className="flex gap-6 overflow-x-auto pb-2 pt-2 no-scrollbar scroll-smooth snap-x">
-            {[
-              { id: 'all', label: 'Tous les domaines', icon: <Briefcase className="h-5 w-5" />, gradient: 'from-orange-500 via-pink-500 to-yellow-500' },
-              { id: 'tech', label: 'Tech & Numérique', icon: <Sparkles className="h-5 w-5" />, gradient: 'from-indigo-500 via-purple-500 to-pink-500' },
-              { id: 'btp', label: 'BTP & Construction', icon: <Building2 className="h-5 w-5" />, gradient: 'from-amber-500 via-orange-500 to-yellow-500' },
-              { id: 'rh', label: 'Ressources Humaines', icon: <Users className="h-5 w-5" />, gradient: 'from-red-500 via-rose-500 to-orange-500' },
-              { id: 'finance', label: 'Banque & Finance', icon: <Award className="h-5 w-5" />, gradient: 'from-emerald-500 via-teal-500 to-cyan-500' },
-              { id: 'marketing', label: 'Comm. & Ventes', icon: <TrendingUp className="h-5 w-5" />, gradient: 'from-pink-500 via-fuchsia-500 to-rose-500' },
-              { id: 'sante', label: 'Santé & Social', icon: <CheckCircle2 className="h-5 w-5" />, gradient: 'from-teal-500 via-emerald-500 to-lime-500' },
-              { id: 'logistique', label: 'Logistique & Transport', icon: <Globe2 className="h-5 w-5" />, gradient: 'from-sky-500 via-blue-500 to-indigo-500' },
-            ].map((sector, index) => {
-              const isActive = selectedSectorFilter === sector.id;
-              
-              return (
-                <motion.button
-                  key={sector.id}
-                  onClick={() => setSelectedSectorFilter(sector.id)}
-                  whileHover={{ scale: 1.05, y: -2 }}
-                  whileTap={{ scale: 0.95 }}
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ 
-                    type: "spring", 
-                    stiffness: 300, 
-                    damping: 25, 
-                    delay: index * 0.04 
+        ) : allHomeOffers.length > 0 ? (
+          <div className="relative w-full max-w-xl mx-auto py-4">
+            
+            {/* Visual Touch Pad Sandbox Container */}
+            <div className="overflow-visible relative touch-pan-y min-h-[380px] sm:min-h-[400px]">
+              <AnimatePresence mode="wait" custom={direction}>
+                <motion.div
+                  key={currentOfferIndex}
+                  custom={direction}
+                  variants={{
+                    enter: (dir: number) => ({
+                      x: dir > 0 ? 120 : -120,
+                      opacity: 0,
+                      scale: 0.96
+                    }),
+                    center: {
+                      x: 0,
+                      opacity: 1,
+                      scale: 1,
+                      transition: {
+                        type: "spring",
+                        stiffness: 380,
+                        damping: 28
+                      }
+                    },
+                    exit: (dir: number) => ({
+                      x: dir > 0 ? -120 : 120,
+                      opacity: 0,
+                      scale: 0.96,
+                      transition: {
+                        duration: 0.18
+                      }
+                    })
                   }}
-                  className="flex flex-col items-center gap-2.5 shrink-0 focus:outline-none cursor-pointer snap-start"
+                  initial="enter"
+                  animate="center"
+                  exit="exit"
+                  drag="x"
+                  dragConstraints={{ left: 0, right: 0 }}
+                  dragElastic={0.4}
+                  onDragEnd={(e, info) => {
+                    const swipeThreshold = 50;
+                    if (info.offset.x < -swipeThreshold) {
+                      setDirection(1);
+                      setCurrentOfferIndex((prevIdx) => (prevIdx + 1) % allHomeOffers.length);
+                    } else if (info.offset.x > swipeThreshold) {
+                      setDirection(-1);
+                      setCurrentOfferIndex((prevIdx) => (prevIdx - 1 + allHomeOffers.length) % allHomeOffers.length);
+                    }
+                  }}
+                  className="cursor-grab active:cursor-grabbing w-full"
                 >
-                  {/* Circle container resembling Instagram Story with active border */}
-                  <div className="relative p-[2.5px] rounded-full transition-all duration-300">
-                    {/* Animated gradient ring */}
-                    <div className={`absolute inset-0 rounded-full bg-gradient-to-tr ${sector.gradient} transition-transform duration-300 ${
-                      isActive ? 'scale-105 opacity-100' : 'scale-100 opacity-40 hover:opacity-100'
-                    }`} />
-                    
-                    {/* Inner spacing helper */}
-                    <div className="relative p-[2.5px] bg-white rounded-full">
-                      {/* Round icon container with 360 rotation on selection */}
-                      <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center transition-all duration-500 ${
-                        isActive 
-                          ? 'bg-slate-950 text-white shadow-lg rotate-[360deg]' 
-                          : 'bg-slate-50 text-slate-700 hover:bg-slate-100 hover:text-slate-900'
-                      }`}>
-                        {sector.icon}
-                      </div>
-                    </div>
+                  {(() => {
+                    const job = allHomeOffers[currentOfferIndex];
+                    const partnerProfile = job.recruiterId ? companiesMap[job.recruiterId] : null;
+                    const isRegistered = partnerProfile && partnerProfile.role === 'recruiter' && partnerProfile.companyName;
+                    const finalLogo = isRegistered ? (partnerProfile.photoUrl || job.companyLogo) : job.companyLogo;
+                    const finalName = isRegistered ? (partnerProfile.companyName || job.companyName) : job.companyName;
 
-                    {/* Check badge */}
-                    {isActive && (
-                      <motion.div 
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        className="absolute bottom-0 right-0 bg-orange-600 text-white p-0.5 rounded-full border border-white"
-                      >
-                        <CheckCircle2 className="h-3 w-3 text-white fill-orange-600" />
-                      </motion.div>
-                    )}
-                  </div>
+                    const revisedJob = {
+                      ...job,
+                      companyLogo: finalLogo,
+                      companyName: finalName
+                    };
 
-                  {/* Label element */}
-                  <span className={`text-[11px] text-center font-black max-w-[90px] leading-tight transition-colors duration-205 ${
-                    isActive ? 'text-orange-600 scale-105' : 'text-slate-500 group-hover:text-slate-900'
-                  }`}>
-                    {sector.label}
-                  </span>
-                </motion.button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Offers Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <AnimatePresence mode="popLayout">
-            {(activeSegmentFilter === 'popular' ? filteredPopularOffers : filteredUniqueOffers).length > 0 ? (
-              (activeSegmentFilter === 'popular' ? filteredPopularOffers : filteredUniqueOffers).map((job) => {
-                const partnerProfile = job.recruiterId ? companiesMap[job.recruiterId] : null;
-                const isRegistered = partnerProfile && partnerProfile.role === 'recruiter' && partnerProfile.companyName;
-                const finalLogo = isRegistered ? (partnerProfile.photoUrl || job.companyLogo) : job.companyLogo;
-                const finalName = isRegistered ? (partnerProfile.companyName || job.companyName) : job.companyName;
-
-                return (
-                  <motion.div
-                    layout
-                    initial={{ opacity: 0, scale: 0.97 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.97 }}
-                    transition={{ duration: 0.3 }}
-                    key={job.id}
-                    className="bg-white border border-slate-200/80 rounded-[32px] p-8 shadow-sm hover:border-orange-500 hover:shadow-xl hover:shadow-orange-100/10 transition-all duration-300 group flex flex-col justify-between text-left"
-                  >
-                    <div>
-                      {/* Header Card */}
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex items-center gap-3.5">
-                          <div className="w-12 h-12 rounded-2xl bg-slate-900 text-white flex items-center justify-center font-black text-sm uppercase overflow-hidden border border-slate-800">
-                            {finalLogo ? (
-                              <img src={finalLogo} alt={finalName} className="h-full w-full object-cover" referrerPolicy="no-referrer" />
-                            ) : (
-                              (finalName || "EP").substring(0, 2)
-                            )}
-                          </div>
-                          <div>
-                            {/* Only show Link if registered direct partner! */}
-                            {isRegistered ? (
-                              <Link 
-                                to={`/company/${job.recruiterId}`} 
-                                className="text-slate-950 font-black text-sm hover:text-orange-600 transition-colors block"
-                              >
-                                {finalName}
-                              </Link>
-                            ) : (
-                              <span className="text-slate-950 font-black text-sm block">{finalName}</span>
-                            )}
-                            <span className="text-[10px] text-slate-400 font-bold tracking-tight">
-                              {activeSegmentFilter === 'popular' ? "Offre Élite Administrateur" : "Réseau Recruteurs Certifié"}
-                            </span>
-                          </div>
-                        </div>
-                        <Badge className="bg-orange-50 text-orange-600 font-extrabold border-none text-[10px] px-3 py-1.5 rounded-xl uppercase">
-                          {job.contractType || job.type || 'CDI'}
-                        </Badge>
-                      </div>
-
-                    {/* Middle Job Details */}
-                    <div className="mt-6">
-                      <h3 className="text-xl font-extrabold text-slate-900 leading-snug tracking-tight group-hover:text-orange-600 transition-colors">
-                        {job.title}
-                      </h3>
-                      {job.description && (
-                        <p className="text-slate-500 font-medium text-xs md:text-sm line-clamp-2 mt-2 leading-relaxed">
-                          {job.description}
-                        </p>
-                      )}
-                      <div className="flex flex-wrap items-center gap-4 text-xs font-bold text-slate-500 mt-4">
-                        <span className="flex items-center gap-1.5">
-                          <MapPin className="h-4 w-4 text-slate-400" />
-                          {job.location}
-                        </span>
-                        {job.salary && (
-                          <span className="flex items-center gap-1.5 text-orange-600 font-bold bg-orange-50/50 px-2.5 py-1 rounded-lg">
-                            <TrendingUp className="h-3.5 w-3.5" />
-                            {job.salary}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Footer apply */}
-                  <div className="mt-8 pt-6 border-t border-slate-100 flex items-center justify-between">
-                    <span className="text-[10px] text-slate-400 font-bold flex items-center gap-1">
-                      <Clock className="h-3.5 w-3.5" /> Publié récemment
-                    </span>
-                    <Button 
-                      onClick={() => navigate('/login')}
-                      className="rounded-xl h-10 px-5 bg-slate-900 border-none hover:bg-orange-600 text-white font-extrabold text-xs flex items-center gap-1.5 transition-all duration-300 group-hover:scale-[1.03]"
-                    >
-                      Postuler
-                      <ArrowUpRight className="h-4 w-4" />
-                    </Button>
-                  </div>
+                    return (
+                      <JobCard
+                        job={revisedJob}
+                        companyName={finalName}
+                        isApplied={appliedJobIds.has(job.id)}
+                        onApply={() => handleApplyHomeJob(job)}
+                        isApplying={isApplying}
+                        onNext={() => {
+                          setDirection(1);
+                          setCurrentOfferIndex((prevIdx) => (prevIdx + 1) % allHomeOffers.length);
+                        }}
+                        showNextArrow={allHomeOffers.length > 1}
+                        loggedIn={!!user}
+                        userRole={user?.role}
+                      />
+                    );
+                  })()}
                 </motion.div>
-              );})
-            ) : (
-              <div className="col-span-2 text-center py-12 bg-slate-50 rounded-[28px] border border-dashed border-slate-200">
-                <Briefcase className="h-10 w-10 text-slate-300 mx-auto mb-3" />
-                <p className="text-slate-500 font-bold">Aucune offre correspondant à ce critère de filtre pour le moment.</p>
+              </AnimatePresence>
+            </div>
+
+            {/* Smart Navigation Aids underneath */}
+            {allHomeOffers.length > 1 && (
+              <div className="flex flex-col items-center justify-center gap-3.5 mt-4">
+                
+                {/* Dots indicator */}
+                <div className="flex items-center gap-1.5">
+                  {allHomeOffers.map((_, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => {
+                        setDirection(idx > currentOfferIndex ? 1 : -1);
+                        setCurrentOfferIndex(idx);
+                      }}
+                      className={`h-1.5 rounded-full transition-all duration-300 ${
+                        idx === currentOfferIndex ? 'w-4.5 bg-orange-600' : 'w-1.5 bg-slate-200 hover:bg-slate-300'
+                      }`}
+                      aria-label={`Aller au poste ${idx + 1}`}
+                    />
+                  ))}
+                </div>
+
+                <div className="flex items-center gap-4 text-[10px] text-slate-400 font-extrabold uppercase tracking-widest bg-slate-50/55 px-4.5 py-1.5 rounded-full border border-slate-100/35">
+                  <button 
+                    onClick={() => {
+                      setDirection(-1);
+                      setCurrentOfferIndex((prevIdx) => (prevIdx - 1 + allHomeOffers.length) % allHomeOffers.length);
+                    }}
+                    className="hover:text-slate-700 transition-colors"
+                  >
+                    ❮ Précédent
+                  </button>
+                  <span className="text-slate-300">|</span>
+                  <span>{currentOfferIndex + 1} sur {allHomeOffers.length}</span>
+                  <span className="text-slate-300">|</span>
+                  <button 
+                    onClick={() => {
+                      setDirection(1);
+                      setCurrentOfferIndex((prevIdx) => (prevIdx + 1) % allHomeOffers.length);
+                    }}
+                    className="hover:text-slate-700 transition-colors"
+                  >
+                    Suivant ❯
+                  </button>
+                </div>
+
               </div>
             )}
-          </AnimatePresence>
-        </div>
+          </div>
+        ) : (
+          <div className="max-w-md mx-auto py-12 bg-slate-50 rounded-[28px] border border-dashed border-slate-200">
+            <p className="text-slate-550 font-extrabold text-sm">Aucun poste actif disponible pour le moment.</p>
+          </div>
+        )}
 
-        <div className="mt-12 text-center">
+        <div className="mt-8 text-center">
           <Link to="/jobs">
-            <Button variant="ghost" className="font-extrabold text-slate-600 hover:text-orange-600 transition-colors uppercase gap-1 text-xs">
-              Découvrir toutes les offres d'emploi d'Afrique
-              <ChevronRight className="h-4.5 w-4.5" />
+            <Button variant="ghost" className="font-extrabold text-slate-600 hover:text-orange-600 transition-colors uppercase gap-1 text-[10px] sm:text-xs">
+              Découvrir toutes les opportunités d'emploi
+              <ChevronRight className="h-4 w-4" />
             </Button>
           </Link>
         </div>
@@ -1066,7 +1052,13 @@ export default function Home() {
           })()}
 
           <Button 
-            onClick={() => setIsPartnerModalOpen(true)}
+            onClick={() => {
+              if (user && user.role === 'recruiter') {
+                navigate('/dashboard/company');
+              } else {
+                navigate('/signup?role=recruiter');
+              }
+            }}
             className="h-12 px-8 bg-slate-900 border-none hover:bg-orange-600 text-white font-extrabold rounded-2xl text-xs flex items-center gap-1.5 shadow-md transition-all duration-300 hover:scale-[1.03]"
           >
             Devenir partenaire d’affaires

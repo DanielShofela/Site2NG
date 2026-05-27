@@ -591,11 +591,7 @@ export default function Signup() {
                   Continuer avec Google
                 </Button>
 
-                {typeof window !== 'undefined' && (window.self !== window.top || window.location.hostname.includes('run.app')) && (
-                  <div className="text-[10px] text-orange-600 font-bold bg-orange-50/70 p-3 rounded-xl border border-orange-100 text-center leading-relaxed">
-                    ⓘ <span className="underline">Note de prévisualisation</span> : Si la connexion Google ne s'ouvre pas ou affiche un refus, veuillez cliquer sur l'icône de <strong className="font-extrabold text-orange-700">Flèche sortante (Ouvrir dans un nouvel onglet)</strong> tout en haut de votre écran pour contourner les restrictions de l'iframe.
-                  </div>
-                )}
+
 
                 <div className="text-sm font-bold text-center text-slate-500">
                   Vous avez déjà un compte ?{" "}
