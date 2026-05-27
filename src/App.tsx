@@ -66,7 +66,7 @@ export default function App() {
 
 function AppLayout() {
   const { user, loading } = useAuth();
-  const { maintenanceEnabled } = useSiteConfig();
+  const { config, maintenanceEnabled } = useSiteConfig();
   const location = useLocation();
   const isDashboardPage = location.pathname.startsWith('/admin') || 
                           location.pathname.startsWith('/recruiter') || 
@@ -95,7 +95,7 @@ function AppLayout() {
   return (
     <div className="min-h-screen bg-background font-sans antialiased overflow-x-hidden">
       {!isDashboardPage && <Navbar />}
-      <main className={!isDashboardPage ? "pt-[88px]" : ""}>
+      <main className={!isDashboardPage ? (config.bannerEnabled && config.bannerContent ? "pt-[136px] sm:pt-[128px]" : "pt-[88px]") : ""}>
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/landing" element={<Home />} />

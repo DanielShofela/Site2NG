@@ -6,6 +6,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSiteConfig } from '@/contexts/SiteConfigContext';
+import PromoBanner from './PromoBanner';
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
@@ -51,11 +52,13 @@ export default function Navbar() {
   ];
 
   return (
-    <nav className={`fixed top-0 left-0 right-0 z-50 w-full transition-all duration-300 ${
-      scrolled 
-        ? 'bg-white/95 backdrop-blur-xl border-b border-slate-200/50 shadow-sm py-4' 
-        : 'bg-white/70 backdrop-blur-md border-b border-slate-100/30 py-5'
-    }`}>
+    <div className="fixed top-0 left-0 right-0 z-50 w-full flex flex-col">
+      <PromoBanner />
+      <nav className={`w-full transition-all duration-300 ${
+        scrolled 
+          ? 'bg-white/95 backdrop-blur-xl border-b border-slate-200/50 shadow-sm py-4' 
+          : 'bg-white/70 backdrop-blur-md border-b border-slate-100/30 py-5'
+      }`}>
       <div className="container mx-auto px-4 sm:px-6 md:px-10">
         <div className="flex h-12 items-center justify-between">
           <div className="flex items-center">
@@ -232,6 +235,7 @@ export default function Navbar() {
           </motion.div>
         )}
       </AnimatePresence>
-    </nav>
+      </nav>
+    </div>
   );
 }

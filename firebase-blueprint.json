@@ -104,9 +104,9 @@
       "schema": "User",
       "description": "User profiles"
     },
-    "/jobs/{jobId}": {
+    "/offers/{offerId}": {
       "schema": "Job",
-      "description": "Job listings"
+      "description": "Job offers/listings"
     },
     "/applications/{applicationId}": {
       "schema": "Application",
@@ -123,6 +123,22 @@
     "/support_tickets/{ticketId}": {
       "schema": "SupportTicket",
       "description": "User support tickets"
+    },
+    "/media/{mediaId}": {
+      "schema": "object",
+      "description": "Médiathèque assets used for branding, logos, and banners"
+    },
+    "/system_notifications/{noticeId}": {
+      "schema": "object",
+      "description": "Administrative announcement broadcasts"
+    },
+    "/partner_logos/{partnerLogoId}": {
+      "schema": "object",
+      "description": "Partner brand logos displayed on the homepage"
+    },
+    "/settings/{docId}": {
+      "schema": "object",
+      "description": "System configuration and tracking goals"
     }
   }
 }

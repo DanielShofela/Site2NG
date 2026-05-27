@@ -40,7 +40,7 @@ export default function LogsModule({ logs }: LogsProps) {
     }
     try {
       // Clear logs from firestore in batch
-      const snapshot = await getDocs(collection(db, 'admin_logs'));
+      const snapshot = await getDocs(collection(db, 'system_logs'));
       const batch = writeBatch(db);
       snapshot.docs.forEach((doc) => {
         batch.delete(doc.ref);

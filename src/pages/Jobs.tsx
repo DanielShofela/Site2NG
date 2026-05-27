@@ -1,4 +1,6 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useSiteConfig } from '@/contexts/SiteConfigContext';
+import BannerRotator from '@/components/BannerRotator';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -39,6 +41,7 @@ import JobCard from '@/components/JobCard';
 export default function Jobs() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { config } = useSiteConfig();
   
   // Data State
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -428,6 +431,21 @@ export default function Jobs() {
   return (
     <div className="min-h-screen bg-[#fcfbf9]/60 px-4 sm:px-6 md:px-12 py-10 max-w-7xl mx-auto">
       
+      {/* 0. DYNAMIC TOP BANNER (L'espace des œuvres) */}
+      {config.jobsBannerEnabled && config.jobsBannerImages && config.jobsBannerImages.length > 0 && (
+        <motion.div 
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="max-w-7xl mx-auto mb-8"
+        >
+          <BannerRotator 
+            images={config.jobsBannerImages}
+            interval={config.jobsBannerInterval || 5000}
+            heightClass="h-44 sm:h-56 md:h-64"
+          />
+        </motion.div>
+      )}
+
       {/* 1. HEADER HERO BANNER & SEARCH */}
       <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6 mb-10">
         <div className="text-left">
@@ -518,36 +536,54 @@ export default function Jobs() {
           {filteredJobs.length > 0 ? (
             /* Halved sizes layout: Dual Columns Grid on wide screen, and vertically stacked scroll feeds on mobile */
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {filteredJobs.map((job) => {
+              {filteredJobs.map((job, index) => {
                 const partnerProfile = job.recruiterId ? companyDetails[job.recruiterId] : null;
                 const isRegistered = partnerProfile && partnerProfile.role === 'recruiter' && partnerProfile.companyName;
                 const finalLogo = isRegistered ? (partnerProfile.photoUrl || job.companyLogo) : job.companyLogo;
                 const finalName = isRegistered ? (partnerProfile.companyName || job.companyName) : job.companyName;
 
                 return (
-                  <motion.div
-                    key={job.id}
-                    layout="position"
-                    initial={{ opacity: 0, y: 12 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ type: "spring", stiffness: 300, damping: 26 }}
-                    className="w-full"
-                  >
-                    <JobCard
-                      job={{
-                        ...job,
-                        companyLogo: finalLogo,
-                        companyName: finalName
-                      }}
-                      companyName={finalName}
-                      isApplied={appliedJobIds.has(job.id)}
-                      onApply={() => handleApplyJob(job)}
-                      isApplying={isApplying}
-                      loggedIn={!!user}
-                      userRole={user?.role}
-                      showNextArrow={false}
-                    />
-                  </motion.div>
+                  <React.Fragment key={job.id}>
+                    <motion.div
+                      layout="position"
+                      initial={{ opacity: 0, y: 12 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ type: "spring", stiffness: 300, damping: 26 }}
+                      className="w-full"
+                    >
+                      <JobCard
+                        job={{
+                          ...job,
+                          companyLogo: finalLogo,
+                          companyName: finalName
+                        }}
+                        companyName={finalName}
+                        isApplied={appliedJobIds.has(job.id)}
+                        onApply={() => handleApplyJob(job)}
+                        isApplying={isApplying}
+                        loggedIn={!!user}
+                        userRole={user?.role}
+                        showNextArrow={false}
+                      />
+                    </motion.div>
+
+                    {config.jobsInBetweenBannersEnabled && 
+                     config.jobsInBetweenBannersImages && 
+                     config.jobsInBetweenBannersImages.length > 0 && 
+                     (index + 1) % (config.jobsInBetweenFrequency || 3) === 0 && (
+                      <motion.div 
+                        initial={{ opacity: 0, scale: 0.98 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="col-span-1 md:col-span-2 py-2 px-1 sm:px-3 mb-4 select-none"
+                      >
+                        <BannerRotator
+                          images={config.jobsInBetweenBannersImages}
+                          interval={config.jobsInBetweenBannersInterval || 5000}
+                          heightClass="h-28 sm:h-36 md:h-44"
+                        />
+                      </motion.div>
+                    )}
+                  </React.Fragment>
                 );
               })}
             </div>

@@ -464,12 +464,21 @@ export default function AdminDashboard() {
           })}
         </nav>
 
-        {/* Sign out footer block */}
-        <div className="p-4 border-t border-slate-900 shrink-0">
+        {/* Sign out & Return footer block */}
+        <div className="p-4 border-t border-slate-900 shrink-0 space-y-2">
+          <button
+            type="button"
+            onClick={() => window.location.href = '/'}
+            className="w-full h-11 rounded-xl bg-slate-900 hover:bg-slate-850 text-xs font-black uppercase text-slate-300 hover:text-white flex items-center gap-3 justify-center transition-colors"
+          >
+            <Globe className="h-5 w-5 shrink-0 text-orange-500 animate-pulse" />
+            {isSidebarOpen && <span>Retour au site</span>}
+          </button>
+          
           <button
             type="button"
             onClick={logout}
-            className="w-full h-11 rounded-xl bg-slate-900 hover:bg-red-950/20 text-xs font-black uppercase text-red-400 hover:text-red-500 flex items-center gap-3 justify-center transition-colors"
+            className="w-full h-11 rounded-xl bg-slate-950 hover:bg-red-950/20 text-xs font-black uppercase text-red-400 hover:text-red-500 flex items-center gap-3 justify-center border border-slate-900 transition-colors"
           >
             <LogOut className="h-5 w-5 shrink-0" />
             {isSidebarOpen && <span>Déconnection</span>}

@@ -28,15 +28,21 @@ service cloud.firestore {
     }
     
     // Improved isAdmin: check the users collection for the admin role
-    // Using exists() + get() for maximum security
+    // Using exists() + get() for maximum security, and fallback on bootstrapped email
     function isAdmin() {
       return request.auth != null && 
-             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+             (request.auth.token.email == "2ng.groupeentreprise@gmail.com" ||
+              (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+               get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin"));
     }
 
     function isRole(role) {
       return request.auth != null && 
-             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == role;
+             (
+               (role == "admin" && request.auth.token.email == "2ng.groupeentreprise@gmail.com") ||
+               (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+                get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == role)
+             );
     }
 
     // 3. User Rules
@@ -99,6 +105,16 @@ service cloud.firestore {
     match /settings/{docId} {
       allow read: if true;
       allow write: if isAdmin();
+    }
+
+    // Media Library Rules
+    match /media/{mediaId} {
+      allow read, write: if isAdmin();
+    }
+
+    // System Notifications Rules
+    match /system_notifications/{noticeId} {
+      allow read, write: if isAdmin();
     }
 
     // 5. Application Rules

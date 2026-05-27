@@ -15,7 +15,8 @@ import {
   Trash2, 
   CheckCircle,
   Eye,
-  ArrowRight
+  ArrowRight,
+  Megaphone
 } from 'lucide-react';
 import { doc, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -28,7 +29,7 @@ interface CMSProps {
 export default function CMSModule({ currentData, onSave }: CMSProps) {
   const [localData, setLocalData] = useState<any>(currentData || {});
   const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<'branding' | 'hero' | 'founder' | 'testimonials'>('branding');
+  const [activeTab, setActiveTab] = useState<'branding' | 'hero' | 'founder' | 'banner' | 'testimonials' | 'jobs_banner'>('branding');
 
   // Slide testimonial creator state
   const [testimName, setTestimName] = useState("");
@@ -119,7 +120,7 @@ export default function CMSModule({ currentData, onSave }: CMSProps) {
       
       {/* Sub-tabs menu */}
       <div className="bg-slate-50 border-b border-slate-100 flex p-2 gap-1 overflow-x-auto">
-        {(['branding', 'hero', 'founder', 'testimonials'] as const).map((tab) => (
+        {(['branding', 'hero', 'founder', 'banner', 'testimonials', 'jobs_banner'] as const).map((tab) => (
           <button
             key={tab}
             type="button"
@@ -133,7 +134,9 @@ export default function CMSModule({ currentData, onSave }: CMSProps) {
             {tab === 'branding' && 'Logo & Branding'}
             {tab === 'hero' && 'Section d\'accueil'}
             {tab === 'founder' && 'Le Fondateur'}
+            {tab === 'banner' && 'Bannière Promotionnelle'}
             {tab === 'testimonials' && 'Carrousel Témoignages'}
+            {tab === 'jobs_banner' && 'Bannières d’Offres (Œuvres)'}
           </button>
         ))}
       </div>
@@ -330,6 +333,229 @@ export default function CMSModule({ currentData, onSave }: CMSProps) {
           </div>
         )}
 
+        {activeTab === 'banner' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h4 className="text-sm font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
+                <Megaphone className="h-5 w-5 text-orange-600" />
+                Configuration de la Bannière Promotionnelle
+              </h4>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  onClick={() => setLocalData({ ...localData, bannerEnabled: !localData.bannerEnabled })}
+                  className={`h-9 px-4 rounded-xl text-xs font-black uppercase transition-all ${
+                    localData.bannerEnabled 
+                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-600/10' 
+                      : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                  }`}
+                >
+                  {localData.bannerEnabled ? "● Activée" : "○ Désactivée"}
+                </Button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {/* Left Column: Content & Colors */}
+              <div className="space-y-6">
+                <div className="space-y-2">
+                  <Label className="text-[11px] font-black uppercase text-slate-800">Contenu de la Bannière (Soutient le code HTML/Balises ou Texte Brut)</Label>
+                  <Textarea 
+                    rows={4}
+                    value={localData.bannerContent || ""} 
+                    onChange={(e) => setLocalData({ ...localData, bannerContent: e.target.value })}
+                    placeholder="Ex: 🌟 Offre Spéciale 2NG : &lt;strong&gt;Profitez de -20%&lt;/strong&gt; sur tous nos recrutements Élite cette semaine ! &lt;a href='/opportunites' class='underline font-bold text-yellow-350 ml-1'&gt;Découvrir →&lt;/a&gt;"
+                    className="rounded-lg border-slate-150 bg-slate-50 font-medium text-xs leading-relaxed"
+                  />
+                  <p className="text-[10px] text-slate-400 leading-normal">
+                    Vous pouvez insérer du texte simple ou coder avec des balises HTML comme <code>&lt;strong&gt;</code> pour mettre en gras, ou <code>&lt;a href="..." class="underline"&gt;</code> pour insérer un bouton de redirection ou de contact cliquable.
+                  </p>
+                </div>
+
+                <div className="space-y-4 bg-slate-50 p-5 rounded-2xl border border-slate-100">
+                  <h5 className="text-xs font-black text-slate-800 uppercase tracking-wider">Style visuel & Arrière-plan</h5>
+                  
+                  <div className="space-y-1.5">
+                    <Label className="text-[10px] font-black uppercase text-slate-700">Type d'arrière-plan de la bannière</Label>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        onClick={() => setLocalData({ ...localData, bannerBgType: 'color' })}
+                        className={`flex-1 h-9 rounded-lg text-xs font-bold ${
+                          localData.bannerBgType !== 'image' 
+                            ? 'bg-slate-900 text-white' 
+                            : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
+                        }`}
+                      >
+                        Couleur unie / Dégradé
+                      </Button>
+                      <Button
+                        type="button"
+                        onClick={() => setLocalData({ ...localData, bannerBgType: 'image' })}
+                        className={`flex-1 h-9 rounded-lg text-xs font-bold ${
+                          localData.bannerBgType === 'image' 
+                            ? 'bg-slate-900 text-white' 
+                            : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
+                        }`}
+                      >
+                        Images Rollover (Diaporama)
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label className="text-[10px] font-black uppercase text-slate-700">Couleur d'arrière-plan</Label>
+                      <div className="flex gap-1.5">
+                        <Input 
+                          type="color"
+                          value={localData.bannerBgColor || "#ea580c"}
+                          onChange={(e) => setLocalData({ ...localData, bannerBgColor: e.target.value })}
+                          className="h-10 w-11 rounded-lg cursor-pointer p-0.5 shrink-0"
+                        />
+                        <Input 
+                          value={localData.bannerBgColor || "#ea580c"} 
+                          onChange={(e) => setLocalData({ ...localData, bannerBgColor: e.target.value })}
+                          className="h-10 rounded-lg border-slate-200 bg-white font-mono text-xs font-bold"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <Label className="text-[10px] font-black uppercase text-slate-700">Couleur du texte</Label>
+                      <div className="flex gap-1.5">
+                        <Input 
+                          type="color"
+                          value={localData.bannerTextColor || "#ffffff"}
+                          onChange={(e) => setLocalData({ ...localData, bannerTextColor: e.target.value })}
+                          className="h-10 w-11 rounded-lg cursor-pointer p-0.5 shrink-0"
+                        />
+                        <Input 
+                          value={localData.bannerTextColor || "#ffffff"} 
+                          onChange={(e) => setLocalData({ ...localData, bannerTextColor: e.target.value })}
+                          className="h-10 rounded-lg border-slate-200 bg-white font-mono text-xs font-bold"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {localData.bannerBgType === 'image' && (
+                    <div className="space-y-2 pt-2 border-t border-slate-200">
+                      <Label className="text-[10px] font-black uppercase text-slate-700">Intervalle de transition automatique (ms)</Label>
+                      <Input 
+                        type="number"
+                        min={1000}
+                        step={500}
+                        value={localData.bannerAutoChangeInterval || 5000}
+                        onChange={(e) => setLocalData({ ...localData, bannerAutoChangeInterval: parseInt(e.target.value) || 5000 })}
+                        className="h-10 rounded-lg bg-white border-slate-200 font-bold text-xs"
+                        placeholder="Ex: 5000"
+                      />
+                      <p className="text-[9px] text-slate-400 italic">Temps d'affichage de chaque image d'arrière-plan avant le défilement automatique (1000 ms = 1 seconde).</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Right Column: Rollover Background Images Management */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h5 className="text-xs font-black text-slate-900 uppercase tracking-widest flex items-center gap-1.5">
+                    <ImageIcon className="h-4.5 w-4.5 text-purple-600" />
+                    Images d'Arrière-plan Rollover ({localData.bannerImages?.length || 0})
+                  </h5>
+                  
+                  <div className="relative">
+                    <Button
+                      type="button"
+                      onClick={() => document.getElementById('banner-bg-uploader')?.click()}
+                      className="h-8 px-3 rounded-lg bg-orange-600 text-white font-black text-[10px] uppercase hover:bg-orange-700 shadow-sm flex items-center gap-1"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      Ajouter une Image
+                    </Button>
+                    <input
+                      id="banner-bg-uploader"
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      className="hidden"
+                      onChange={(e) => {
+                        const files = e.target.files;
+                        if (files && files.length > 0) {
+                          const readersArr: Promise<string>[] = Array.from(files).map((file: any) => {
+                            return new Promise((resolve) => {
+                              const reader = new FileReader();
+                              reader.onloadend = () => resolve(reader.result as string);
+                              reader.readAsDataURL(file);
+                            });
+                          });
+                          Promise.all(readersArr).then(results => {
+                            const existing = localData.bannerImages || [];
+                            setLocalData({
+                              ...localData,
+                              bannerImages: [...existing, ...results]
+                            });
+                          });
+                        }
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div className="border border-slate-100 bg-slate-50/50 p-4 rounded-2xl min-h-[220px] max-h-[380px] overflow-y-auto space-y-3">
+                  {localData.bannerImages && localData.bannerImages.length > 0 ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {localData.bannerImages.map((imgUrl: string, idx: number) => (
+                        <div key={idx} className="relative group bg-white border border-slate-200 rounded-xl p-2.5 flex flex-col gap-2 shadow-sm">
+                          <span className="absolute top-1.5 left-1.5 bg-black/75 backdrop-blur-sm text-white font-extrabold text-[9px] px-2 py-0.5 rounded-md z-10">
+                            {idx === 0 ? "Image Principale (Rollover 1)" : `Image n°${idx + 1} (Rollover ${idx + 1})`}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const updated = (localData.bannerImages || []).filter((_: any, i: number) => i !== idx);
+                              setLocalData({ ...localData, bannerImages: updated });
+                            }}
+                            className="absolute top-1.5 right-1.5 bg-red-600 hover:bg-red-700 text-white p-1 rounded-md transition-colors z-10"
+                            title="Supprimer cette image"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                          <div className="h-28 rounded-lg overflow-hidden bg-slate-100 border border-slate-100 flex items-center justify-center">
+                            <img src={imgUrl} className="h-full w-full object-cover" alt={`Rollover ${idx}`} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-10 text-center space-y-2 select-none">
+                      <ImageIcon className="h-10 w-10 text-slate-300" />
+                      <div>
+                        <p className="text-xs font-bold text-slate-700">Aucune image d'arrière-plan rollover</p>
+                        <p className="text-[10px] text-slate-400 max-w-xs mt-1">
+                          Si aucune image n'est ajoutée, la bannière utilisera la couleur d'arrière-plan choisie à gauche. Importez au moins deux images pour voir le changement automatique du fond !
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="bg-orange-50/70 p-4 rounded-xl border border-orange-100 text-[10px] text-orange-800 font-semibold space-y-1 leading-normal text-left">
+                  <p className="font-bold flex items-center gap-1 uppercase tracking-wide text-[10px] text-orange-900 mb-1">
+                    💡 Fonctionnement du Rollover et d'Arrière-plan
+                  </p>
+                  <ul className="list-disc pl-3.5 space-y-1">
+                    <li>Si vous sélectionnez un mode d'arrière-plan <strong>"Images Rollover"</strong>, le système affiche les visuels importés en arrière-plan.</li>
+                    <li>S'il y a <strong>plusieurs images</strong>, le fond changera automatiquement à intervalle régulier avec une transition en fondu esthétique.</li>
+                    <li>S'il n'y a <strong>aucune image</strong> (ou si elles sont toutes supprimées), l'image est retirée de l'arrière-plan et le fond basculera proprement sur la couleur de marque.</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {activeTab === 'testimonials' && (
           <div className="space-y-8">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -408,6 +634,292 @@ export default function CMSModule({ currentData, onSave }: CMSProps) {
                   )}
                 </div>
               </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'jobs_banner' && (
+          <div className="space-y-10">
+            {/* 1. TOP JOBS PAGE BANNER SECTION */}
+            <div className="p-6 bg-slate-50 border border-slate-100 rounded-3xl space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-200/50 pb-4 gap-4">
+                <div>
+                  <h4 className="text-sm font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
+                    <Megaphone className="h-5 w-5 text-orange-600" />
+                    Bannière de l'Espace des Offres (œuvres)
+                  </h4>
+                  <p className="text-[11px] font-semibold text-slate-400 mt-1">
+                    Gérez la bannière principale apparaissant tout en haut de la page des offres d'emploi publiques.
+                  </p>
+                </div>
+                <div>
+                  <Button
+                    type="button"
+                    onClick={() => setLocalData({ ...localData, jobsBannerEnabled: !localData.jobsBannerEnabled })}
+                    className={`h-9 px-4 rounded-xl text-xs font-black uppercase transition-all ${
+                      localData.jobsBannerEnabled 
+                        ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-600/10' 
+                        : 'bg-slate-250 hover:bg-slate-300 text-slate-700'
+                    }`}
+                  >
+                    {localData.jobsBannerEnabled ? "● Activée" : "○ Désactivée"}
+                  </Button>
+                </div>
+              </div>
+
+              {localData.jobsBannerEnabled && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  {/* Left block: interval slider setting */}
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label className="text-[10px] font-black uppercase text-slate-700">Intervalle du diaporama automatique (ms)</Label>
+                      <Input 
+                        type="number"
+                        min={1000}
+                        step={500}
+                        value={localData.jobsBannerInterval || 5000}
+                        onChange={(e) => setLocalData({ ...localData, jobsBannerInterval: parseInt(e.target.value) || 5000 })}
+                        className="h-10 rounded-lg bg-white border-slate-200 font-bold text-xs"
+                        placeholder="Ex: 5000"
+                      />
+                      <p className="text-[10px] text-slate-400 font-medium">Temps d'affichage de chaque image avant la rotation (1000 ms = 1 seconde).</p>
+                    </div>
+
+                    <div className="bg-white border border-slate-200 p-5 rounded-2xl">
+                      <h5 className="font-extrabold text-xs text-slate-800 uppercase tracking-wider mb-2">Instructions d'affichage</h5>
+                      <p className="text-[11px] text-slate-500 leading-relaxed font-medium">
+                        Ajoutez plusieurs images pour former une liste d'images déroulantes de manière fluide. Les dimensions idéales pour cette bannière d'en-tête sont de <strong className="text-slate-800">1200 x 300 pixels</strong> (paysage).
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Right block: jobsBannerImages uploader */}
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h5 className="text-[11px] font-black text-slate-800 uppercase tracking-wider flex items-center gap-1">
+                        <ImageIcon className="h-4 w-4 text-purple-600" />
+                        Images de la Bannière ({localData.jobsBannerImages?.length || 0})
+                      </h5>
+                      <div>
+                        <Button
+                          type="button"
+                          onClick={() => document.getElementById('jobs-banner-uploader')?.click()}
+                          className="h-8 px-3 rounded-lg bg-orange-600 text-white font-black text-[10px] uppercase hover:bg-orange-700 shadow-sm flex items-center gap-1"
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                          Ajouter
+                        </Button>
+                        <input
+                          id="jobs-banner-uploader"
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          className="hidden"
+                          onChange={(e) => {
+                            const files = e.target.files;
+                            if (files && files.length > 0) {
+                              const readersArr: Promise<string>[] = Array.from(files).map((file: any) => {
+                                return new Promise((resolve) => {
+                                  const reader = new FileReader();
+                                  reader.onloadend = () => resolve(reader.result as string);
+                                  reader.readAsDataURL(file);
+                                });
+                              });
+                              Promise.all(readersArr).then(results => {
+                                const existing = localData.jobsBannerImages || [];
+                                setLocalData({
+                                  ...localData,
+                                  jobsBannerImages: [...existing, ...results]
+                                });
+                              });
+                            }
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="bg-white border border-slate-250 p-4 rounded-2xl min-h-[160px] max-h-[300px] overflow-y-auto">
+                      {localData.jobsBannerImages && localData.jobsBannerImages.length > 0 ? (
+                        <div className="grid grid-cols-2 gap-3">
+                          {localData.jobsBannerImages.map((imgUrl: string, idx: number) => (
+                            <div key={idx} className="relative group bg-slate-50 border border-slate-100 rounded-xl p-1.5 flex flex-col gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const updated = (localData.jobsBannerImages || []).filter((_: any, i: number) => i !== idx);
+                                  setLocalData({ ...localData, jobsBannerImages: updated });
+                                }}
+                                className="absolute top-1 right-1 bg-red-600 hover:bg-red-700 text-white p-1 rounded-md transition-colors z-10"
+                                title="Supprimer cette image"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </button>
+                              <div className="h-20 rounded-lg overflow-hidden bg-slate-100 flex items-center justify-center">
+                                <img src={imgUrl} className="h-full w-full object-cover" alt={`Offre Banner ${idx}`} />
+                              </div>
+                              <span className="text-[9px] text-center font-bold text-slate-500">Image {idx + 1}</span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-10 text-slate-400">
+                          <ImageIcon className="h-8 w-8 text-slate-300 mx-auto mb-1" />
+                          <p className="text-[10px] font-bold">Aucune image configurée.</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* 2. IN-BETWEEN LIST BANNER SECTION */}
+            <div className="p-6 bg-slate-50 border border-slate-100 rounded-3xl space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-200/50 pb-4 gap-4">
+                <div>
+                  <h4 className="text-sm font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
+                    <ImageIcon className="h-5 w-5 text-orange-600" />
+                    Bannière Interne (Entre deux albums / offres)
+                  </h4>
+                  <p className="text-[11px] font-semibold text-slate-400 mt-1">
+                    Configurez l'apparition d'un encart publicitaire ou décoratif déroulant directement entre les fiches d'offres d'emploi.
+                  </p>
+                </div>
+                <div>
+                  <Button
+                    type="button"
+                    onClick={() => setLocalData({ ...localData, jobsInBetweenBannersEnabled: !localData.jobsInBetweenBannersEnabled })}
+                    className={`h-9 px-4 rounded-xl text-xs font-black uppercase transition-all ${
+                      localData.jobsInBetweenBannersEnabled 
+                        ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-600/10' 
+                        : 'bg-slate-250 hover:bg-slate-300 text-slate-700'
+                    }`}
+                  >
+                    {localData.jobsInBetweenBannersEnabled ? "● Activée" : "○ Désactiveé"}
+                  </Button>
+                </div>
+              </div>
+
+              {localData.jobsInBetweenBannersEnabled && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  {/* Left block: settings */}
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <Label className="text-[10px] font-black uppercase text-slate-700">Fréquence d'apparition</Label>
+                        <select
+                          value={localData.jobsInBetweenFrequency || 3}
+                          onChange={(e) => setLocalData({ ...localData, jobsInBetweenFrequency: parseInt(e.target.value) || 3 })}
+                          className="w-full h-10 rounded-lg border-slate-200 bg-white font-bold text-xs px-3 focus:ring-1 focus:ring-orange-500"
+                        >
+                          <option value={1}>Toutes les 1 offres</option>
+                          <option value={2}>Toutes les 2 offres</option>
+                          <option value={3}>Toutes les 3 offres (Recommandé)</option>
+                          <option value={4}>Toutes les 4 offres</option>
+                          <option value={5}>Toutes les 5 offres</option>
+                        </select>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <Label className="text-[10px] font-black uppercase text-slate-700">Intervalle de transition (ms)</Label>
+                        <Input 
+                          type="number"
+                          min={1000}
+                          step={500}
+                          value={localData.jobsInBetweenBannersInterval || 5000}
+                          onChange={(e) => setLocalData({ ...localData, jobsInBetweenBannersInterval: parseInt(e.target.value) || 5000 })}
+                          className="h-10 rounded-lg bg-white border-slate-200 font-bold text-xs"
+                          placeholder="Ex: 5000"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="bg-white border border-slate-200 p-5 rounded-2xl">
+                      <h5 className="font-extrabold text-xs text-slate-800 uppercase tracking-wider mb-2">Notice d'utilisation</h5>
+                      <p className="text-[11px] text-slate-500 leading-relaxed font-medium">
+                        Cette section insère une carte élégante au milieu des colonnes des offres, contenant un diaporama de vos bannières publicitaires téléversées. Des bannières au ratio <strong className="text-slate-850">800 x 200 pixels</strong> donneront un rendu optimal.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Right block: images list */}
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h5 className="text-[11px] font-black text-slate-800 uppercase tracking-wider flex items-center gap-1">
+                        <ImageIcon className="h-4 w-4 text-purple-600" />
+                        Images Rollover ({localData.jobsInBetweenBannersImages?.length || 0})
+                      </h5>
+                      <div>
+                        <Button
+                          type="button"
+                          onClick={() => document.getElementById('jobs-between-uploader')?.click()}
+                          className="h-8 px-3 rounded-lg bg-orange-600 text-white font-black text-[10px] uppercase hover:bg-orange-700 shadow-sm flex items-center gap-1"
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                          Ajouter
+                        </Button>
+                        <input
+                          id="jobs-between-uploader"
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          className="hidden"
+                          onChange={(e) => {
+                            const files = e.target.files;
+                            if (files && files.length > 0) {
+                              const readersArr: Promise<string>[] = Array.from(files).map((file: any) => {
+                                return new Promise((resolve) => {
+                                  const reader = new FileReader();
+                                  reader.onloadend = () => resolve(reader.result as string);
+                                  reader.readAsDataURL(file);
+                                });
+                              });
+                              Promise.all(readersArr).then(results => {
+                                const existing = localData.jobsInBetweenBannersImages || [];
+                                setLocalData({
+                                  ...localData,
+                                  jobsInBetweenBannersImages: [...existing, ...results]
+                                });
+                              });
+                            }
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="bg-white border border-slate-250 p-4 rounded-2xl min-h-[160px] max-h-[300px] overflow-y-auto">
+                      {localData.jobsInBetweenBannersImages && localData.jobsInBetweenBannersImages.length > 0 ? (
+                        <div className="grid grid-cols-2 gap-3">
+                          {localData.jobsInBetweenBannersImages.map((imgUrl: string, idx: number) => (
+                            <div key={idx} className="relative group bg-slate-50 border border-slate-100 rounded-xl p-1.5 flex flex-col gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const updated = (localData.jobsInBetweenBannersImages || []).filter((_: any, i: number) => i !== idx);
+                                  setLocalData({ ...localData, jobsInBetweenBannersImages: updated });
+                                }}
+                                className="absolute top-1 right-1 bg-red-600 hover:bg-red-700 text-white p-1 rounded-md transition-colors z-10"
+                                title="Supprimer cette image"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </button>
+                              <div className="h-20 rounded-lg overflow-hidden bg-slate-100 flex items-center justify-center">
+                                <img src={imgUrl} className="h-full w-full object-cover" alt={`Between Banner ${idx}`} />
+                              </div>
+                              <span className="text-[9px] text-center font-bold text-slate-500">Image {idx + 1}</span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-10 text-slate-400">
+                          <ImageIcon className="h-8 w-8 text-slate-300 mx-auto mb-1" />
+                          <p className="text-[10px] font-bold">Aucune image configurée.</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
