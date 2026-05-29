@@ -26,6 +26,46 @@ interface CMSProps {
   onSave: (newData: any) => void;
 }
 
+const compressImage = (base64Str: string, maxWidth = 900, maxHeight = 900, quality = 0.70): Promise<string> => {
+  return new Promise((resolve) => {
+    if (!base64Str || !base64Str.startsWith('data:image/')) {
+      resolve(base64Str);
+      return;
+    }
+    const img = new Image();
+    img.src = base64Str;
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      let width = img.width;
+      let height = img.height;
+
+      if (width > maxWidth || height > maxHeight) {
+        if (width > height) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        } else {
+          width = Math.round((width * maxHeight) / height);
+          height = maxHeight;
+        }
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      } else {
+        resolve(base64Str);
+      }
+    };
+    img.onerror = () => {
+      resolve(base64Str);
+    };
+  });
+};
+
 export default function CMSModule({ currentData, onSave }: CMSProps) {
   const [localData, setLocalData] = useState<any>(currentData || {});
   const [saving, setSaving] = useState(false);
@@ -45,13 +85,44 @@ export default function CMSModule({ currentData, onSave }: CMSProps) {
   const handleSave = async () => {
     setSaving(true);
     try {
+      // Proactively compress any long uncompressed base64 images in localData before saving to prevent Firestore 1MB limits!
+      const dataToSave = { ...localData };
+      
+      const compressListIfNecessary = async (list: string[] | undefined) => {
+        if (!list) return undefined;
+        return Promise.all(list.map(async (img) => {
+          if (img && img.startsWith('data:image/') && img.length > 150000) {
+            return await compressImage(img, 900, 900, 0.65);
+          }
+          return img;
+        }));
+      };
+
+      if (dataToSave.jobsBannerImages) {
+        dataToSave.jobsBannerImages = await compressListIfNecessary(dataToSave.jobsBannerImages);
+      }
+      if (dataToSave.jobsInBetweenBannersImages) {
+        dataToSave.jobsInBetweenBannersImages = await compressListIfNecessary(dataToSave.jobsInBetweenBannersImages);
+      }
+      if (dataToSave.bannerImages) {
+        dataToSave.bannerImages = await compressListIfNecessary(dataToSave.bannerImages);
+      }
+      
+      const fieldsToCompress = ['founderPhotoUrl', 'logoUrl', 'iconUrl'];
+      for (const field of fieldsToCompress) {
+        if (dataToSave[field] && dataToSave[field].startsWith('data:image/') && dataToSave[field].length > 150000) {
+          dataToSave[field] = await compressImage(dataToSave[field], 700, 700, 0.70);
+        }
+      }
+
       const configRef = doc(db, 'site_config', 'home');
-      await setDoc(configRef, localData);
-      onSave(localData);
+      await setDoc(configRef, dataToSave);
+      onSave(dataToSave);
+      setLocalData(dataToSave);
       alert("La configuration globale du CMS a été mise à jour en direct ! Les visiteurs verront immédiatement ces modifications.");
     } catch (e) {
       console.error(e);
-      alert("Erreur lors de l'enregistrement de la configuration.");
+      alert("Erreur lors de l'enregistrement de la configuration. Conseil : assurez-vous de ne pas dépasser la taille autorisée et que vos images ne soient pas excessivement lourdes.");
     } finally {
       setSaving(false);
     }
@@ -61,8 +132,9 @@ export default function CMSModule({ currentData, onSave }: CMSProps) {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onloadend = () => {
-        setLocalData({ ...localData, [field]: reader.result as string });
+      reader.onloadend = async () => {
+        const compressed = await compressImage(reader.result as string, 800, 800, 0.72);
+        setLocalData((prev: any) => ({ ...prev, [field]: compressed }));
       };
       reader.readAsDataURL(file);
     }
@@ -321,14 +393,65 @@ export default function CMSModule({ currentData, onSave }: CMSProps) {
               <h4 className="text-xs font-black text-slate-900 uppercase tracking-widest border-b border-slate-50 pb-2">
                 Mot d'accueil & Vision stratégique
               </h4>
-              <Label className="text-[10px] font-black uppercase text-slate-800">Texte / Discours rédigé du dirigeant</Label>
-              <Textarea 
-                rows={9}
-                value={localData.founderVision || ""} 
-                onChange={(e) => setLocalData({ ...localData, founderVision: e.target.value })}
-                placeholder="Rédigez le texte d'accueil qui sera affiché en première page publique..."
-                className="rounded-lg border-slate-100 bg-slate-50 font-semibold text-xs leading-relaxed"
-              />
+              <div className="space-y-1.5">
+                <Label className="text-[10px] font-black uppercase text-slate-800">Texte / Discours rédigé du dirigeant</Label>
+                <Textarea 
+                  rows={6}
+                  value={localData.founderVision || ""} 
+                  onChange={(e) => setLocalData({ ...localData, founderVision: e.target.value })}
+                  placeholder="Rédigez le texte d'accueil qui sera affiché en première page publique..."
+                  className="rounded-lg border-slate-100 bg-slate-50 font-semibold text-xs leading-relaxed"
+                />
+              </div>
+
+              <div className="space-y-4 pt-4 border-t border-slate-100">
+                <h5 className="text-[10px] font-black uppercase text-slate-900 tracking-wider">
+                  Attributs Spécifiques (Leadership)
+                </h5>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-[9px] font-black uppercase text-slate-800">Fonction du dirigeant</Label>
+                    <Input 
+                      value={localData.founderFonction || ""} 
+                      onChange={(e) => setLocalData({ ...localData, founderFonction: e.target.value })}
+                      placeholder="Ex: Formateur, Enseignant supérieur"
+                      className="h-10 rounded-lg border-slate-100 bg-slate-50 font-semibold text-xs"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[9px] font-black uppercase text-slate-800">Spécialisation</Label>
+                    <Input 
+                      value={localData.founderSpecialisation || ""} 
+                      onChange={(e) => setLocalData({ ...localData, founderSpecialisation: e.target.value })}
+                      placeholder="Ex: Ingénieur électromécanique, Consultant"
+                      className="h-10 rounded-lg border-slate-100 bg-slate-50 font-semibold text-xs"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="space-y-1">
+                    <Label className="text-[9px] font-black uppercase text-slate-800">Poste exact / Titre</Label>
+                    <Input 
+                      value={localData.founderPoste || ""} 
+                      onChange={(e) => setLocalData({ ...localData, founderPoste: e.target.value })}
+                      placeholder="Ex: Directeur Général"
+                      className="h-10 rounded-lg border-slate-100 bg-slate-50 font-semibold text-xs"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label className="text-[9px] font-black uppercase text-slate-800">Biographie courte / Parcours</Label>
+                    <Textarea 
+                      rows={4}
+                      value={localData.founderBio || ""} 
+                      onChange={(e) => setLocalData({ ...localData, founderBio: e.target.value })}
+                      placeholder="Biographie courte ou parcours clé du dirigeant..."
+                      className="rounded-lg border-slate-100 bg-slate-50 font-semibold text-xs leading-relaxed"
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -486,7 +609,10 @@ export default function CMSModule({ currentData, onSave }: CMSProps) {
                           const readersArr: Promise<string>[] = Array.from(files).map((file: any) => {
                             return new Promise((resolve) => {
                               const reader = new FileReader();
-                              reader.onloadend = () => resolve(reader.result as string);
+                              reader.onloadend = async () => {
+                                const compressed = await compressImage(reader.result as string, 900, 900, 0.68);
+                                resolve(compressed);
+                              };
                               reader.readAsDataURL(file);
                             });
                           });
@@ -721,7 +847,10 @@ export default function CMSModule({ currentData, onSave }: CMSProps) {
                               const readersArr: Promise<string>[] = Array.from(files).map((file: any) => {
                                 return new Promise((resolve) => {
                                   const reader = new FileReader();
-                                  reader.onloadend = () => resolve(reader.result as string);
+                                  reader.onloadend = async () => {
+                                    const compressed = await compressImage(reader.result as string, 900, 900, 0.68);
+                                    resolve(compressed);
+                                  };
                                   reader.readAsDataURL(file);
                                 });
                               });
@@ -870,7 +999,10 @@ export default function CMSModule({ currentData, onSave }: CMSProps) {
                               const readersArr: Promise<string>[] = Array.from(files).map((file: any) => {
                                 return new Promise((resolve) => {
                                   const reader = new FileReader();
-                                  reader.onloadend = () => resolve(reader.result as string);
+                                  reader.onloadend = async () => {
+                                    const compressed = await compressImage(reader.result as string, 900, 900, 0.68);
+                                    resolve(compressed);
+                                  };
                                   reader.readAsDataURL(file);
                                 });
                               });

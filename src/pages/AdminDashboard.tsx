@@ -296,15 +296,27 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleJobAction = async (jobId: string, action: 'approve' | 'suspend' | 'delete' | 'toggleFeatured', reason?: string) => {
+  const handleJobAction = async (
+    jobId: string, 
+    action: 'approve' | 'suspend' | 'delete' | 'toggleFeatured' | 'toggleRestricted' | 'toggleHidden' | 'toggleAdminFavorite', 
+    reason?: string
+  ) => {
     try {
       const jobRef = doc(db, 'offers', jobId);
+      // Find existing Job state
+      const jobMatch = allJobs.find(j => j.id === jobId);
+
       if (action === 'delete') {
+        const isAdminJob = jobMatch?.createdBy === 'admin' || jobMatch?.recruiterId === 'admin_popular' || jobMatch?.recruiterId === 'admin';
+        if (!isAdminJob) {
+          throw new Error("Action non autorisée : les administrateurs ne peuvent supprimer définitivement que les offres issues du système administrateur (offres populaires). Utilisez l'outil Masquer pour suspendre les autres offres.");
+        }
         await deleteDoc(jobRef);
         await addLog("Offre supprimée", `ID: ${jobId}`, "warning");
       } else if (action === 'approve') {
         await updateDoc(jobRef, { 
           status: 'active',
+          is_hidden: false,
           approvedAt: serverTimestamp(),
           suspensionReason: null
         });
@@ -312,19 +324,44 @@ export default function AdminDashboard() {
       } else if (action === 'suspend') {
         await updateDoc(jobRef, { 
           status: 'suspended', 
+          is_hidden: true,
           suspensionReason: reason || "Non-conformité de l'offre.",
           suspendedAt: serverTimestamp()
         });
         await addLog("Offre d'emploi masquée", `Suspension de l'offre ID: ${jobId}. Motif: ${reason}`, "warning");
+      } else if (action === 'toggleHidden') {
+        const currentHidden = jobMatch?.is_hidden || jobMatch?.status === 'suspended' || false;
+        const nextHidden = !currentHidden;
+        await updateDoc(jobRef, { 
+          is_hidden: nextHidden,
+          status: nextHidden ? 'suspended' : 'active'
+        });
+        await addLog("Modification masquage offre", `Offre ID: ${jobId} masquée: ${nextHidden}`, "info");
       } else if (action === 'toggleFeatured') {
-        // Find existing Job state
-        const jobMatch = allJobs.find(j => j.id === jobId);
-        const nextFeatured = !(jobMatch?.isFeatured);
-        await updateDoc(jobRef, { isFeatured: nextFeatured });
+        const nextFeatured = !((jobMatch as any)?.is_featured || jobMatch?.isFeatured || false);
+        await updateDoc(jobRef, { 
+          isFeatured: nextFeatured,
+          is_featured: nextFeatured 
+        });
         await addLog("Modification offre à la une", `Offre ID: ${jobId} configurée Featured: ${nextFeatured}`, "info");
+      } else if (action === 'toggleRestricted') {
+        const currentRestricted = (jobMatch as any)?.is_restricted || false;
+        const nextRestricted = !currentRestricted;
+        await updateDoc(jobRef, { 
+          is_restricted: nextRestricted 
+        });
+        await addLog("Modification restriction offre", `Offre ID: ${jobId} restreinte: ${nextRestricted}`, "info");
+      } else if (action === 'toggleAdminFavorite') {
+        const currentFav = (jobMatch as any)?.is_admin_favorite || false;
+        const nextFav = !currentFav;
+        await updateDoc(jobRef, { 
+          is_admin_favorite: nextFav 
+        });
+        await addLog("Offre coup de coeur admin", `Offre ID: ${jobId} favori admin: ${nextFav}`, "info");
       }
     } catch (e) {
       handleFirestoreError(e, OperationType.UPDATE, `offers/${jobId}`);
+      throw e; // rethrow to let caller handle loader/toast
     }
   };
 
@@ -394,9 +431,11 @@ export default function AdminDashboard() {
 
       {/* Sidebar navigation panel */}
       <aside 
-        className={`bg-slate-950 text-white border-r border-slate-900 flex flex-col z-50 shrink-0 transition-all duration-300 ${
-          isSidebarOpen ? 'w-64' : 'w-0 xl:w-20'
-        } fixed xl:relative h-full ${isMobileMenuOpen ? 'w-64' : ''}`}
+        className={`bg-slate-950 text-white border-r border-slate-900 flex flex-col z-50 shrink-0 transition-transform xl:transition-all duration-300 fixed xl:relative h-full top-0 bottom-0 left-0
+          ${isMobileMenuOpen 
+            ? 'translate-x-0 w-64 shadow-2xl' 
+            : '-translate-x-full xl:translate-x-0'
+          } ${isSidebarOpen ? 'xl:w-64' : 'xl:w-20'}`}
       >
         {/* Brand Banner */}
         <div className="h-20 border-b border-slate-900 flex items-center justify-between px-6 shrink-0">
@@ -404,7 +443,7 @@ export default function AdminDashboard() {
             <span className="h-9 w-9 bg-orange-600 rounded-xl flex items-center justify-center font-black text-sm text-white shrink-0 shadow-lg shadow-orange-600/20">
               2N
             </span>
-            {isSidebarOpen && (
+            {(isSidebarOpen || isMobileMenuOpen) && (
               <span className="font-extrabold text-sm tracking-tight text-white select-none whitespace-nowrap">
                 2NG Groupe Console
               </span>
@@ -443,11 +482,11 @@ export default function AdminDashboard() {
               >
                 <div className="flex items-center gap-3">
                   <Icon className="h-5 w-5 shrink-0" />
-                  {isSidebarOpen && <span className="truncate">{item.label}</span>}
+                  {(isSidebarOpen || isMobileMenuOpen) && <span className="truncate">{item.label}</span>}
                 </div>
                 
                 {/* Visual Alert Dot/Badges */}
-                {isSidebarOpen && (
+                {(isSidebarOpen || isMobileMenuOpen) && (
                   <>
                     {item.badge !== undefined && item.badge > 0 && (
                       <span className="h-5 min-w-[20px] px-1.5 rounded-full bg-orange-600 text-[10px] font-bold text-white flex items-center justify-center">
@@ -472,7 +511,7 @@ export default function AdminDashboard() {
             className="w-full h-11 rounded-xl bg-slate-900 hover:bg-slate-850 text-xs font-black uppercase text-slate-300 hover:text-white flex items-center gap-3 justify-center transition-colors"
           >
             <Globe className="h-5 w-5 shrink-0 text-orange-500 animate-pulse" />
-            {isSidebarOpen && <span>Retour au site</span>}
+            {(isSidebarOpen || isMobileMenuOpen) && <span>Retour au site</span>}
           </button>
           
           <button
@@ -481,7 +520,7 @@ export default function AdminDashboard() {
             className="w-full h-11 rounded-xl bg-slate-950 hover:bg-red-950/20 text-xs font-black uppercase text-red-400 hover:text-red-500 flex items-center gap-3 justify-center border border-slate-900 transition-colors"
           >
             <LogOut className="h-5 w-5 shrink-0" />
-            {isSidebarOpen && <span>Déconnection</span>}
+            {(isSidebarOpen || isMobileMenuOpen) && <span>Déconnection</span>}
           </button>
         </div>
       </aside>
@@ -489,7 +528,7 @@ export default function AdminDashboard() {
       {/* Main Panel frame */}
       <div className="flex-1 flex flex-col min-w-0 bg-[#F8FAFC]">
         {/* Topbar navigation metrics */}
-        <header className="h-20 bg-white border-b border-slate-100 flex items-center justify-between px-6 shrink-0">
+        <header className="h-20 bg-white/95 backdrop-blur-md border-b border-slate-100 flex items-center justify-between px-6 shrink-0 sticky top-0 z-40">
           <div className="flex items-center gap-3">
             <Button 
               size="icon" 

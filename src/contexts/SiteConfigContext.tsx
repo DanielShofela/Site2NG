@@ -13,6 +13,10 @@ interface SiteConfig {
   founderName?: string;
   founderTitle?: string;
   founderVision?: string;
+  founderFonction?: string;
+  founderSpecialisation?: string;
+  founderPoste?: string;
+  founderBio?: string;
   
   // Banner fields
   bannerEnabled?: boolean;
@@ -44,6 +48,10 @@ const defaultContent: SiteConfig = {
   founderName: "",
   founderTitle: "",
   founderVision: "",
+  founderFonction: "",
+  founderSpecialisation: "",
+  founderPoste: "",
+  founderBio: "",
   bannerEnabled: false,
   bannerContent: "🌟 Offre Élite 2NG : Recrutez de nouveaux talents dès aujourd'hui !",
   bannerBgColor: "#ea580c",

@@ -40,6 +40,10 @@ export default function UsersModule({ users, onAction, addLog }: UsersModuleProp
   const [roleFilter, setRoleFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   
+  const [cityFilter, setCityFilter] = useState("");
+  const [sortField, setSortField] = useState("createdAt"); // 'createdAt' | 'name'
+  const [sortOrder, setSortOrder] = useState("desc");      // 'asc' | 'desc'
+  
   const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
   const [isViewOpen, setIsViewOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
@@ -49,7 +53,8 @@ export default function UsersModule({ users, onAction, addLog }: UsersModuleProp
   const [isSendingCorrection, setIsSendingCorrection] = useState(false);
 
   const filteredUsers = useMemo(() => {
-    return users.filter(u => {
+    // 1. Filter
+    let result = users.filter(u => {
       const name = (u.displayName || u.companyName || u.email || "").toLowerCase();
       const matchSearch = name.includes(searchTerm.toLowerCase());
       const matchRole = roleFilter === "all" || u.role === roleFilter;
@@ -60,10 +65,29 @@ export default function UsersModule({ users, onAction, addLog }: UsersModuleProp
         else if (statusFilter === "active") matchStatus = u.accountStatus !== "suspended";
         else if (statusFilter === "pending") matchStatus = u.status === "pending" || u.status === "submitted" || u.status === "verifying";
       }
+
+      const userCity = (u.city || "").toLowerCase();
+      const matchCity = !cityFilter || userCity.includes(cityFilter.toLowerCase());
       
-      return matchSearch && matchRole && matchStatus;
+      return matchSearch && matchRole && matchStatus && matchCity;
     });
-  }, [users, searchTerm, roleFilter, statusFilter]);
+
+    // 2. Sort
+    result.sort((a, b) => {
+      if (sortField === "name") {
+        const nameA = (a.companyName || a.displayName || a.email || "").toLowerCase();
+        const nameB = (b.companyName || b.displayName || b.email || "").toLowerCase();
+        return sortOrder === "asc" ? nameA.localeCompare(nameB) : nameB.localeCompare(nameA);
+      } else if (sortField === "createdAt") {
+        const timeA = a.createdAt?.seconds || 0;
+        const timeB = b.createdAt?.seconds || 0;
+        return sortOrder === "asc" ? timeA - timeB : timeB - timeA;
+      }
+      return 0;
+    });
+
+    return result;
+  }, [users, searchTerm, roleFilter, statusFilter, cityFilter, sortField, sortOrder]);
 
   // Export users to CSV format
   const handleExportCSV = () => {
@@ -108,31 +132,45 @@ export default function UsersModule({ users, onAction, addLog }: UsersModuleProp
   return (
     <>
       <Card className="border-none shadow-sm rounded-[32px] overflow-hidden bg-white">
-        <CardHeader className="border-b border-slate-50 flex flex-col md:flex-row md:items-center justify-between gap-6 p-6 md:p-8">
-          <div>
-            <CardTitle className="text-xl font-black text-slate-900">Annuaire des Adhérents</CardTitle>
-            <CardDescription className="text-xs font-semibold text-slate-400 mt-1">Supervisez, suspendez ou supprimez les comptes inscrits.</CardDescription>
-          </div>
-          <div className="flex flex-wrap gap-3 items-center w-full md:w-auto">
+        <CardHeader className="border-b border-slate-50 flex flex-col gap-6 p-6 md:p-8">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div>
+              <CardTitle className="text-xl font-black text-slate-900 animate-fade-in">Annuaire des Adhérents</CardTitle>
+              <CardDescription className="text-xs font-semibold text-slate-400 mt-1">Supervisez, suspendez ou supprimez les comptes inscrits.</CardDescription>
+            </div>
             <Button 
               onClick={handleExportCSV}
               variant="outline" 
-              className="h-11 rounded-xl font-black text-xs uppercase px-4 border-slate-100 bg-slate-50 flex items-center gap-2 text-slate-600 hover:bg-slate-100"
+              className="h-11 rounded-xl font-black text-xs uppercase px-4 border-slate-100 bg-slate-50 flex items-center gap-2 text-slate-600 hover:bg-slate-100 w-full md:w-auto justify-center"
             >
               <Download className="h-4 w-4 text-orange-600" /> Export CSV
             </Button>
-            <div className="relative flex-1 sm:w-64 min-w-[200px]">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          </div>
+
+          {/* ADVANCED FILTER GRID */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 bg-slate-50/50 p-4 rounded-2xl border border-slate-100/60 shadow-sm">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
               <Input 
-                placeholder="Rechercher par nom, email..." 
-                className="pl-10 h-11 rounded-xl border-slate-100 bg-slate-50 text-sm font-semibold"
+                placeholder="Nom, entreprise, email..." 
+                className="pl-9 h-10 border-slate-150 bg-white text-xs font-semibold rounded-xl"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            
+
+            <div className="relative">
+              <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+              <Input 
+                placeholder="Filtrer par Ville..." 
+                className="pl-9 h-10 border-slate-150 bg-white text-xs font-semibold rounded-xl"
+                value={cityFilter}
+                onChange={(e) => setCityFilter(e.target.value)}
+              />
+            </div>
+
             <select 
-              className="h-11 px-4 rounded-xl border border-slate-100 bg-slate-50 text-xs font-black uppercase text-slate-600 outline-none cursor-pointer"
+              className="h-10 px-3.5 rounded-xl border border-slate-150 bg-white text-xs font-black uppercase text-slate-600 outline-none cursor-pointer"
               value={roleFilter}
               onChange={(e) => setRoleFilter(e.target.value)}
             >
@@ -143,15 +181,34 @@ export default function UsersModule({ users, onAction, addLog }: UsersModuleProp
             </select>
 
             <select 
-              className="h-11 px-4 rounded-xl border border-slate-100 bg-slate-50 text-xs font-black uppercase text-slate-600 outline-none cursor-pointer"
+              className="h-10 px-3.5 rounded-xl border border-slate-150 bg-white text-xs font-black uppercase text-slate-600 outline-none cursor-pointer"
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
             >
               <option value="all">Tous les statuts</option>
-              <option value="active">Actifs</option>
-              <option value="suspended">Suspendus</option>
-              <option value="pending">En attente juridique</option>
+              <option value="active">Comptes Actifs</option>
+              <option value="suspended">Comptes Suspendus</option>
+              <option value="pending">En attente juridique (Validation)</option>
             </select>
+
+            <div className="flex gap-2">
+              <select 
+                className="h-10 px-3 rounded-xl border border-slate-150 bg-white text-[10px] font-black uppercase text-slate-600 outline-none cursor-pointer flex-1"
+                value={sortField}
+                onChange={(e) => setSortField(e.target.value)}
+              >
+                <option value="createdAt">Date Inscription</option>
+                <option value="name">Noms (A-Z)</option>
+              </select>
+              <select 
+                className="h-10 px-2.5 rounded-xl border border-slate-150 bg-white text-[9px] font-black uppercase text-slate-500 outline-none cursor-pointer shrink-0"
+                value={sortOrder}
+                onChange={(e) => setSortOrder(e.target.value)}
+              >
+                <option value="desc">DECR ↓</option>
+                <option value="asc">CROI ↑</option>
+              </select>
+            </div>
           </div>
         </CardHeader>
         

@@ -60,14 +60,17 @@ export default function Jobs() {
   const [salaryFilter, setSalaryFilter] = useState('all'); // 'all', 'specified', 'unspecified'
   const [showMobileFilters, setShowMobileFilters] = useState(false);
 
-  // Load All Active Jobs on mount
+  // Load All Active Jobs on mount (or when admin role changes)
   useEffect(() => {
     const fetchJobsAndRecruiters = async () => {
       try {
-        const q = query(
-          collection(db, 'offers'),
-          where('status', '==', 'active')
-        );
+        const isAdmin = user?.role === 'admin';
+        const q = isAdmin
+          ? query(collection(db, 'offers'))
+          : query(
+              collection(db, 'offers'),
+              where('status', '==', 'active')
+            );
         const querySnapshot = await getDocs(q);
         const jobsData = querySnapshot.docs.map(doc => ({
           id: doc.id,
@@ -119,7 +122,7 @@ export default function Jobs() {
     };
 
     fetchJobsAndRecruiters();
-  }, []);
+  }, [user]);
 
   // Fetch applicant's applications to toggle correct postulé status in the list
   useEffect(() => {
@@ -207,6 +210,13 @@ export default function Jobs() {
 
   // Highly responsive 5-dimension filter mechanism
   const filteredJobs = jobs.filter(job => {
+    // 0. Screen out hidden or restricted jobs (unless user is an admin or the owner recruiter)
+    const isAdmin = user?.role === 'admin';
+    const isOwner = user && (job.recruiterId === user.uid || (job as any).companyId === user.uid);
+    if (!isAdmin && !isOwner) {
+      if (job.is_hidden || job.is_restricted) return false;
+    }
+
     // 1. Search query
     const queryStr = searchTerm.toLowerCase();
     const docName = currentCompanyName(job).toLowerCase();

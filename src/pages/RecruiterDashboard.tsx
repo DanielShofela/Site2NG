@@ -40,7 +40,8 @@ import {
   Palette,
   AlertTriangle,
   HelpCircle,
-  Check
+  Check,
+  Trash2
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -58,7 +59,8 @@ import {
   doc,
   updateDoc,
   increment,
-  onSnapshot
+  onSnapshot,
+  deleteDoc
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Job, Application, SupportTicket, UserProfile } from '@/types';
@@ -85,9 +87,14 @@ export default function RecruiterDashboard() {
   const [jobType, setJobType] = useState('CDI');
   const [jobLocation, setJobLocation] = useState('');
   const [jobDescription, setJobDescription] = useState('');
-  const [jobField, setJobField] = useState('Informatique');
+  const [jobField, setJobField] = useState('Technologie & IA');
   const [jobSalary, setJobSalary] = useState('');
   const [jobExpiresAt, setJobExpiresAt] = useState('');
+  const [jobRequirements, setJobRequirements] = useState('');
+  const [jobStudyLevels, setJobStudyLevels] = useState<string[]>(["Bac+3"]);
+  const [jobExperienceYears, setJobExperienceYears] = useState<string>("3 ans");
+  const [jobRequiredDocs, setJobRequiredDocs] = useState<string[]>(["Curriculum Vitae (CV)"]);
+  const [jobPrioritizePlatform, setJobPrioritizePlatform] = useState<boolean>(true);
 
   // Edit form state
   const [editingJob, setEditingJob] = useState<Job | null>(null);
@@ -96,9 +103,14 @@ export default function RecruiterDashboard() {
   const [editType, setEditType] = useState('CDI');
   const [editLocation, setEditLocation] = useState('');
   const [editDescription, setEditDescription] = useState('');
-  const [editField, setEditField] = useState('Informatique');
+  const [editField, setEditField] = useState('Technologie & IA');
   const [editSalary, setEditSalary] = useState('');
   const [editExpiresAt, setEditExpiresAt] = useState('');
+  const [editRequirements, setEditRequirements] = useState('');
+  const [editStudyLevels, setEditStudyLevels] = useState<string[]>(["Bac+3"]);
+  const [editExperienceYears, setEditExperienceYears] = useState<string>("3 ans");
+  const [editRequiredDocs, setEditRequiredDocs] = useState<string[]>(["Curriculum Vitae (CV)"]);
+  const [editPrioritizePlatform, setEditPrioritizePlatform] = useState<boolean>(true);
 
   // Data state
   const [myJobs, setMyJobs] = useState<Job[]>([]);
@@ -306,14 +318,44 @@ export default function RecruiterDashboard() {
     };
   };
 
+  const handleDeleteJob = async (jobId: string) => {
+    if (!window.confirm("Êtes-vous absolument sûr de vouloir supprimer définitivement cette offre d'emploi ? Cette action est irréversible et supprimera également toutes les statistiques et candidatures associées.")) {
+      return;
+    }
+    try {
+      await deleteDoc(doc(db, 'offers', jobId));
+      
+      // Also delete associated applications to clean up!
+      const appsQ = query(collection(db, 'applications'), where('jobId', '==', jobId));
+      const appsSnap = await getDocs(appsQ);
+      const batchPromises = appsSnap.docs.map(appDoc => deleteDoc(appDoc.ref));
+      await Promise.all(batchPromises);
+      
+      // Update local state
+      setMyJobs(prev => prev.filter(j => j.id !== jobId));
+      alert("L'offre d'emploi a été supprimée avec succès.");
+    } catch (error) {
+      console.error("Error deleting job offer:", error);
+      alert("Une erreur est survenue lors de la suppression de l'offre d'emploi. Veuillez réessayer.");
+    }
+  };
+
   const handleOpenEdit = (job: Job) => {
     setEditingJob(job);
     setEditTitle(job.title || '');
     setEditType((job as any).contractType || job.type || 'CDI');
     setEditLocation(job.location || '');
     setEditDescription(job.description || '');
-    setEditField(job.field || 'Informatique');
+    setEditField(job.field || 'Technologie & IA');
     setEditSalary(job.salary || '');
+    
+    // Loaded extended fields
+    setEditStudyLevels((job as any).studyLevels || ["Bac+3"]);
+    setEditExperienceYears((job as any).experienceYears || "3 ans");
+    setEditRequiredDocs((job as any).requiredDocs || ["Curriculum Vitae (CV)"]);
+    setEditPrioritizePlatform((job as any).prioritizePlatform !== false);
+    setEditRequirements((job as any).requirements || "");
+
     const expiresVal = (job as any).expiresAt ? (typeof (job as any).expiresAt === 'string' ? (job as any).expiresAt : ((job as any).expiresAt.toDate ? (job as any).expiresAt.toDate() : new Date((job as any).expiresAt)).toISOString().substring(0, 16)) : '';
     setEditExpiresAt(expiresVal);
     setIsEditingJobOpen(true);
@@ -345,7 +387,14 @@ export default function RecruiterDashboard() {
         salary: editSalary,
         expiresAt: editExpiresAt ? new Date(editExpiresAt) : null,
         status: 'pending_validation', // Go back to pending validation upon modification
-        updatedAt: serverTimestamp()
+        updatedAt: serverTimestamp(),
+        
+        // Expanded recruiting criteria
+        studyLevels: editStudyLevels,
+        experienceYears: editExperienceYears,
+        requiredDocs: editRequiredDocs,
+        prioritizePlatform: editPrioritizePlatform,
+        requirements: editRequirements
       });
       
       // Update local state
@@ -360,7 +409,12 @@ export default function RecruiterDashboard() {
         category: editField,
         salary: editSalary,
         expiresAt: editExpiresAt ? new Date(editExpiresAt) : null,
-        status: 'pending_validation'
+        status: 'pending_validation',
+        studyLevels: editStudyLevels,
+        experienceYears: editExperienceYears,
+        requiredDocs: editRequiredDocs,
+        prioritizePlatform: editPrioritizePlatform,
+        requirements: editRequirements
       } : j));
       
       setIsEditingJobOpen(false);
@@ -408,7 +462,14 @@ export default function RecruiterDashboard() {
         expiresAt: jobExpiresAt ? new Date(jobExpiresAt) : null,
         status: 'pending_validation', // Default is en attente de validation
         createdAt: serverTimestamp(),
-        isFeatured: false
+        isFeatured: false,
+        
+        // Expanded recruiting criteria
+        studyLevels: jobStudyLevels,
+        experienceYears: jobExperienceYears,
+        requiredDocs: jobRequiredDocs,
+        prioritizePlatform: jobPrioritizePlatform,
+        requirements: jobRequirements
       };
 
       const docRef = await addDoc(collection(db, 'offers'), jobData);
@@ -423,6 +484,11 @@ export default function RecruiterDashboard() {
       setJobDescription('');
       setJobSalary('');
       setJobExpiresAt('');
+      setJobRequirements('');
+      setJobStudyLevels(["Bac+3"]);
+      setJobExperienceYears("3 ans");
+      setJobRequiredDocs(["Curriculum Vitae (CV)"]);
+      setJobPrioritizePlatform(true);
     } catch (error) {
       console.error('Error creating job:', error);
     } finally {
@@ -640,64 +706,227 @@ export default function RecruiterDashboard() {
                     </Button>
                   </div>
                 ) : (
-                  <form onSubmit={handleCreateJob} className="p-8 space-y-6">
-                    <div className="space-y-2">
-                      <Label htmlFor="title" className="font-black text-slate-700 ml-1 uppercase text-xs tracking-widest">Intitulé du poste *</Label>
-                      <Input id="title" placeholder="Ex: Senior Marketing Manager" className="h-14 rounded-2xl border-slate-200 focus-visible:ring-orange-600 font-bold" value={jobTitle} onChange={e => setJobTitle(e.target.value)} required />
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="type" className="font-black text-slate-700 ml-1 uppercase text-xs tracking-widest">Contrat</Label>
-                        <Select value={jobType} onValueChange={setJobType}>
-                          <SelectTrigger className="h-14 rounded-2xl border-slate-200 font-bold">
-                            <SelectValue placeholder="Choisir..." />
-                          </SelectTrigger>
-                          <SelectContent className="rounded-2xl">
-                            <SelectItem value="CDI">CDI</SelectItem>
-                            <SelectItem value="CDD">CDD</SelectItem>
-                            <SelectItem value="Stage">Stage</SelectItem>
-                            <SelectItem value="Freelance">Freelance</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="location" className="font-black text-slate-700 ml-1 uppercase text-xs tracking-widest">Ville *</Label>
-                        <Input id="location" placeholder="Abidjan, Dakar..." className="h-14 rounded-2xl border-slate-200 focus-visible:ring-orange-600 font-bold" value={jobLocation} onChange={e => setJobLocation(e.target.value)} required />
-                      </div>
-                    </div>
+                  <form onSubmit={handleCreateJob} className="p-8 space-y-6 text-left">
                     
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="category" className="font-black text-slate-700 ml-1 uppercase text-xs tracking-widest">Secteur d'activité *</Label>
-                        <Select value={jobField} onValueChange={setJobField}>
-                          <SelectTrigger className="h-14 rounded-2xl border-slate-200 font-bold">
-                            <SelectValue placeholder="Secteur..." />
+                    {/* BLOCK 1: INFORMATIONS ENTREPRISE */}
+                    <div className="bg-slate-50/50 p-5 rounded-2xl border border-slate-100 space-y-4">
+                      <h4 className="text-xs font-black text-orange-600 uppercase tracking-widest border-b border-orange-100 pb-2 flex items-center gap-1.5">
+                        <Building2 className="h-4 w-4" /> Block 1 : Informations Entreprise & Contact
+                      </h4>
+                      
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                          <Label className="text-[10px] font-black text-slate-900 uppercase">Secteur / Domaine d'activité</Label>
+                          <Select value={jobField} onValueChange={setJobField}>
+                            <SelectTrigger className="h-12 rounded-xl border-slate-200 bg-white font-bold text-xs">
+                              <SelectValue placeholder="Secteur..." />
+                            </SelectTrigger>
+                            <SelectContent className="rounded-2xl">
+                              <SelectItem value="Technologie & IA">Technologie & IA</SelectItem>
+                              <SelectItem value="Banque, Assurances, Finance">Banque & Finance</SelectItem>
+                              <SelectItem value="Bâtiment & Travaux Publics (BTP)">Bâtiments / BTP</SelectItem>
+                              <SelectItem value="Transport & Logistique">Transport & Logistique</SelectItem>
+                              <SelectItem value="Santé & Paramédical">Santé & Paramédical</SelectItem>
+                              <SelectItem value="Agriculture & Agroalimentaire">Agriculture & Agroalimentaire</SelectItem>
+                              <SelectItem value="Mines & Énergie">Mines & Énergie</SelectItem>
+                              <SelectItem value="Éducation & Formation">Éducation & Formation</SelectItem>
+                              <SelectItem value="Télécommunications">Télécommunications</SelectItem>
+                              <SelectItem value="Tourisme & Hôtellerie">Tourisme & Hôtellerie</SelectItem>
+                              <SelectItem value="Commerce, Distribution, Vente">Commerce / Vente</SelectItem>
+                              <SelectItem value="Administration & Fonction Publique">Administration / Fonction Publique</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="space-y-1">
+                          <Label className="text-[10px] font-black text-slate-900 uppercase">Localisation (Ville, Pays) *</Label>
+                          <Input 
+                            required
+                            value={jobLocation} 
+                            onChange={(e) => setJobLocation(e.target.value)}
+                            className="h-12 rounded-xl border-slate-200 bg-white text-xs font-bold"
+                            placeholder="Ex: Abidjan, Côte d'Ivoire"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 pt-2">
+                        <input
+                          id="recruiter-prioritize-platform"
+                          type="checkbox"
+                          checked={jobPrioritizePlatform}
+                          onChange={(e) => setJobPrioritizePlatform(e.target.checked)}
+                          className="h-4.5 w-4.5 rounded border-slate-350 text-orange-600 focus:ring-orange-500 cursor-pointer"
+                        />
+                        <Label htmlFor="recruiter-prioritize-platform" className="text-[10px] font-black text-slate-700 cursor-pointer select-none">
+                          Prioriser le canal direct de la plate-forme (Recommandé)
+                        </Label>
+                      </div>
+                    </div>
+
+                    {/* BLOCK 2: DÉTAILS DE L’OFFRE */}
+                    <div className="bg-slate-50/50 p-5 rounded-2xl border border-slate-100 space-y-4">
+                      <h4 className="text-xs font-black text-orange-600 uppercase tracking-widest border-b border-orange-100 pb-2 flex items-center gap-1.5">
+                        <Briefcase className="h-4 w-4" /> Block 2 : Descriptif de l'offre
+                      </h4>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                          <Label className="text-[10px] font-black text-slate-900 uppercase">Intitulé du Poste Recherché *</Label>
+                          <Input 
+                            required
+                            placeholder="Ex: Chef de Projet Digital" 
+                            value={jobTitle} 
+                            onChange={(e) => setJobTitle(e.target.value)}
+                            className="h-12 rounded-xl border-slate-200 bg-white text-xs font-bold"
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <Label className="text-[10px] font-black text-slate-900 uppercase">Contrat de Travail *</Label>
+                          <Select value={jobType} onValueChange={setJobType}>
+                            <SelectTrigger className="h-12 rounded-xl border-slate-200 bg-white font-bold text-xs">
+                              <SelectValue placeholder="Contrat..." />
+                            </SelectTrigger>
+                            <SelectContent className="rounded-2xl">
+                              <SelectItem value="CDI">CDI (Indéterminé)</SelectItem>
+                              <SelectItem value="CDD">CDD (Déterminé)</SelectItem>
+                              <SelectItem value="Stage">Stage Professionnel</SelectItem>
+                              <SelectItem value="Freelance">Consultant / Freelance</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                          <Label className="text-[10px] font-black text-slate-900 uppercase">Rémunération Mensuelle (Optionnelle)</Label>
+                          <Input 
+                            placeholder="Ex: 500.000 F CFA - 800.000 F CFA" 
+                            value={jobSalary} 
+                            onChange={(e) => setJobSalary(e.target.value)}
+                            className="h-12 rounded-xl border-slate-200 bg-white text-xs font-bold"
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <Label className="text-[10px] font-black text-slate-900 uppercase">Date limite d'expiration *</Label>
+                          <Input 
+                            required
+                            type="datetime-local" 
+                            value={jobExpiresAt} 
+                            onChange={(e) => setJobExpiresAt(e.target.value)}
+                            className="h-12 rounded-xl border-slate-200 bg-white text-xs font-bold"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <Label className="text-[10px] font-black text-slate-900 uppercase">Missions & Présentation du poste *</Label>
+                        <Textarea 
+                          required
+                          rows={4}
+                          placeholder="Décrivez précisément les missions du collaborateur..."
+                          value={jobDescription}
+                          onChange={(e) => setJobDescription(e.target.value)}
+                          className="rounded-xl border-slate-200 bg-white text-xs font-medium p-3"
+                        />
+                      </div>
+                    </div>
+
+                    {/* BLOCK 3: CRITÈRES & COMPÉTENCES */}
+                    <div className="bg-slate-50/50 p-5 rounded-2xl border border-slate-100 space-y-4">
+                      <h4 className="text-xs font-black text-orange-600 uppercase tracking-widest border-b border-orange-100 pb-2 flex items-center gap-1.5">
+                        <Check className="h-4 w-4" /> Block 3 : Compétences, Diplômes & Expérience
+                      </h4>
+
+                      <div className="space-y-1.5">
+                        <Label className="text-[10px] font-black text-slate-900 uppercase">Expérience Professionnelle Requise</Label>
+                        <Select value={jobExperienceYears} onValueChange={setJobExperienceYears}>
+                          <SelectTrigger className="h-12 rounded-xl border-slate-200 bg-white font-bold text-xs">
+                            <SelectValue placeholder="Expérience..." />
                           </SelectTrigger>
                           <SelectContent className="rounded-2xl">
-                            <SelectItem value="Civil Engineering">Génie Civil / BTP</SelectItem>
-                            <SelectItem value="Medical Health">Santé / Médical</SelectItem>
-                            <SelectItem value="Commerce">Commerce / Vente</SelectItem>
-                            <SelectItem value="Finance">Finance / Gestion</SelectItem>
-                            <SelectItem value="Informatique">Technologies / IT</SelectItem>
-                            <SelectItem value="Autre">Autre</SelectItem>
+                            <SelectItem value="1 an">1 an d'expérience</SelectItem>
+                            <SelectItem value="2 ans">2 ans d'expérience</SelectItem>
+                            <SelectItem value="3 ans">3 ans d'expérience (Recommandé)</SelectItem>
+                            <SelectItem value="5 ans">5 ans d'expérience (Senior)</SelectItem>
+                            <SelectItem value="10 ans+">10 ans+ d'expérience (Expert)</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
+
                       <div className="space-y-2">
-                        <Label htmlFor="salary" className="font-black text-slate-700 ml-1 uppercase text-xs tracking-widest">Salaire (CFA) *</Label>
-                        <Input id="salary" placeholder="Ex: 500 000 CFA / mois" className="h-14 rounded-2xl border-slate-200 focus-visible:ring-orange-600 font-bold" value={jobSalary} onChange={e => setJobSalary(e.target.value)} required />
+                        <Label className="text-[10px] font-black text-slate-900 uppercase">Niveaux d'études exigés (Sélection multiple)</Label>
+                        <div className="flex flex-wrap gap-x-4 gap-y-2 bg-white p-3 rounded-xl border border-slate-200">
+                          {["Bac", "Bac+2", "Bac+3", "Bac+5", "Bac+8 (Doctorat)"].map((level) => {
+                            const checked = jobStudyLevels.includes(level);
+                            return (
+                              <label key={level} className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-700 select-none">
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  onChange={() => {
+                                    if (checked) {
+                                      setJobStudyLevels(jobStudyLevels.filter(x => x !== level));
+                                    } else {
+                                      setJobStudyLevels([...jobStudyLevels, level]);
+                                    }
+                                  }}
+                                  className="h-4 w-4 rounded border-slate-300 text-orange-600 focus:ring-orange-500"
+                                />
+                                {level}
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="text-[10px] font-black text-slate-900 uppercase">Pièces complémentaires exigées *</Label>
+                        <div className="flex flex-wrap gap-x-4 gap-y-2 bg-white p-3 rounded-xl border border-slate-200">
+                          {[
+                            "Curriculum Vitae (CV)",
+                            "Lettre de Motivation (LM)",
+                            "Diplômes / Certificats d'études",
+                            "Attestation de travail",
+                            "Pièce d'identité (CNI / Passeport)"
+                          ].map((docName) => {
+                            const checked = jobRequiredDocs.includes(docName);
+                            return (
+                              <label key={docName} className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-700 select-none">
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  onChange={() => {
+                                    if (checked) {
+                                      setJobRequiredDocs(jobRequiredDocs.filter(x => x !== docName));
+                                    } else {
+                                      setJobRequiredDocs([...jobRequiredDocs, docName]);
+                                    }
+                                  }}
+                                  className="h-4 w-4 rounded border-slate-300 text-orange-600 focus:ring-orange-500"
+                                />
+                                {docName}
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <Label className="text-[10px] font-black text-slate-900 uppercase">Compétences clés impératives (1 par ligne) *</Label>
+                        <Textarea 
+                          required
+                          rows={3}
+                          placeholder="Ex: Maîtrise avancée de React & NodeJS&#10;Expérience de 3 ans min en PME&#10;Rigueur et esprit critique"
+                          value={jobRequirements}
+                          onChange={(e) => setJobRequirements(e.target.value)}
+                          className="rounded-xl border-slate-200 bg-white text-xs font-medium p-3"
+                        />
                       </div>
                     </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="expiresAt" className="font-black text-slate-700 ml-1 uppercase text-xs tracking-widest">Date d'expiration (Sous 48h = Automatiquement "Offre Rapide")</Label>
-                      <Input id="expiresAt" type="datetime-local" className="h-14 rounded-2xl border-slate-200 focus-visible:ring-orange-600 font-bold" value={jobExpiresAt} onChange={e => setJobExpiresAt(e.target.value)} />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="description" className="font-black text-slate-700 ml-1 uppercase text-xs tracking-widest">Descriptif & Missions *</Label>
-                      <Textarea id="description" className="min-h-[120px] rounded-3xl border-slate-200 focus-visible:ring-orange-600 font-medium p-6" placeholder="Qu'attendez-vous du candidat idéal ?" value={jobDescription} onChange={e => setJobDescription(e.target.value)} required />
-                    </div>
                     <DialogFooter>
                       <Button type="submit" className="w-full h-16 rounded-2xl bg-orange-600 hover:bg-orange-700 text-white font-black shadow-xl shadow-orange-600/20 border-none transition-all" disabled={isCreatingJob}>
                         {isCreatingJob ? "ENVOI EN VALIDATION..." : "SOUMETTRE À LA VALIDATION"}
@@ -848,12 +1077,23 @@ export default function RecruiterDashboard() {
                           <Button 
                             variant="outline" 
                             size="sm" 
-                            className="rounded-xl border-slate-200 h-10 px-4 font-black text-xs text-slate-705 hover:bg-slate-50 hover:text-orange-600 transition-colors"
+                            className="rounded-xl border-slate-200 h-10 px-4 font-black text-xs text-slate-700 hover:bg-slate-50 hover:text-orange-600 transition-colors"
                             onClick={() => handleOpenEdit(job)}
                           >
                             Modifier
                           </Button>
                         )}
+
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="rounded-xl text-red-600 hover:text-red-700 hover:bg-red-50 h-10 px-3 font-black text-xs transition-colors flex items-center gap-1.5"
+                          onClick={() => handleDeleteJob(job.id)}
+                          title="Supprimer définitivement l'offre"
+                        >
+                          <Trash2 className="h-4 w-4 shrink-0 text-red-500" />
+                          Supprimer
+                        </Button>
                       </div>
                     </div>
                   </CardHeader>

@@ -89,6 +89,39 @@ export default function About() {
                 </p>
               </div>
             )}
+
+            {/* Executive Badge Grid */}
+            {(config.founderFonction || config.founderPoste || config.founderSpecialisation) && (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 border-y border-slate-100 py-4 my-2">
+                {config.founderFonction && (
+                  <div className="space-y-0.5">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Fonction</span>
+                    <span className="text-xs font-black text-slate-800">{config.founderFonction}</span>
+                  </div>
+                )}
+                {config.founderPoste && (
+                  <div className="space-y-0.5">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Poste Actuel</span>
+                    <span className="text-xs font-black text-slate-800">{config.founderPoste}</span>
+                  </div>
+                )}
+                {config.founderSpecialisation && (
+                  <div className="space-y-0.5">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Spécialisation</span>
+                    <span className="text-xs font-black text-slate-800">{config.founderSpecialisation}</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {config.founderBio && (
+              <div className="space-y-1.5 pt-2">
+                <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider">Biographie & leadership</h4>
+                <p className="text-slate-505 text-xs md:text-sm leading-relaxed font-medium">
+                  {config.founderBio}
+                </p>
+              </div>
+            )}
           </div>
         </motion.div>
       )}

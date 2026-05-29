@@ -1264,13 +1264,29 @@ export default function Home() {
 
           <div className="mt-8 flex flex-col sm:flex-row gap-4 justify-center items-center">
             <Button 
-              onClick={() => navigate('/signup')}
+              onClick={() => {
+                if (user) {
+                  if (user.role === 'recruiter') navigate('/recruiter-dashboard');
+                  else if (user.role === 'candidate') navigate('/candidate-dashboard');
+                  else if (user.role === 'admin') navigate('/admin-dashboard');
+                } else {
+                  window.location.href = '/signup';
+                }
+              }}
               className="w-full sm:w-auto h-14 px-8 bg-slate-900 border-none hover:bg-slate-800 text-white font-extrabold rounded-2xl shadow-xl hover:scale-[1.02] transition-transform"
             >
               Créer un compte
             </Button>
             <Button 
-              onClick={() => navigate('/signup?role=recruiter')}
+              onClick={() => {
+                if (user) {
+                  if (user.role === 'recruiter') navigate('/recruiter-dashboard?create=true');
+                  else if (user.role === 'admin') navigate('/admin-dashboard?create=true');
+                  else navigate('/signup?role=recruiter');
+                } else {
+                  window.location.href = '/signup?role=recruiter';
+                }
+              }}
               className="w-full sm:w-auto h-14 px-8 bg-white border-none text-orange-600 hover:bg-orange-50 font-extrabold rounded-2xl shadow-md hover:scale-[1.02] transition-transform"
             >
               Publier une offre

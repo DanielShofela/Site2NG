@@ -49,6 +49,16 @@ export default function ApplicationsModule({ applications, users, jobs, onUpdate
     });
   }, [applications, searchTerm, statusFilter]);
 
+  const selectedJob = useMemo(() => {
+    if (!selectedApp || !jobs) return null;
+    return jobs.find((j: any) => j.id === selectedApp.jobId);
+  }, [selectedApp, jobs]);
+
+  const isDirectAdminJob = useMemo(() => {
+    if (!selectedJob) return false;
+    return selectedJob.createdBy === 'admin' || selectedJob.recruiterId === 'admin_popular' || selectedJob.recruiterId === 'admin';
+  }, [selectedJob]);
+
   const handleUpdateStatus = async (appId: string, newStatus: string) => {
     setUpdating(true);
     try {
@@ -215,16 +225,33 @@ export default function ApplicationsModule({ applications, users, jobs, onUpdate
                   </div>
                 </DialogTitle>
                 <DialogDescription className="text-left font-bold text-sm text-slate-400 mt-1">
-                  Examen approfondi du dossier de candidature et lettre de motivation transmise.
+                  Examen du dossier de candidature et suivi d'orientation.
                 </DialogDescription>
               </DialogHeader>
+
+              {/* CONFIDENTIAL BANNER FOR EXTERNAL COMPANY JOBS */}
+              {!isDirectAdminJob ? (
+                <div className="bg-amber-50/80 border border-amber-200/60 p-5 rounded-2xl flex items-start gap-3.5 text-left">
+                  <AlertCircle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <h5 className="text-xs font-black uppercase text-amber-900 tracking-wide">Accès Restreint & Confidentiel B2B</h5>
+                    <p className="text-[11px] font-semibold text-amber-700 leading-relaxed">
+                      Cette candidature appartient à une offre d'emploi interne gérée directement par l'entreprise concernée. En tant qu'administrateur de la plateforme, vous n'êtes habilité qu'à visualiser les statistiques d'activité. Le dossier complet, la lettre de motivation, le Curriculum Vitae (CV) et la gestion des statuts restent la propriété exclusive et confidentielle du recruteur de l'entreprise.
+                    </p>
+                  </div>
+                </div>
+              ) : null}
 
               {/* Cover Letter Panel */}
               <div className="space-y-2">
                 <Label className="text-[10px] font-black tracking-widest text-slate-400 uppercase">Lettre d'introduction / Motivation</Label>
                 <div className="p-5 bg-slate-50 border border-slate-55 rounded-2xl">
                   <p className="text-xs font-semibold text-slate-600 whitespace-pre-line leading-relaxed italic">
-                    {selectedApp.coverLetter ? `"${selectedApp.coverLetter}"` : `"Aucune lettre de motivation d'introduction n'a été rédigée."`}
+                    {!isDirectAdminJob ? (
+                      "• • • • • • • • • • (Lettre masquée pour préserver la confidentialité B2B de l'entreprise)"
+                    ) : (
+                      selectedApp.coverLetter ? `"${selectedApp.coverLetter}"` : `"Aucune lettre de motivation d'introduction n'a été rédigée."`
+                    )}
                   </p>
                 </div>
               </div>
@@ -233,91 +260,126 @@ export default function ApplicationsModule({ applications, users, jobs, onUpdate
               <div className="p-4 bg-orange-50/30 border border-orange-100/50 rounded-2xl grid grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <p className="text-[10px] uppercase font-black text-slate-400">Email Candidat</p>
-                  <a href={`mailto:${selectedApp.candidateProfile?.email || selectedApp.candidateEmail}`} className="text-xs font-black text-orange-600 hover:underline flex items-center gap-1">
-                    <Mail className="h-3.5 w-3.5" /> {selectedApp.candidateProfile?.email || selectedApp.candidateEmail || "Non renseigné"}
-                  </a>
-                </div>
-                {selectedApp.candidateProfile?.phone && (
-                  <div className="space-y-1">
-                    <p className="text-[10px] uppercase font-black text-slate-400 font-sans">Contact Téléphone</p>
-                    <p className="text-xs font-black text-slate-800 flex items-center gap-1">
-                      <Phone className="h-3.5 w-3.5 text-slate-400" /> {selectedApp.candidateProfile.phone}
+                  {!isDirectAdminJob ? (
+                    <p className="text-xs font-bold text-slate-500 flex items-center gap-1">
+                      <Mail className="h-3.5 w-3.5 text-slate-300" /> ••••••••@••••.com
                     </p>
-                  </div>
-                )}
+                  ) : (
+                    <a href={`mailto:${selectedApp.candidateProfile?.email || selectedApp.candidateEmail}`} className="text-xs font-black text-orange-600 hover:underline flex items-center gap-1">
+                      <Mail className="h-3.5 w-3.5" /> {selectedApp.candidateProfile?.email || selectedApp.candidateEmail || "Non renseigné"}
+                    </a>
+                  )}
+                </div>
+                <div className="space-y-1">
+                  <p className="text-[10px] uppercase font-black text-slate-400">Contact Téléphone</p>
+                  {!isDirectAdminJob ? (
+                    <p className="text-xs font-bold text-slate-500 flex items-center gap-1">
+                      <Phone className="h-3.5 w-3.5 text-slate-300" /> +225 •• •• •• ••
+                    </p>
+                  ) : (
+                    <p className="text-xs font-black text-slate-800 flex items-center gap-1">
+                      <Phone className="h-3.5 w-3.5 text-slate-400" /> {selectedApp.candidateProfile?.phone || "Non renseigné"}
+                    </p>
+                  )}
+                </div>
               </div>
 
               {selectedApp.candidateProfile?.cvUrl && (
                 <div className="space-y-2">
                   <Label className="text-[10px] font-black tracking-widest text-slate-400 uppercase">Document Curriculum Vitae</Label>
-                  <a 
-                    href={selectedApp.candidateProfile.cvUrl} 
-                    target="_blank" 
-                    rel="noopener"
-                    className="flex items-center justify-between p-4 bg-white border border-slate-150 rounded-2xl hover:border-orange-500 hover:shadow-lg transition-all group/cv"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 bg-orange-50 text-orange-600 rounded-xl flex items-center justify-center font-bold font-sans text-xs">PDF</div>
-                      <div>
-                        <p className="text-xs font-black text-slate-900 group-hover/cv:text-orange-600 transition-colors">Visualiser le CV du Candidat</p>
-                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">Format Document PDF / Image</p>
+                  {!isDirectAdminJob ? (
+                    <div className="flex items-center justify-between p-4 bg-slate-50 border border-slate-100 rounded-2xl cursor-not-allowed opacity-80">
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 bg-slate-200 text-slate-400 rounded-xl flex items-center justify-center font-bold font-sans text-xs">PDF</div>
+                        <div>
+                          <p className="text-xs font-bold text-slate-400">CV Confidentiel</p>
+                          <p className="text-[10px] text-slate-450 font-bold uppercase tracking-wider mt-0.5">Fichier réservé exclusivement à l'entreprise</p>
+                        </div>
                       </div>
                     </div>
-                    <ArrowUpRight className="h-5 w-5 text-slate-300 group-hover/cv:text-orange-600 transition-colors" />
-                  </a>
+                  ) : (
+                    <a 
+                      href={selectedApp.candidateProfile.cvUrl} 
+                      target="_blank" 
+                      rel="noopener"
+                      className="flex items-center justify-between p-4 bg-white border border-slate-150 rounded-2xl hover:border-orange-500 hover:shadow-lg transition-all group/cv"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 bg-orange-50 text-orange-600 rounded-xl flex items-center justify-center font-bold font-sans text-xs">PDF</div>
+                        <div>
+                          <p className="text-xs font-black text-slate-900 group-hover/cv:text-orange-600 transition-colors">Visualiser le CV du Candidat</p>
+                          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">Format Document PDF / Image</p>
+                        </div>
+                      </div>
+                      <ArrowUpRight className="h-5 w-5 text-slate-300 group-hover/cv:text-orange-600 transition-colors" />
+                    </a>
+                  )}
                 </div>
               )}
 
-              {/* Status Action Buttons Panel */}
-              <div className="border-t border-slate-50 pt-5 space-y-3">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Changer le Statut de Sélection</p>
-                <div className="flex flex-wrap gap-2">
-                  <Button 
-                    variant="outline"
-                    className={`h-10 text-[10px] font-black uppercase rounded-lg px-4 ${selectedApp.status === 'pending' ? 'bg-amber-500 text-white' : 'text-amber-600 border-amber-100 hover:bg-amber-50'}`}
-                    onClick={() => handleUpdateStatus(selectedApp.id, 'pending')}
-                  >
-                    Mettre en attente
-                  </Button>
-                  <Button 
-                    variant="outline"
-                    className={`h-10 text-[10px] font-black uppercase rounded-lg px-4 ${selectedApp.status === 'reviewed' ? 'bg-blue-600 text-white' : 'text-blue-600 border-blue-100 hover:bg-blue-50'}`}
-                    onClick={() => handleUpdateStatus(selectedApp.id, 'reviewed')}
-                  >
-                    Lue / Révisée
-                  </Button>
-                  <Button 
-                    variant="outline"
-                    className={`h-10 text-[10px] font-black uppercase rounded-lg px-4 ${selectedApp.status === 'interview' ? 'bg-purple-600 text-white' : 'text-purple-600 border-purple-100 hover:bg-purple-50'}`}
-                    onClick={() => handleUpdateStatus(selectedApp.id, 'interview')}
-                  >
-                    Planifier Entretien
-                  </Button>
-                  <Button 
-                    variant="outline"
-                    className={`h-10 text-[10px] font-black uppercase rounded-lg px-4 ${selectedApp.status === 'accepted' ? 'bg-emerald-600 text-white' : 'text-emerald-00 border-emerald-100 hover:bg-emerald-50'}`}
-                    onClick={() => handleUpdateStatus(selectedApp.id, 'accepted')}
-                  >
-                    Accepter l'embauche
-                  </Button>
-                  <Button 
-                    variant="outline"
-                    className={`h-10 text-[10px] font-black uppercase rounded-lg px-4 ${selectedApp.status === 'rejected' ? 'bg-red-600 text-white' : 'text-red-600 border-red-100 hover:bg-red-50'}`}
-                    onClick={() => handleUpdateStatus(selectedApp.id, 'rejected')}
-                  >
-                    Écarter / Terminer
-                  </Button>
+              {/* Status Action Buttons Panel - HELD ONLY FOR DIRECT JOBS */}
+              {isDirectAdminJob ? (
+                <div className="border-t border-slate-50 pt-5 space-y-3 font-sans">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Changer le Statut de Sélection</p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button 
+                      variant="outline"
+                      className={`h-10 text-[10px] font-black uppercase rounded-lg px-4 ${selectedApp.status === 'pending' ? 'bg-amber-500 text-white' : 'text-amber-600 border-amber-100 hover:bg-amber-50'}`}
+                      onClick={() => handleUpdateStatus(selectedApp.id, 'pending')}
+                    >
+                      Mettre en attente
+                    </Button>
+                    <Button 
+                      variant="outline"
+                      className={`h-10 text-[10px] font-black uppercase rounded-lg px-4 ${selectedApp.status === 'reviewed' ? 'bg-blue-600 text-white' : 'text-blue-600 border-blue-100 hover:bg-blue-50'}`}
+                      onClick={() => handleUpdateStatus(selectedApp.id, 'reviewed')}
+                    >
+                      Lue / Révisée
+                    </Button>
+                    <Button 
+                      variant="outline"
+                      className={`h-10 text-[10px] font-black uppercase rounded-lg px-4 ${selectedApp.status === 'interview' ? 'bg-purple-600 text-white' : 'text-purple-600 border-purple-100 hover:bg-purple-50'}`}
+                      onClick={() => handleUpdateStatus(selectedApp.id, 'interview')}
+                    >
+                      Planifier Entretien
+                    </Button>
+                    <Button 
+                      variant="outline"
+                      className={`h-10 text-[10px] font-black uppercase rounded-lg px-4 ${selectedApp.status === 'accepted' ? 'bg-emerald-600 text-white' : 'text-emerald-00 border-emerald-100 hover:bg-emerald-50'}`}
+                      onClick={() => handleUpdateStatus(selectedApp.id, 'accepted')}
+                    >
+                      Accepter l'embauche
+                    </Button>
+                    <Button 
+                      variant="outline"
+                      className={`h-10 text-[10px] font-black uppercase rounded-lg px-4 ${selectedApp.status === 'rejected' ? 'bg-red-600 text-white' : 'text-red-600 border-red-100 hover:bg-red-50'}`}
+                      onClick={() => handleUpdateStatus(selectedApp.id, 'rejected')}
+                    >
+                      Écarter / Terminer
+                    </Button>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="border-t border-slate-50 pt-5 text-left text-xs text-slate-405 font-semibold">
+                  <span>Statut actuel de la candidature : </span>
+                  <Badge variant="outline" className="ml-1 uppercase text-[9px] font-bold">
+                    {selectedApp.status || 'pending'}
+                  </Badge>
+                </div>
+              )}
 
               <DialogFooter className="border-t border-slate-50 pt-5 flex justify-between w-full">
-                <Button 
-                  variant="ghost" 
-                  className="rounded-xl h-11 text-xs font-black text-red-500 hover:bg-red-50"
-                  onClick={() => handleDeleteApplication(selectedApp.id)}
-                >
-                  <Trash2 className="h-5 w-5 mr-1" /> Supprimer candidature
-                </Button>
+                {isDirectAdminJob ? (
+                  <Button 
+                    variant="ghost" 
+                    className="rounded-xl h-11 text-xs font-black text-red-500 hover:bg-red-50"
+                    onClick={() => handleDeleteApplication(selectedApp.id)}
+                  >
+                    <Trash2 className="h-5 w-5 mr-1" /> Supprimer candidature
+                  </Button>
+                ) : (
+                  <div />
+                )}
                 <Button 
                   className="rounded-xl bg-slate-950 text-white h-11 px-6 font-black text-xs uppercase"
                   onClick={() => setIsViewOpen(false)}

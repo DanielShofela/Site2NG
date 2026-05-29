@@ -186,6 +186,14 @@ export interface Job {
   applyMethod?: string;
   companyEmail?: string;
   conditionsDocuments?: string[];
+  studyLevels?: string[];
+  requiredDocs?: string[];
+  prioritizePlatform?: boolean;
+  offer_type?: 'internal' | 'external';
+  external_apply_email?: string;
+  is_featured?: boolean;
+  is_hidden?: boolean;
+  is_restricted?: boolean;
 }
 
 export interface Application {
