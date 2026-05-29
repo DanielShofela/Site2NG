@@ -32,7 +32,7 @@ import {
   Loader2
 } from 'lucide-react';
 import { Job } from '@/types';
-import { collection, addDoc, doc, setDoc } from 'firebase/firestore';
+import { collection, addDoc, doc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
 interface JobsModuleProps {
@@ -132,6 +132,125 @@ export default function JobsModule({ jobs, onAction, recruiterNames }: JobsModul
   const [newExperienceYears, setNewExperienceYears] = useState<string>("3 ans");
   const [newRequiredDocs, setNewRequiredDocs] = useState<string[]>(["Curriculum Vitae (CV)"]);
   const [newPrioritizePlatform, setNewPrioritizePlatform] = useState<boolean>(true);
+
+  // Admin Editing Job Form State
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [editingJobState, setEditingJobState] = useState<Job | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editCompany, setEditCompany] = useState("");
+  const [editType, setEditType] = useState("CDI");
+  const [editField, setEditField] = useState("Technologie & IT");
+  const [editCategory, setEditCategory] = useState("popular");
+  const [editOfferType, setEditOfferType] = useState<'internal' | 'external'>('internal');
+  const [editLocation, setEditLocation] = useState("");
+  const [editSalary, setEditSalary] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [editRequirements, setEditRequirements] = useState("");
+  const [editExpiresAt, setEditExpiresAt] = useState("");
+  const [editExternalApplyEmail, setEditExternalApplyEmail] = useState("");
+  const [editStudyLevels, setEditStudyLevels] = useState<string[]>(["Bac+3"]);
+  const [editExperienceYears, setEditExperienceYears] = useState<string>("3 ans");
+  const [editRequiredDocs, setEditRequiredDocs] = useState<string[]>(["Curriculum Vitae (CV)"]);
+  const [editPrioritizePlatform, setEditPrioritizePlatform] = useState<boolean>(true);
+  const [isUpdating, setIsUpdating] = useState(false);
+
+  const handleOpenEdit = (job: Job) => {
+    setEditingJobState(job);
+    setEditTitle(job.title || '');
+    setEditCompany(job.companyName || '');
+    setEditType((job as any).contractType || job.type || 'CDI');
+    setEditField(job.field || 'Technologie & IT');
+    setEditCategory(job.category || 'popular');
+    setEditOfferType(job.offer_type || 'internal');
+    setEditLocation(job.location || '');
+    setEditSalary(job.salary || '');
+    setEditDescription(job.description || '');
+    setEditRequirements(job.requirements || '');
+    setEditStudyLevels((job as any).studyLevels || ["Bac+3"]);
+    setEditExperienceYears((job as any).experienceYears || "3 ans");
+    setEditRequiredDocs((job as any).requiredDocs || ["Curriculum Vitae (CV)"]);
+    setEditPrioritizePlatform((job as any).prioritizePlatform !== false);
+    setEditExternalApplyEmail(job.external_apply_email || '');
+    
+    let expiresDateString = "";
+    if (job.expiresAt) {
+      try {
+        const d = job.expiresAt.seconds ? new Date(job.expiresAt.seconds * 1000) : new Date(job.expiresAt);
+        if (!isNaN(d.getTime())) {
+          expiresDateString = d.toISOString().split('T')[0];
+        }
+      } catch (e) {}
+    }
+    setEditExpiresAt(expiresDateString);
+    setIsEditOpen(true);
+  };
+
+  const handleUpdateAdminJob = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingJobState) return;
+    if (!editTitle.trim() || !editCompany.trim() || !editDescription.trim() || !editRequirements.trim() || !editExpiresAt) {
+      addToast("Veuillez remplir correctement les champs obligatoires (*).", 'error');
+      return;
+    }
+    if (editOfferType === 'external' && !editExternalApplyEmail.trim()) {
+      addToast("Veuillez fournir un email de candidature pour les offres populaires relais.", 'error');
+      return;
+    }
+
+    setIsUpdating(true);
+    try {
+      const jobRef = doc(db, 'offers', editingJobState.id);
+      await updateDoc(jobRef, {
+        title: editTitle,
+        companyName: editCompany,
+        contractType: editType,
+        type: editType,
+        field: editField,
+        category: editCategory,
+        offer_type: editOfferType,
+        location: editLocation,
+        salary: editSalary || "Non spécifié",
+        description: editDescription,
+        requirements: editRequirements,
+        expiresAt: editExpiresAt ? new Date(editExpiresAt) : null,
+        external_apply_email: editOfferType === 'external' ? editExternalApplyEmail : null,
+        studyLevels: editStudyLevels,
+        experienceYears: editExperienceYears,
+        requiredDocs: editRequiredDocs,
+        prioritizePlatform: editPrioritizePlatform,
+        updatedAt: serverTimestamp()
+      });
+      addToast("Offre d'emploi mise à jour avec succès !", 'success');
+      setIsEditOpen(false);
+      
+      if (selectedJob && selectedJob.id === editingJobState.id) {
+        setSelectedJob({
+          ...selectedJob,
+          title: editTitle,
+          companyName: editCompany,
+          type: editType,
+          field: editField,
+          category: editCategory,
+          offer_type: editOfferType,
+          location: editLocation,
+          salary: editSalary || "Non spécifié",
+          description: editDescription,
+          requirements: editRequirements,
+          expiresAt: editExpiresAt ? { seconds: Math.floor(new Date(editExpiresAt).getTime() / 1000) } as any : null,
+          external_apply_email: editOfferType === 'external' ? editExternalApplyEmail : null,
+          studyLevels: editStudyLevels,
+          experienceYears: editExperienceYears,
+          requiredDocs: editRequiredDocs,
+          prioritizePlatform: editPrioritizePlatform
+        });
+      }
+    } catch (error) {
+      console.error("Error updating admin job:", error);
+      addToast("Erreur lors de la mise à jour de l'offre.", 'error');
+    } finally {
+      setIsUpdating(false);
+    }
+  };
 
   const filteredJobs = useMemo(() => {
     return jobs.filter(j => {
