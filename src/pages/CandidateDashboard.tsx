@@ -33,7 +33,8 @@ import {
   Link as LinkIcon,
   MessageSquare,
   HelpCircle,
-  Check
+  Check,
+  Building2
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -64,11 +65,45 @@ import { calculateCompletionScore, getProfileSuggestions } from '@/lib/profileUt
 import { generateCV } from '@/lib/pdfUtils';
 import { motion } from 'motion/react';
 
+const CandidateCompanyLogo = ({ app, companyLogoUrl, className = "h-16 w-16 rounded-2xl" }: { app: any; companyLogoUrl?: string; className?: string }) => {
+  const [imgError, setImgError] = useState(false);
+  const logoToUse = app.companyLogo || companyLogoUrl;
+  const isAnon = !!app.is_anonymous || 
+    app.companyName === "Recruteur Confidentiel" || 
+    app.companyName === "Recruteur confidentiel" || 
+    logoToUse === "https://lh3.googleusercontent.com/d/1O58k8ZpXqgXW-9_H-Hk3V-e4I5V_H_R3=w200-h200";
+
+  const showDefault = imgError || isAnon || !logoToUse;
+
+  useEffect(() => {
+    setImgError(false);
+  }, [logoToUse]);
+
+  return (
+    <div className={`${className} bg-white border border-slate-150/70 overflow-hidden flex items-center justify-center shrink-0 shadow-sm leading-none transition-transform group-hover:scale-105`}>
+      {showDefault ? (
+        <div className="w-full h-full bg-orange-50/85 text-[#e25c1d] flex items-center justify-center">
+          <Building2 className={`${className.includes('h-12') ? 'h-6 w-6' : 'h-8 w-8'} stroke-[2]`} />
+        </div>
+      ) : (
+        <img 
+          src={logoToUse} 
+          alt={app.companyName || "Entreprise"} 
+          className="h-full w-full object-cover" 
+          referrerPolicy="no-referrer" 
+          onError={() => setImgError(true)}
+        />
+      )}
+    </div>
+  );
+};
+
 export default function CandidateDashboard() {
   const { user, updateProfile } = useAuth();
   const [activeTab, setActiveTab] = useState('profile');
   const [applications, setApplications] = useState<any[]>([]);
   const [companyNames, setCompanyNames] = useState<Record<string, string>>({});
+  const [companyLogos, setCompanyLogos] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [cvBlobUrl, setCvBlobUrl] = useState<string | null>(null);
@@ -207,10 +242,11 @@ export default function CandidateDashboard() {
         }));
         setApplications(apps);
 
-        // Fetch current company names
+        // Fetch current company names and logos
         const recruiterIds = Array.from(new Set(apps.map((a: any) => a.recruiterId).filter(Boolean)));
         if (recruiterIds.length > 0) {
           const namesMap: Record<string, string> = {};
+          const logosMap: Record<string, string> = {};
           for (let i = 0; i < recruiterIds.length; i += 10) {
             const batch = recruiterIds.slice(i, i + 10);
             const recruitersQ = query(
@@ -223,9 +259,11 @@ export default function CandidateDashboard() {
               const data = doc.data();
               // Prioritize companyName, then tradeName, then displayName
               namesMap[doc.id] = data.companyName || data.tradeName || data.displayName || "Entreprise";
+              logosMap[doc.id] = data.photoUrl || "";
             });
           }
           setCompanyNames(namesMap);
+          setCompanyLogos(logosMap);
         }
       } catch (error) {
         console.error('Error fetching applications:', error);
@@ -238,6 +276,9 @@ export default function CandidateDashboard() {
   }, [user]);
 
   const getCompanyName = (app: any) => {
+    if (app.is_anonymous || app.companyName === "Recruteur Confidentiel") {
+      return "Recruteur Confidentiel";
+    }
     return companyNames[app.recruiterId] || app.companyName;
   };
 
@@ -544,14 +585,12 @@ export default function CandidateDashboard() {
                     <Card className="hover:border-orange-200 transition-all border border-transparent shadow-sm overflow-hidden group">
                       <CardContent className="py-6 flex flex-col sm:flex-row items-center justify-between gap-6 px-8">
                         <div className="flex items-center gap-6">
-                          <div className="h-16 w-16 bg-slate-900 rounded-2xl flex items-center justify-center font-black text-white text-xl shadow-lg shadow-slate-900/10 transition-transform group-hover:scale-110">
-                            {getCompanyName(app)?.[0] || 'J'}
-                          </div>
+                          <CandidateCompanyLogo app={app} companyLogoUrl={companyLogos[app.recruiterId]} className="h-16 w-16 rounded-2xl" />
                           <div>
                             <h3 className="text-lg font-extrabold text-slate-900">{app.jobTitle}</h3>
                             <div className="flex items-center gap-2">
                               <p className="text-slate-500 font-medium">{getCompanyName(app)}</p>
-                              {app.recruiterId && (
+                              {app.recruiterId && !app.is_anonymous && app.companyName !== "Recruteur Confidentiel" && (
                                 <Link 
                                   to={`/company/${app.recruiterId}`}
                                   className="text-slate-400 hover:text-orange-600 transition-colors"
@@ -777,14 +816,12 @@ export default function CandidateDashboard() {
 
               <div className="p-4 md:p-8 space-y-4">
                 <div className="flex items-center gap-4 bg-slate-50 p-3 md:p-4 rounded-xl md:rounded-2xl border border-slate-100">
-                  <div className="h-12 w-12 bg-slate-900 rounded-xl flex items-center justify-center font-black text-white text-lg shrink-0">
-                    {getCompanyName(selectedApp)?.[0] || 'J'}
-                  </div>
+                  <CandidateCompanyLogo app={selectedApp} companyLogoUrl={companyLogos[selectedApp.recruiterId]} className="h-12 w-12 rounded-xl" />
                   <div className="min-w-0">
                     <h4 className="font-extrabold text-slate-900 truncate">{selectedApp.jobTitle}</h4>
                     <div className="flex items-center gap-2">
                       <p className="text-slate-500 text-sm font-medium truncate">{getCompanyName(selectedApp)}</p>
-                      {selectedApp.recruiterId && (
+                      {selectedApp.recruiterId && !selectedApp.is_anonymous && selectedApp.companyName !== "Recruteur Confidentiel" && (
                         <Link 
                            to={`/company/${selectedApp.recruiterId}`}
                            className="text-slate-400 hover:text-orange-600 transition-colors"

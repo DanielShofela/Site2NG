@@ -194,6 +194,7 @@ export interface Job {
   is_featured?: boolean;
   is_hidden?: boolean;
   is_restricted?: boolean;
+  is_anonymous?: boolean;
 }
 
 export interface Application {

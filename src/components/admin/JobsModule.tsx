@@ -29,7 +29,8 @@ import {
   CheckCircle,
   HelpCircle,
   AlertOctagon,
-  Loader2
+  Loader2,
+  Pencil
 } from 'lucide-react';
 import { Job } from '@/types';
 import { collection, addDoc, doc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
@@ -120,6 +121,7 @@ export default function JobsModule({ jobs, onAction, recruiterNames }: JobsModul
   const [newRequirements, setNewRequirements] = useState("");
   const [newDescription, setNewDescription] = useState("");
   const [newExpiresAt, setNewExpiresAt] = useState("");
+  const [newIsAnonymous, setNewIsAnonymous] = useState<boolean>(false);
   
   // New specific properties requested in Section 8
   const [newOfferType, setNewOfferType] = useState<'internal' | 'external'>('internal');
@@ -152,6 +154,7 @@ export default function JobsModule({ jobs, onAction, recruiterNames }: JobsModul
   const [editExperienceYears, setEditExperienceYears] = useState<string>("3 ans");
   const [editRequiredDocs, setEditRequiredDocs] = useState<string[]>(["Curriculum Vitae (CV)"]);
   const [editPrioritizePlatform, setEditPrioritizePlatform] = useState<boolean>(true);
+  const [editIsAnonymous, setEditIsAnonymous] = useState<boolean>(false);
   const [isUpdating, setIsUpdating] = useState(false);
 
   const handleOpenEdit = (job: Job) => {
@@ -161,6 +164,7 @@ export default function JobsModule({ jobs, onAction, recruiterNames }: JobsModul
     setEditType((job as any).contractType || job.type || 'CDI');
     setEditField(job.field || 'Technologie & IT');
     setEditCategory(job.category || 'popular');
+    setEditIsAnonymous(!!job.is_anonymous);
     setEditOfferType(job.offer_type || 'internal');
     setEditLocation(job.location || '');
     setEditSalary(job.salary || '');
@@ -218,6 +222,7 @@ export default function JobsModule({ jobs, onAction, recruiterNames }: JobsModul
         experienceYears: editExperienceYears,
         requiredDocs: editRequiredDocs,
         prioritizePlatform: editPrioritizePlatform,
+        is_anonymous: editIsAnonymous,
         updatedAt: serverTimestamp()
       });
       addToast("Offre d'emploi mise à jour avec succès !", 'success');
@@ -241,7 +246,8 @@ export default function JobsModule({ jobs, onAction, recruiterNames }: JobsModul
           studyLevels: editStudyLevels,
           experienceYears: editExperienceYears,
           requiredDocs: editRequiredDocs,
-          prioritizePlatform: editPrioritizePlatform
+          prioritizePlatform: editPrioritizePlatform,
+          is_anonymous: editIsAnonymous
         });
       }
     } catch (error) {
@@ -297,6 +303,7 @@ export default function JobsModule({ jobs, onAction, recruiterNames }: JobsModul
         is_featured: true,
         is_hidden: false,
         is_restricted: false,
+        is_anonymous: newIsAnonymous,
         offer_type: newOfferType,
         external_apply_email: newOfferType === 'external' ? newExternalApplyEmail : "",
         createdBy: "admin",
@@ -333,6 +340,7 @@ export default function JobsModule({ jobs, onAction, recruiterNames }: JobsModul
     setNewRequirements("");
     setNewDescription("");
     setNewExpiresAt("");
+    setNewIsAnonymous(false);
     setNewStudyLevels(["Bac+3"]);
     setNewExperienceYears("3 ans");
     setNewRequiredDocs(["Curriculum Vitae (CV)"]);
@@ -456,11 +464,11 @@ export default function JobsModule({ jobs, onAction, recruiterNames }: JobsModul
                     <tr key={j.id} className="hover:bg-slate-50/20 transition-colors group">
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
-                          <div className="h-10 w-10 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center font-bold font-sans flex-shrink-0 overflow-hidden border border-slate-100/50">
-                            {j.companyLogo ? (
+                          <div className="h-10 w-10 rounded-xl bg-orange-50/70 text-[#e25c1d] flex items-center justify-center font-sans flex-shrink-0 overflow-hidden border border-slate-100/50">
+                            {j.companyLogo && j.companyLogo !== "https://lh3.googleusercontent.com/d/1O58k8ZpXqgXW-9_H-Hk3V-e4I5V_H_R3=w200-h200" ? (
                               <img src={j.companyLogo} className="w-full h-full object-cover rounded-xl" />
                             ) : (
-                              j.title?.[0] || 'J'
+                              <Building2 className="h-5 w-5 stroke-[2.2]" />
                             )}
                           </div>
                           <div className="min-w-0">
@@ -534,6 +542,15 @@ export default function JobsModule({ jobs, onAction, recruiterNames }: JobsModul
                           onClick={() => { setSelectedJob(j); setIsViewOpen(true); }}
                         >
                           <Eye className="h-4 w-4 mr-0.5" /> Voir
+                        </Button>
+
+                        <Button 
+                          size="sm" 
+                          variant="ghost" 
+                          className="h-8 text-xs font-black text-slate-500 hover:text-orange-600 hover:bg-orange-50/50"
+                          onClick={() => handleOpenEdit(j)}
+                        >
+                          <Pencil className="h-3.5 w-3.5 mr-0.5" /> Modifier
                         </Button>
 
                         {/* 2. METTRE EN AVANT (is_featured) */}
@@ -694,6 +711,18 @@ export default function JobsModule({ jobs, onAction, recruiterNames }: JobsModul
                     onChange={(e) => setNewCompany(e.target.value)}
                     className="h-11 rounded-lg border-slate-150 bg-white font-semibold"
                   />
+                  <div className="flex items-center gap-2 pt-1.5">
+                    <input
+                      type="checkbox"
+                      id="newIsAnonymous"
+                      checked={newIsAnonymous}
+                      onChange={(e) => setNewIsAnonymous(e.target.checked)}
+                      className="h-4 w-4 rounded border-slate-300 text-orange-600 focus:ring-orange-500 cursor-pointer"
+                    />
+                    <Label htmlFor="newIsAnonymous" className="text-[10px] font-black text-slate-700 uppercase cursor-pointer select-none">
+                      Publier anonymement
+                    </Label>
+                  </div>
                 </div>
               </div>
 
@@ -968,11 +997,11 @@ export default function JobsModule({ jobs, onAction, recruiterNames }: JobsModul
             <>
               <DialogHeader className="border-b border-slate-50 pb-5">
                 <div className="flex items-start gap-4">
-                  <div className="h-14 w-14 rounded-2xl bg-orange-50 text-orange-600 flex items-center justify-center font-bold text-xl flex-shrink-0 overflow-hidden border border-orange-100">
-                    {selectedJob.companyLogo ? (
+                  <div className="h-14 w-14 rounded-2xl bg-orange-50/70 text-[#e25c1d] flex items-center justify-center flex-shrink-0 overflow-hidden border border-orange-100/50">
+                    {selectedJob.companyLogo && selectedJob.companyLogo !== "https://lh3.googleusercontent.com/d/1O58k8ZpXqgXW-9_H-Hk3V-e4I5V_H_R3=w200-h200" ? (
                       <img src={selectedJob.companyLogo} className="w-full h-full object-cover" />
                     ) : (
-                      selectedJob.title?.[0] || 'J'
+                      <Building2 className="h-7 w-7 stroke-[2.2]" />
                     )}
                   </div>
                   <div className="min-w-0 flex-1">
@@ -1241,6 +1270,328 @@ export default function JobsModule({ jobs, onAction, recruiterNames }: JobsModul
               </DialogFooter>
             </>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Direct Job Editing Modal */}
+      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+        <DialogContent className="max-w-2xl w-full rounded-[30px] p-8 border-none shadow-2xl overflow-y-auto max-h-[85vh] bg-white text-left">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-black text-slate-900 flex items-center gap-2">
+              <Pencil className="h-6 w-6 text-[#e25c1d]" />
+              Modifier l'offre d'emploi
+            </DialogTitle>
+            <DialogDescription className="font-semibold text-xs text-slate-400 mt-1">
+              Remplissez les informations ci-dessous pour mettre à jour les détails affichés sur l'offre d'emploi.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleUpdateAdminJob} className="py-4 space-y-6">
+            
+            {/* BLOCK 1: INFORMATIONS ENTREPRISE */}
+            <div className="bg-slate-50/50 p-5 rounded-2xl border border-slate-100 space-y-4">
+              <h4 className="text-xs font-black text-[#e25c1d] uppercase tracking-widest border-b border-orange-100 pb-2 flex items-center gap-1.5">
+                <Building2 className="h-4 w-4" /> Block 1 : Informations Entreprise & Configuration
+              </h4>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <Label className="text-[10px] font-black text-slate-900 uppercase">Type d'offre d'emploi *</Label>
+                  <select 
+                    className="w-full h-11 px-3 rounded-lg border border-slate-150 bg-white text-xs font-black uppercase text-slate-600 outline-none cursor-pointer p-2"
+                    value={editOfferType}
+                    onChange={(e) => setEditOfferType(e.target.value as 'internal' | 'external')}
+                  >
+                    <option value="internal">Recrutement Direct (Candidature Plateforme)</option>
+                    <option value="external">Offre Populaire / Relais (Candidature Email Externe)</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-[10px] font-black text-slate-900 uppercase">Entreprise ou Groupe Bénéficiaire *</Label>
+                  <Input 
+                    required
+                    placeholder="Ex: 2NG Partner Executive" 
+                    value={editCompany} 
+                    onChange={(e) => setEditCompany(e.target.value)}
+                    className="h-11 rounded-lg border-slate-150 bg-white font-semibold"
+                  />
+                  <div className="flex items-center gap-2 pt-1.5">
+                    <input
+                      type="checkbox"
+                      id="editIsAnonymous"
+                      checked={editIsAnonymous}
+                      onChange={(e) => setEditIsAnonymous(e.target.checked)}
+                      className="h-4 w-4 rounded border-slate-300 text-orange-600 focus:ring-orange-500 cursor-pointer"
+                    />
+                    <Label htmlFor="editIsAnonymous" className="text-[10px] font-black text-slate-700 uppercase cursor-pointer select-none">
+                      Publier anonymement
+                    </Label>
+                  </div>
+                </div>
+              </div>
+
+              {editOfferType === 'external' && (
+                <div className="space-y-1 animate-fadeIn duration-250">
+                  <Label className="text-[10px] font-black text-slate-900 uppercase">Email de réception des candidatures *</Label>
+                  <Input 
+                    required={editOfferType === 'external'}
+                    type="email"
+                    placeholder="Ex: recrutement@groupe-partenaire.com" 
+                    value={editExternalApplyEmail} 
+                    onChange={(e) => setEditExternalApplyEmail(e.target.value)}
+                    className="h-11 rounded-lg border-rose-200 bg-rose-50/10 font-bold text-xs text-rose-800"
+                  />
+                  <p className="text-[10px] font-bold text-rose-500 italic mt-1 bg-rose-50/50 p-2 rounded-lg border border-rose-100">
+                    * Attention: Cette offre est configurée en mode Populaire / Relais. Le bouton de candidature directe sera désactivé pour les candidats, au profit d'une directive d'envoi d'email à cette adresse.
+                  </p>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <Label className="text-[10px] font-black text-slate-900 uppercase">Secteur / Domaine d'activité</Label>
+                  <select 
+                    className="w-full h-11 px-3 rounded-lg border border-slate-150 bg-white text-xs font-black uppercase text-slate-600 outline-none cursor-pointer"
+                    value={editField}
+                    onChange={(e) => setEditField(e.target.value)}
+                  >
+                    <option value="Technologie & IA">Technologie & IA</option>
+                    <option value="Banque, Assurances, Finance">Banque & Finance</option>
+                    <option value="Bâtiment & Travaux Publics (BTP)">Bâtiments / BTP</option>
+                    <option value="Transport & Logistique">Transport & Logistique</option>
+                    <option value="Santé & Paramédical">Santé & Paramédical</option>
+                    <option value="Agriculture & Agroalimentaire">Agriculture & Agroalimentaire</option>
+                    <option value="Mines & Énergie">Mines & Énergie</option>
+                    <option value="Éducation & Formation">Éducation & Formation</option>
+                    <option value="Télécommunications">Télécommunications</option>
+                    <option value="Tourisme & Hôtellerie">Tourisme & Hôtellerie</option>
+                    <option value="Commerce, Distribution, Vente">Commerce / Vente</option>
+                    <option value="Administration & Fonction Publique">Administration / Fonction Publique</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-[10px] font-black text-slate-900 uppercase">Localisation (Ville, Pays) *</Label>
+                  <Input 
+                    required
+                    value={editLocation} 
+                    onChange={(e) => setEditLocation(e.target.value)}
+                    className="h-11 rounded-lg border-slate-150 bg-white font-semibold"
+                    placeholder="Ex: Abidjan, Côte d'Ivoire"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 pt-2">
+                <input
+                  id="edit-prioritize-platform"
+                  type="checkbox"
+                  checked={editPrioritizePlatform}
+                  onChange={(e) => setEditPrioritizePlatform(e.target.checked)}
+                  className="h-4.5 w-4.5 rounded border-slate-350 text-orange-600 focus:ring-orange-500 cursor-pointer"
+                />
+                <Label htmlFor="edit-prioritize-platform" className="text-[10px] font-black text-slate-700 cursor-pointer select-none">
+                  Prioriser le canal direct de la plate-forme (Recommandé)
+                </Label>
+              </div>
+            </div>
+
+            {/* BLOCK 2: DÉTAILS DE L’OFFRE */}
+            <div className="bg-slate-50/50 p-5 rounded-2xl border border-slate-100 space-y-4">
+              <h4 className="text-xs font-black text-[#e25c1d] uppercase tracking-widest border-b border-orange-100 pb-2 flex items-center gap-1.5">
+                <Briefcase className="h-4 w-4" /> Block 2 : Descriptif détaillé de l'offre
+              </h4>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <Label className="text-[10px] font-black text-slate-900 uppercase">Intitulé du Poste Recherché *</Label>
+                  <Input 
+                    required
+                    placeholder="Ex: Chef de Projet Digital" 
+                    value={editTitle} 
+                    onChange={(e) => setEditTitle(e.target.value)}
+                    className="h-11 rounded-lg border-slate-150 bg-white font-semibold"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-[10px] font-black text-slate-900 uppercase">Contrat de Travail *</Label>
+                  <select 
+                    className="w-full h-11 px-3 rounded-lg border border-slate-150 bg-white text-xs font-black uppercase text-slate-600 outline-none cursor-pointer"
+                    value={editType}
+                    onChange={(e) => setEditType(e.target.value)}
+                  >
+                    <option value="CDI">CDI (Contrat Durée Indéterminée)</option>
+                    <option value="CDD">CDD (Contrat Durée Déterminée)</option>
+                    <option value="Freelance">Consultant / Freelance</option>
+                    <option value="Stage">Stage Professionnel</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-4">
+                <div className="col-span-2 space-y-1">
+                  <Label className="text-[10px] font-black text-slate-900 uppercase">Rémunération Brute (Optionnelle)</Label>
+                  <Input 
+                    placeholder="Ex: 600.000 F CFA - 900.000 F CFA / Mois" 
+                    value={editSalary} 
+                    onChange={(e) => setEditSalary(e.target.value)}
+                    className="h-11 rounded-lg border-slate-150 bg-white font-semibold"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-[10px] font-black text-slate-900 uppercase">Valorisation d'affichage</Label>
+                  <select 
+                    className="w-full h-11 px-3 rounded-lg border border-slate-150 bg-white text-xs font-black uppercase text-slate-600 outline-none cursor-pointer"
+                    value={editCategory}
+                    onChange={(e) => setEditCategory(e.target.value)}
+                  >
+                    <option value="popular">Sélection Populaire</option>
+                    <option value="rapid">Recrutement Rapide (48h)</option>
+                    <option value="unique">Direct Partenaire</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-[10px] font-black text-slate-900 uppercase">Date limite d'expiration *</Label>
+                <Input 
+                  required
+                  type="date" 
+                  value={editExpiresAt} 
+                  onChange={(e) => setEditExpiresAt(e.target.value)}
+                  className="h-11 rounded-lg border-slate-150 bg-white font-black cursor-pointer text-xs uppercase"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-[10px] font-black text-slate-900 uppercase">Présentation Descriptif de Poste *</Label>
+                <Textarea 
+                  required
+                  rows={4}
+                  placeholder="Présentez les missions quotidiennes, l'environnement de travail et les responsabilités rattachées au poste..."
+                  value={editDescription}
+                  onChange={(e) => setEditDescription(e.target.value)}
+                  className="rounded-lg border-slate-150 bg-white font-semibold text-xs leading-relaxed"
+                />
+              </div>
+            </div>
+
+            {/* BLOCK 3: COMPÉTENCES & CRITÈRES */}
+            <div className="bg-slate-50/50 p-5 rounded-2xl border border-slate-100 space-y-4">
+              <h4 className="text-xs font-black text-[#e25c1d] uppercase tracking-widest border-b border-orange-100 pb-2 flex items-center gap-1.5">
+                <Check className="h-4 w-4" /> Block 3 : Compétences, Diplômes & Expérience
+              </h4>
+
+              {/* Expérience Requise selection */}
+              <div className="space-y-1.5">
+                <Label className="text-[10px] font-black text-slate-900 uppercase">Expérience Professionnelle Requise</Label>
+                <select 
+                  className="w-full h-11 px-3 rounded-lg border border-slate-150 bg-white text-xs font-black uppercase text-slate-600 outline-none cursor-pointer"
+                  value={editExperienceYears}
+                  onChange={(e) => setEditExperienceYears(e.target.value)}
+                >
+                  <option value="1 an">1 an d'expérience</option>
+                  <option value="2 ans">2 ans d'expérience</option>
+                  <option value="3 ans">3 ans d'expérience (Recommandé)</option>
+                  <option value="5 ans">5 ans d'expérience (Senior)</option>
+                  <option value="10 ans+">10 ans+ d'expérience (Expert/Directeur)</option>
+                </select>
+              </div>
+
+              {/* Niveaux d'étude checkboxes selection */}
+              <div className="space-y-2">
+                <Label className="text-[10px] font-black text-slate-900 uppercase">Niveau d'études exigé (Sélection multiple)</Label>
+                <div className="flex flex-wrap gap-x-4 gap-y-2 bg-white p-3 rounded-xl border border-slate-150">
+                  {["Bac", "Bac+2", "Bac+3", "Bac+5", "Bac+8 (Doctorat)"].map((level) => {
+                    const checked = editStudyLevels.includes(level);
+                    return (
+                      <label key={level} className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-700 select-none">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => {
+                            if (checked) {
+                              setEditStudyLevels(editStudyLevels.filter(x => x !== level));
+                            } else {
+                              setEditStudyLevels([...editStudyLevels, level]);
+                            }
+                          }}
+                          className="h-4 w-4 rounded border-slate-300 text-orange-600 focus:ring-orange-500"
+                        />
+                        {level}
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Required Documents checkboxes selection */}
+              <div className="space-y-2">
+                <Label className="text-[10px] font-black text-slate-900 uppercase">Pièces à fournir impérativement (Cocher)</Label>
+                <div className="flex flex-wrap gap-x-4 gap-y-2 bg-white p-3 rounded-xl border border-slate-150">
+                  {[
+                    "Curriculum Vitae (CV)",
+                    "Lettre de Motivation (LM)",
+                    "Diplômes / Certificats d'études",
+                    "Attestation de travail",
+                    "Pièce d'identité (CNI / Passeport)"
+                  ].map((docName) => {
+                    const checked = editRequiredDocs.includes(docName);
+                    return (
+                      <label key={docName} className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-700 select-none">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => {
+                            if (checked) {
+                              setEditRequiredDocs(editRequiredDocs.filter(x => x !== docName));
+                            } else {
+                              setEditRequiredDocs([...editRequiredDocs, docName]);
+                            }
+                          }}
+                          className="h-4 w-4 rounded border-slate-300 text-orange-600 focus:ring-orange-500"
+                        />
+                        {docName}
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-[10px] font-black text-slate-900 uppercase">Compétences & Profil réquis (1 par ligne) *</Label>
+                <Textarea 
+                  required
+                  rows={3}
+                  placeholder="Ex: Maîtrise avancée de React & NodeJS&#10;Expérience de 3 ans min en PME&#10;Rigueur et esprit critique"
+                  value={editRequirements}
+                  onChange={(e) => setEditRequirements(e.target.value)}
+                  className="rounded-lg border-slate-150 bg-white font-semibold text-xs leading-relaxed"
+                />
+              </div>
+            </div>
+
+            <DialogFooter className="pt-4 border-t border-slate-50 flex gap-3">
+              <Button 
+                type="button" 
+                variant="outline" 
+                className="rounded-xl font-black text-xs uppercase h-11 border-slate-100"
+                onClick={() => setIsEditOpen(false)}
+              >
+                Annuler
+              </Button>
+              <Button 
+                type="submit" 
+                className="rounded-xl bg-[#e25c1d] text-white font-black text-xs uppercase h-11 px-6 hover:bg-[#c94d15] shadow-xl shadow-orange-600/15"
+                disabled={isUpdating}
+              >
+                {isUpdating ? "Enregistrement..." : "Sauvegarder les modifications"}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
     </>

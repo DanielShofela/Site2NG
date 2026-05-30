@@ -166,6 +166,8 @@ export default function Jobs() {
         recruiterId: rId,
         jobTitle: job.title,
         companyName: companyNameStr,
+        companyLogo: job.companyLogo || '',
+        is_anonymous: !!job.is_anonymous,
         status: 'pending',
         appliedAt: serverTimestamp(),
         candidateProfile: {
@@ -549,8 +551,12 @@ export default function Jobs() {
               {filteredJobs.map((job, index) => {
                 const partnerProfile = job.recruiterId ? companyDetails[job.recruiterId] : null;
                 const isRegistered = partnerProfile && partnerProfile.role === 'recruiter' && partnerProfile.companyName;
-                const finalLogo = isRegistered ? (partnerProfile.photoUrl || job.companyLogo) : job.companyLogo;
-                const finalName = isRegistered ? (partnerProfile.companyName || job.companyName) : job.companyName;
+                const isAnonymous = !!job.is_anonymous || 
+                                    job.companyName === "Recruteur Confidentiel" || 
+                                    job.companyName === "Recruteur confidentiel" ||
+                                    job.companyLogo === "https://lh3.googleusercontent.com/d/1O58k8ZpXqgXW-9_H-Hk3V-e4I5V_H_R3=w200-h200";
+                const finalLogo = isAnonymous ? "https://lh3.googleusercontent.com/d/1O58k8ZpXqgXW-9_H-Hk3V-e4I5V_H_R3=w200-h200" : (isRegistered ? (partnerProfile.photoUrl || job.companyLogo) : job.companyLogo);
+                const finalName = isAnonymous ? "Recruteur Confidentiel" : (isRegistered ? (partnerProfile.companyName || job.companyName) : job.companyName);
 
                 return (
                   <React.Fragment key={job.id}>
@@ -565,7 +571,8 @@ export default function Jobs() {
                         job={{
                           ...job,
                           companyLogo: finalLogo,
-                          companyName: finalName
+                          companyName: finalName,
+                          is_anonymous: isAnonymous
                         }}
                         companyName={finalName}
                         isApplied={appliedJobIds.has(job.id)}

@@ -95,6 +95,7 @@ export default function RecruiterDashboard() {
   const [jobExperienceYears, setJobExperienceYears] = useState<string>("3 ans");
   const [jobRequiredDocs, setJobRequiredDocs] = useState<string[]>(["Curriculum Vitae (CV)"]);
   const [jobPrioritizePlatform, setJobPrioritizePlatform] = useState<boolean>(true);
+  const [jobIsAnonymous, setJobIsAnonymous] = useState<boolean>(false);
 
   // Edit form state
   const [editingJob, setEditingJob] = useState<Job | null>(null);
@@ -111,6 +112,7 @@ export default function RecruiterDashboard() {
   const [editExperienceYears, setEditExperienceYears] = useState<string>("3 ans");
   const [editRequiredDocs, setEditRequiredDocs] = useState<string[]>(["Curriculum Vitae (CV)"]);
   const [editPrioritizePlatform, setEditPrioritizePlatform] = useState<boolean>(true);
+  const [editIsAnonymous, setEditIsAnonymous] = useState<boolean>(false);
 
   // Data state
   const [myJobs, setMyJobs] = useState<Job[]>([]);
@@ -355,6 +357,7 @@ export default function RecruiterDashboard() {
     setEditRequiredDocs((job as any).requiredDocs || ["Curriculum Vitae (CV)"]);
     setEditPrioritizePlatform((job as any).prioritizePlatform !== false);
     setEditRequirements((job as any).requirements || "");
+    setEditIsAnonymous(!!job.is_anonymous);
 
     const expiresVal = (job as any).expiresAt ? (typeof (job as any).expiresAt === 'string' ? (job as any).expiresAt : ((job as any).expiresAt.toDate ? (job as any).expiresAt.toDate() : new Date((job as any).expiresAt)).toISOString().substring(0, 16)) : '';
     setEditExpiresAt(expiresVal);
@@ -388,6 +391,7 @@ export default function RecruiterDashboard() {
         expiresAt: editExpiresAt ? new Date(editExpiresAt) : null,
         status: 'pending_validation', // Go back to pending validation upon modification
         updatedAt: serverTimestamp(),
+        is_anonymous: editIsAnonymous,
         
         // Expanded recruiting criteria
         studyLevels: editStudyLevels,
@@ -414,7 +418,8 @@ export default function RecruiterDashboard() {
         experienceYears: editExperienceYears,
         requiredDocs: editRequiredDocs,
         prioritizePlatform: editPrioritizePlatform,
-        requirements: editRequirements
+        requirements: editRequirements,
+        is_anonymous: editIsAnonymous
       } : j));
       
       setIsEditingJobOpen(false);
@@ -463,6 +468,7 @@ export default function RecruiterDashboard() {
         status: 'pending_validation', // Default is en attente de validation
         createdAt: serverTimestamp(),
         isFeatured: false,
+        is_anonymous: jobIsAnonymous,
         
         // Expanded recruiting criteria
         studyLevels: jobStudyLevels,
@@ -488,6 +494,7 @@ export default function RecruiterDashboard() {
       setJobStudyLevels(["Bac+3"]);
       setJobExperienceYears("3 ans");
       setJobRequiredDocs(["Curriculum Vitae (CV)"]);
+      setJobIsAnonymous(false);
       setJobPrioritizePlatform(true);
     } catch (error) {
       console.error('Error creating job:', error);
@@ -750,17 +757,32 @@ export default function RecruiterDashboard() {
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2 pt-2">
-                        <input
-                          id="recruiter-prioritize-platform"
-                          type="checkbox"
-                          checked={jobPrioritizePlatform}
-                          onChange={(e) => setJobPrioritizePlatform(e.target.checked)}
-                          className="h-4.5 w-4.5 rounded border-slate-350 text-orange-600 focus:ring-orange-500 cursor-pointer"
-                        />
-                        <Label htmlFor="recruiter-prioritize-platform" className="text-[10px] font-black text-slate-700 cursor-pointer select-none">
-                          Prioriser le canal direct de la plate-forme (Recommandé)
-                        </Label>
+                      <div className="flex flex-col gap-2 pt-2">
+                        <div className="flex items-center gap-2">
+                          <input
+                            id="recruiter-prioritize-platform"
+                            type="checkbox"
+                            checked={jobPrioritizePlatform}
+                            onChange={(e) => setJobPrioritizePlatform(e.target.checked)}
+                            className="h-4.5 w-4.5 rounded border-slate-350 text-orange-600 focus:ring-orange-500 cursor-pointer"
+                          />
+                          <Label htmlFor="recruiter-prioritize-platform" className="text-[10px] font-black text-slate-700 cursor-pointer select-none">
+                            Prioriser le canal direct de la plate-forme (Recommandé)
+                          </Label>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <input
+                            id="recruiter-job-is-anonymous"
+                            type="checkbox"
+                            checked={jobIsAnonymous}
+                            onChange={(e) => setJobIsAnonymous(e.target.checked)}
+                            className="h-4.5 w-4.5 rounded border-slate-350 text-orange-600 focus:ring-orange-500 cursor-pointer"
+                          />
+                          <Label htmlFor="recruiter-job-is-anonymous" className="text-[10px] font-black text-slate-700 cursor-pointer select-none">
+                            Publier anonymement (Recruteur Confidentiel)
+                          </Label>
+                        </div>
                       </div>
                     </div>
 
@@ -1924,6 +1946,19 @@ export default function RecruiterDashboard() {
             <div className="space-y-2">
               <Label htmlFor="edit-expiresAt" className="font-black text-slate-700 ml-1 uppercase text-xs tracking-widest">Date d'expiration (Sous 48h = Automatiquement "Offre Rapide")</Label>
               <Input id="edit-expiresAt" type="datetime-local" className="h-14 rounded-2xl border-slate-200 focus-visible:ring-orange-600 font-bold" value={editExpiresAt} onChange={e => setEditExpiresAt(e.target.value)} />
+            </div>
+
+            <div className="flex items-center gap-2 py-1 ml-1 bg-slate-50 border border-slate-100 p-3 rounded-2xl">
+              <input
+                id="edit-is-anonymous"
+                type="checkbox"
+                checked={editIsAnonymous}
+                onChange={(e) => setEditIsAnonymous(e.target.checked)}
+                className="h-4.5 w-4.5 rounded border-slate-300 text-orange-600 focus:ring-orange-500 cursor-pointer shrink-0"
+              />
+              <Label htmlFor="edit-is-anonymous" className="text-[10px] font-black text-slate-700 cursor-pointer select-none uppercase">
+                Publier de manière anonyme (Recruteur Confidentiel)
+              </Label>
             </div>
 
             <div className="space-y-2">
