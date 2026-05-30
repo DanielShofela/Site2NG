@@ -679,49 +679,49 @@ export default function RecruiterDashboard() {
                 </Button>
               <Dialog onOpenChange={(open) => { if (!open) setJobCreated(false); }}>
                 <DialogTrigger asChild nativeButton={true}>
-                  <Button className="h-11 md:h-12 px-6 md:px-8 rounded-xl md:rounded-2xl bg-orange-600 hover:bg-orange-700 text-white font-black shadow-xl shadow-orange-600/20 border-none flex-1 md:flex-none">
+                  <Button className="h-11 md:h-12 px-6 md:px-8 rounded-xl md:rounded-2xl bg-[#e25c1d] hover:bg-[#c94f16] text-white font-black shadow-xl shadow-orange-600/20 border-none flex-1 md:flex-none">
                     <Plus className="mr-2 h-5 w-5" /> Publier Offre
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto rounded-[40px] border-none shadow-2xl">
+                <DialogContent className="sm:max-w-[600px] w-[calc(100%-1.5rem)] xs:w-[calc(100%-2rem)] md:w-full max-h-[90vh] overflow-y-auto rounded-[24px] sm:rounded-[40px] p-0 border-none shadow-2xl bg-white text-left">
             {!jobCreated ? (
               <>
-                <DialogHeader className="bg-slate-900 text-white p-8 rounded-t-[40px]">
-                  <DialogTitle className="text-2xl font-black">Publier une offre d'emploi</DialogTitle>
-                  <DialogDescription className="text-slate-400 font-bold">
+                <DialogHeader className="bg-slate-900 text-white p-5 sm:p-8 rounded-t-[24px] sm:rounded-t-[40px] text-left">
+                  <DialogTitle className="text-xl sm:text-2xl font-black">Publier une offre d'emploi</DialogTitle>
+                  <DialogDescription className="text-slate-400 font-bold text-xs">
                     Attirez les meilleurs talents africains.
                   </DialogDescription>
                 </DialogHeader>
                 {!getValidationWaitingState().canPost ? (
-                  <div className="p-8 text-center space-y-6">
-                    <div className="inline-flex items-center justify-center p-4 bg-orange-50 text-orange-600 rounded-full mt-4">
+                  <div className="p-5 sm:p-8 text-center space-y-6">
+                    <div className="inline-flex items-center justify-center p-4 bg-orange-50 text-[#e25c1d] rounded-full mt-4">
                       <Clock className="h-12 w-12 animate-pulse" />
                     </div>
                     <div className="space-y-2">
-                      <h3 className="text-xl font-black text-slate-900">Période de Validation Requise (72h)</h3>
-                      <p className="text-slate-500 font-bold text-sm max-w-sm mx-auto leading-relaxed">
+                      <h3 className="text-lg sm:text-xl font-black text-slate-900">Période de Validation Requise (72h)</h3>
+                      <p className="text-slate-500 font-bold text-xs sm:text-sm max-w-sm mx-auto leading-relaxed">
                         Conformément à nos règles de sécurité, les nouvelles entreprises doivent attendre un délai de validation obligatoire de 72h après approbation de leur profil avant de pouvoir publier des offres d'emploi d'Afrique.
                       </p>
                     </div>
                     <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 max-w-xs mx-auto">
                       <p className="text-[10px] uppercase font-black tracking-widest text-slate-450">Temps d'attente restant</p>
-                      <p className="text-2xl font-black text-orange-600 mt-1 animate-pulse">
+                      <p className="text-xl sm:text-2xl font-black text-[#e25c1d] mt-1 animate-pulse">
                         {getValidationWaitingState().hoursLeft} heures
                       </p>
                     </div>
                     <Button 
                       onClick={() => navigate('/recruiter-onboarding')}
-                      className="w-full h-12 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-black uppercase text-xs"
+                      className="w-full h-11 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-black uppercase text-xs"
                     >
                       Vérifier mes informations juridiques
                     </Button>
                   </div>
                 ) : (
-                  <form onSubmit={handleCreateJob} className="p-8 space-y-6 text-left">
+                  <form onSubmit={handleCreateJob} className="p-4 sm:p-8 space-y-4 sm:space-y-6 text-left">
                     
                     {/* BLOCK 1: INFORMATIONS ENTREPRISE */}
-                    <div className="bg-slate-50/50 p-5 rounded-2xl border border-slate-100 space-y-4">
-                      <h4 className="text-xs font-black text-orange-600 uppercase tracking-widest border-b border-orange-100 pb-2 flex items-center gap-1.5">
+                    <div className="bg-slate-50/50 p-4 sm:p-5 rounded-xl sm:rounded-2xl border border-slate-100 space-y-4">
+                      <h4 className="text-xs font-black text-[#e25c1d] uppercase tracking-widest border-b border-orange-100 pb-2 flex items-center gap-1.5">
                         <Building2 className="h-4 w-4" /> Block 1 : Informations Entreprise & Contact
                       </h4>
                       
@@ -1891,14 +1891,14 @@ export default function RecruiterDashboard() {
 
       {/* Modification Offre Dialog */}
       <Dialog open={isEditingJobOpen} onOpenChange={setIsEditingJobOpen}>
-        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto rounded-[40px] border-none shadow-2xl">
-          <DialogHeader className="bg-slate-900 text-white p-8 rounded-t-[40px]">
-            <DialogTitle className="text-2xl font-black">Modifier l'offre d'emploi</DialogTitle>
-            <DialogDescription className="text-slate-400 font-bold">
+        <DialogContent className="sm:max-w-[600px] w-[calc(100%-1.5rem)] xs:w-[calc(100%-2rem)] md:w-full max-h-[90vh] overflow-y-auto rounded-[24px] sm:rounded-[40px] p-0 border-none shadow-2xl bg-white text-left">
+          <DialogHeader className="bg-slate-900 text-white p-5 sm:p-8 rounded-t-[24px] sm:rounded-t-[40px] text-left">
+            <DialogTitle className="text-xl sm:text-2xl font-black">Modifier l'offre d'emploi</DialogTitle>
+            <DialogDescription className="text-slate-400 font-bold text-xs">
               Modifiez votre annonce. Toute modification nécessite une nouvelle validation par un administrateur.
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleUpdateJob} className="p-8 space-y-6">
+          <form onSubmit={handleUpdateJob} className="p-4 xs:p-6 sm:p-8 space-y-4 sm:space-y-6">
             <div className="space-y-2">
               <Label htmlFor="edit-title" className="font-black text-slate-700 ml-1 uppercase text-xs tracking-widest">Intitulé du poste *</Label>
               <Input id="edit-title" placeholder="Ex: Senior Marketing Manager" className="h-14 rounded-2xl border-slate-200 focus-visible:ring-orange-600 font-bold" value={editTitle} onChange={e => setEditTitle(e.target.value)} required />

@@ -673,30 +673,30 @@ export default function JobsModule({ jobs, onAction, recruiterNames }: JobsModul
 
       {/* Direct Job Creation Modal */}
       <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-        <DialogContent className="max-w-2xl w-full rounded-[30px] p-8 border-none shadow-2xl overflow-y-auto max-h-[85vh]">
-          <DialogHeader>
-            <DialogTitle className="text-2xl font-black text-slate-900 flex items-center gap-2">
-              <Briefcase className="h-6 w-6 text-orange-600" />
+        <DialogContent className="sm:max-w-2xl w-[calc(100%-1.5rem)] xs:w-[calc(100%-2rem)] md:w-full rounded-[24px] sm:rounded-[30px] p-4 xs:p-6 md:p-8 border-none shadow-2xl overflow-y-auto max-h-[90vh] bg-white">
+          <DialogHeader className="space-y-1">
+            <DialogTitle className="text-lg sm:text-2xl font-black text-slate-900 flex items-center gap-2">
+              <Briefcase className="h-5 w-5 sm:h-6 sm:w-6 text-[#e25c1d]" />
               Publier pour 2NG Groupe Partenaires
             </DialogTitle>
-            <DialogDescription className="font-semibold text-xs text-slate-400 mt-1">
+            <DialogDescription className="font-semibold text-[11px] sm:text-xs text-slate-400">
               Cette offre est directement marquée comme approuvée en tant que Partenaire Exclusif du groupe 2NG.
             </DialogDescription>
           </DialogHeader>
 
-          <form onSubmit={handlePostDirectJob} className="py-4 space-y-6">
+          <form onSubmit={handlePostDirectJob} className="py-2.5 sm:py-4 space-y-4 sm:space-y-6 text-left">
             
             {/* BLOCK 1: INFORMATIONS ENTREPRISE */}
-            <div className="bg-slate-50/50 p-5 rounded-2xl border border-slate-100 space-y-4">
-              <h4 className="text-xs font-black text-orange-600 uppercase tracking-widest border-b border-orange-100 pb-2 flex items-center gap-1.5">
+            <div className="bg-slate-50/50 p-4 sm:p-5 rounded-xl sm:rounded-2xl border border-slate-100/80 space-y-4">
+              <h4 className="text-xs font-black text-[#e25c1d] uppercase tracking-widest border-b border-orange-100 pb-2 flex items-center gap-1.5">
                 <Building2 className="h-4 w-4" /> Block 1 : Informations Entreprise & Configuration
               </h4>
               
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <Label className="text-[10px] font-black text-slate-900 uppercase">Type d'offre d'emploi *</Label>
+                  <Label className="text-[10px] font-black text-slate-950 uppercase">Type d'offre d'emploi *</Label>
                   <select 
-                    className="w-full h-11 px-3 rounded-lg border border-slate-150 bg-white text-xs font-black uppercase text-slate-600 outline-none cursor-pointer p-2"
+                    className="w-full h-11 px-3 rounded-lg border border-slate-200 bg-white text-xs font-bold uppercase text-slate-700 outline-none cursor-pointer focus:border-orange-500 transition-all"
                     value={newOfferType}
                     onChange={(e) => setNewOfferType(e.target.value as 'internal' | 'external')}
                   >
@@ -706,13 +706,13 @@ export default function JobsModule({ jobs, onAction, recruiterNames }: JobsModul
                 </div>
 
                 <div className="space-y-1">
-                  <Label className="text-[10px] font-black text-slate-900 uppercase">Entreprise ou Groupe Bénéficiaire *</Label>
+                  <Label className="text-[10px] font-black text-slate-950 uppercase">Entreprise ou Groupe Bénéficiaire *</Label>
                   <Input 
                     required
                     placeholder="Ex: 2NG Partner Executive" 
                     value={newCompany} 
                     onChange={(e) => setNewCompany(e.target.value)}
-                    className="h-11 rounded-lg border-slate-150 bg-white font-semibold"
+                    className="h-11 rounded-lg border-slate-200 bg-white font-semibold focus-visible:ring-[#e25c1d]"
                   />
                   <div className="flex items-center gap-2 pt-1.5">
                     <input
@@ -746,11 +746,11 @@ export default function JobsModule({ jobs, onAction, recruiterNames }: JobsModul
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <Label className="text-[10px] font-black text-slate-900 uppercase">Secteur / Domaine d'activité</Label>
+                  <Label className="text-[10px] font-black text-slate-950 uppercase">Secteur / Domaine d'activité</Label>
                   <select 
-                    className="w-full h-11 px-3 rounded-lg border border-slate-150 bg-white text-xs font-black uppercase text-slate-600 outline-none"
+                    className="w-full h-11 px-3 rounded-lg border border-slate-200 bg-white text-xs font-bold uppercase text-slate-700 outline-none focus:border-orange-500 transition-all cursor-pointer"
                     value={newField}
                     onChange={(e) => setNewField(e.target.value)}
                   >
@@ -770,12 +770,12 @@ export default function JobsModule({ jobs, onAction, recruiterNames }: JobsModul
                 </div>
 
                 <div className="space-y-1">
-                  <Label className="text-[10px] font-black text-slate-900 uppercase">Localisation (Ville, Pays) *</Label>
+                  <Label className="text-[10px] font-black text-slate-950 uppercase">Localisation (Ville, Pays) *</Label>
                   <Input 
                     required
                     value={newLocation} 
                     onChange={(e) => setNewLocation(e.target.value)}
-                    className="h-11 rounded-lg border-slate-150 bg-white font-semibold"
+                    className="h-11 rounded-lg border-slate-200 bg-white font-semibold focus-visible:ring-[#e25c1d]"
                     placeholder="Ex: Abidjan, Côte d'Ivoire"
                   />
                 </div>
@@ -796,27 +796,27 @@ export default function JobsModule({ jobs, onAction, recruiterNames }: JobsModul
             </div>
 
             {/* BLOCK 2: DÉTAILS DE L’OFFRE */}
-            <div className="bg-slate-50/50 p-5 rounded-2xl border border-slate-100 space-y-4">
-              <h4 className="text-xs font-black text-orange-600 uppercase tracking-widest border-b border-orange-100 pb-2 flex items-center gap-1.5">
+            <div className="bg-slate-50/50 p-4 sm:p-5 rounded-xl sm:rounded-2xl border border-slate-100/80 space-y-4">
+              <h4 className="text-xs font-black text-[#e25c1d] uppercase tracking-widest border-b border-orange-100 pb-2 flex items-center gap-1.5">
                 <Briefcase className="h-4 w-4" /> Block 2 : Descriptif détaillé de l'offre
               </h4>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <Label className="text-[10px] font-black text-slate-900 uppercase">Intitulé du Poste Recherché *</Label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1 text-left">
+                  <Label className="text-[10px] font-black text-slate-950 uppercase">Intitulé du Poste Recherché *</Label>
                   <Input 
                     required
                     placeholder="Ex: Chef de Projet Digital" 
                     value={newTitle} 
                     onChange={(e) => setNewTitle(e.target.value)}
-                    className="h-11 rounded-lg border-slate-150 bg-white font-semibold"
+                    className="h-11 rounded-lg border-slate-200 bg-white font-semibold focus-visible:ring-[#e25c1d]"
                   />
                 </div>
 
-                <div className="space-y-1">
-                  <Label className="text-[10px] font-black text-slate-900 uppercase">Contrat de Travail *</Label>
+                <div className="space-y-1 text-left">
+                  <Label className="text-[10px] font-black text-slate-950 uppercase">Contrat de Travail *</Label>
                   <select 
-                    className="w-full h-11 px-3 rounded-lg border border-slate-150 bg-white text-xs font-black uppercase text-slate-600 outline-none"
+                    className="w-full h-11 px-3 rounded-lg border border-slate-200 bg-white text-xs font-bold text-slate-700 cursor-pointer focus:border-orange-500 transition-all"
                     value={newType}
                     onChange={(e) => setNewType(e.target.value)}
                   >
@@ -828,21 +828,21 @@ export default function JobsModule({ jobs, onAction, recruiterNames }: JobsModul
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-4">
-                <div className="col-span-2 space-y-1">
-                  <Label className="text-[10px] font-black text-slate-900 uppercase">Rémunération Brute (Optionnelle)</Label>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="sm:col-span-2 space-y-1 text-left">
+                  <Label className="text-[10px] font-black text-slate-950 uppercase">Rémunération Brute (Optionnelle)</Label>
                   <Input 
                     placeholder="Ex: 600.000 F CFA - 900.000 F CFA / Mois" 
                     value={newSalary} 
                     onChange={(e) => setNewSalary(e.target.value)}
-                    className="h-11 rounded-lg border-slate-150 bg-white font-semibold"
+                    className="h-11 rounded-lg border-slate-200 bg-white font-semibold focus-visible:ring-[#e25c1d]"
                   />
                 </div>
 
-                <div className="space-y-1">
-                  <Label className="text-[10px] font-black text-slate-900 uppercase">Valorisation d'affichage</Label>
+                <div className="space-y-1 text-left">
+                  <Label className="text-[10px] font-black text-slate-950 uppercase">Valorisation d'affichage</Label>
                   <select 
-                    className="w-full h-11 px-3 rounded-lg border border-slate-150 bg-white text-xs font-black uppercase text-slate-600 outline-none"
+                    className="w-full h-11 px-3 rounded-lg border border-slate-200 bg-white text-xs font-bold text-slate-700 cursor-pointer focus:border-orange-500 transition-all"
                     value={newCategory}
                     onChange={(e) => setNewCategory(e.target.value)}
                   >
@@ -853,14 +853,14 @@ export default function JobsModule({ jobs, onAction, recruiterNames }: JobsModul
                 </div>
               </div>
 
-              <div className="space-y-1">
-                <Label className="text-[10px] font-black text-slate-900 uppercase">Date limite d'expiration *</Label>
+              <div className="space-y-1 text-left">
+                <Label className="text-[10px] font-black text-slate-950 uppercase">Date limite d'expiration *</Label>
                 <Input 
                   required
                   type="date" 
                   value={newExpiresAt} 
                   onChange={(e) => setNewExpiresAt(e.target.value)}
-                  className="h-11 rounded-lg border-slate-150 bg-white font-black cursor-pointer text-xs uppercase"
+                  className="h-11 rounded-lg border-slate-200 bg-white font-bold cursor-pointer text-xs uppercase focus-visible:ring-[#e25c1d]"
                 />
               </div>
 
@@ -995,7 +995,7 @@ export default function JobsModule({ jobs, onAction, recruiterNames }: JobsModul
 
       {/* Selected Job Viewer/Moderator Dialog */}
       <Dialog open={isViewOpen} onOpenChange={setIsViewOpen}>
-        <DialogContent className="max-w-3xl w-full rounded-[30px] p-8 border-none shadow-2xl overflow-y-auto max-h-[85vh] bg-white">
+        <DialogContent className="sm:max-w-3xl w-[calc(100%-1.5rem)] xs:w-[calc(100%-2rem)] md:w-full rounded-[24px] sm:rounded-[30px] p-4 xs:p-6 md:p-8 border-none shadow-2xl overflow-y-auto max-h-[90vh] bg-white text-left">
           {selectedJob && (
             <>
               <DialogHeader className="border-b border-slate-50 pb-5">
@@ -1278,30 +1278,30 @@ export default function JobsModule({ jobs, onAction, recruiterNames }: JobsModul
 
       {/* Direct Job Editing Modal */}
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-        <DialogContent className="max-w-2xl w-full rounded-[30px] p-8 border-none shadow-2xl overflow-y-auto max-h-[85vh] bg-white text-left">
-          <DialogHeader>
-            <DialogTitle className="text-2xl font-black text-slate-900 flex items-center gap-2">
-              <Pencil className="h-6 w-6 text-[#e25c1d]" />
+        <DialogContent className="sm:max-w-2xl w-[calc(100%-1.5rem)] xs:w-[calc(100%-2rem)] md:w-full rounded-[24px] sm:rounded-[30px] p-4 xs:p-6 md:p-8 border-none shadow-2xl overflow-y-auto max-h-[90vh] bg-white text-left">
+          <DialogHeader className="space-y-1">
+            <DialogTitle className="text-lg sm:text-2xl font-black text-slate-900 flex items-center gap-2">
+              <Pencil className="h-5 w-5 sm:h-6 sm:w-6 text-[#e25c1d]" />
               Modifier l'offre d'emploi
             </DialogTitle>
-            <DialogDescription className="font-semibold text-xs text-slate-400 mt-1">
+            <DialogDescription className="font-semibold text-[11px] sm:text-xs text-slate-400">
               Remplissez les informations ci-dessous pour mettre à jour les détails affichés sur l'offre d'emploi.
             </DialogDescription>
           </DialogHeader>
 
-          <form onSubmit={handleUpdateAdminJob} className="py-4 space-y-6">
+          <form onSubmit={handleUpdateAdminJob} className="py-2.5 sm:py-4 space-y-4 sm:space-y-6 text-left">
             
             {/* BLOCK 1: INFORMATIONS ENTREPRISE */}
-            <div className="bg-slate-50/50 p-5 rounded-2xl border border-slate-100 space-y-4">
+            <div className="bg-slate-50/50 p-4 sm:p-5 rounded-xl sm:rounded-2xl border border-slate-100/80 space-y-4">
               <h4 className="text-xs font-black text-[#e25c1d] uppercase tracking-widest border-b border-orange-100 pb-2 flex items-center gap-1.5">
                 <Building2 className="h-4 w-4" /> Block 1 : Informations Entreprise & Configuration
               </h4>
               
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <Label className="text-[10px] font-black text-slate-900 uppercase">Type d'offre d'emploi *</Label>
+                  <Label className="text-[10px] font-black text-slate-950 uppercase">Type d'offre d'emploi *</Label>
                   <select 
-                    className="w-full h-11 px-3 rounded-lg border border-slate-150 bg-white text-xs font-black uppercase text-slate-600 outline-none cursor-pointer p-2"
+                    className="w-full h-11 px-3 rounded-lg border border-slate-200 bg-white text-xs font-bold uppercase text-slate-700 outline-none cursor-pointer focus:border-orange-500 transition-all p-2"
                     value={editOfferType}
                     onChange={(e) => setEditOfferType(e.target.value as 'internal' | 'external')}
                   >
@@ -1311,13 +1311,13 @@ export default function JobsModule({ jobs, onAction, recruiterNames }: JobsModul
                 </div>
 
                 <div className="space-y-1">
-                  <Label className="text-[10px] font-black text-slate-900 uppercase">Entreprise ou Groupe Bénéficiaire *</Label>
+                  <Label className="text-[10px] font-black text-slate-950 uppercase">Entreprise ou Groupe Bénéficiaire *</Label>
                   <Input 
                     required
                     placeholder="Ex: 2NG Partner Executive" 
                     value={editCompany} 
                     onChange={(e) => setEditCompany(e.target.value)}
-                    className="h-11 rounded-lg border-slate-150 bg-white font-semibold"
+                    className="h-11 rounded-lg border-slate-200 bg-white font-semibold focus-visible:ring-[#e25c1d]"
                   />
                   <div className="flex items-center gap-2 pt-1.5">
                     <input
@@ -1351,11 +1351,11 @@ export default function JobsModule({ jobs, onAction, recruiterNames }: JobsModul
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <Label className="text-[10px] font-black text-slate-900 uppercase">Secteur / Domaine d'activité</Label>
+                  <Label className="text-[10px] font-black text-slate-950 uppercase">Secteur / Domaine d'activité</Label>
                   <select 
-                    className="w-full h-11 px-3 rounded-lg border border-slate-150 bg-white text-xs font-black uppercase text-slate-600 outline-none cursor-pointer"
+                    className="w-full h-11 px-3 rounded-lg border border-slate-200 bg-white text-xs font-bold uppercase text-slate-700 outline-none cursor-pointer focus:border-orange-500 transition-all"
                     value={editField}
                     onChange={(e) => setEditField(e.target.value)}
                   >
@@ -1375,12 +1375,12 @@ export default function JobsModule({ jobs, onAction, recruiterNames }: JobsModul
                 </div>
 
                 <div className="space-y-1">
-                  <Label className="text-[10px] font-black text-slate-900 uppercase">Localisation (Ville, Pays) *</Label>
+                  <Label className="text-[10px] font-black text-slate-950 uppercase">Localisation (Ville, Pays) *</Label>
                   <Input 
                     required
                     value={editLocation} 
                     onChange={(e) => setEditLocation(e.target.value)}
-                    className="h-11 rounded-lg border-slate-150 bg-white font-semibold"
+                    className="h-11 rounded-lg border-slate-200 bg-white font-semibold focus-visible:ring-[#e25c1d]"
                     placeholder="Ex: Abidjan, Côte d'Ivoire"
                   />
                 </div>
@@ -1401,27 +1401,27 @@ export default function JobsModule({ jobs, onAction, recruiterNames }: JobsModul
             </div>
 
             {/* BLOCK 2: DÉTAILS DE L’OFFRE */}
-            <div className="bg-slate-50/50 p-5 rounded-2xl border border-slate-100 space-y-4">
+            <div className="bg-slate-50/50 p-4 sm:p-5 rounded-xl sm:rounded-2xl border border-slate-100/80 space-y-4">
               <h4 className="text-xs font-black text-[#e25c1d] uppercase tracking-widest border-b border-orange-100 pb-2 flex items-center gap-1.5">
                 <Briefcase className="h-4 w-4" /> Block 2 : Descriptif détaillé de l'offre
               </h4>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <Label className="text-[10px] font-black text-slate-900 uppercase">Intitulé du Poste Recherché *</Label>
+                  <Label className="text-[10px] font-black text-slate-950 uppercase">Intitulé du Poste Recherché *</Label>
                   <Input 
                     required
                     placeholder="Ex: Chef de Projet Digital" 
                     value={editTitle} 
                     onChange={(e) => setEditTitle(e.target.value)}
-                    className="h-11 rounded-lg border-slate-150 bg-white font-semibold"
+                    className="h-11 rounded-lg border-slate-200 bg-white font-semibold focus-visible:ring-[#e25c1d]"
                   />
                 </div>
 
                 <div className="space-y-1">
-                  <Label className="text-[10px] font-black text-slate-900 uppercase">Contrat de Travail *</Label>
+                  <Label className="text-[10px] font-black text-slate-950 uppercase">Contrat de Travail *</Label>
                   <select 
-                    className="w-full h-11 px-3 rounded-lg border border-slate-150 bg-white text-xs font-black uppercase text-slate-600 outline-none cursor-pointer"
+                    className="w-full h-11 px-3 rounded-lg border border-slate-200 bg-white text-xs font-bold text-slate-700 cursor-pointer focus:border-orange-500 transition-all outline-none"
                     value={editType}
                     onChange={(e) => setEditType(e.target.value)}
                   >
@@ -1433,21 +1433,21 @@ export default function JobsModule({ jobs, onAction, recruiterNames }: JobsModul
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-4">
-                <div className="col-span-2 space-y-1">
-                  <Label className="text-[10px] font-black text-slate-900 uppercase">Rémunération Brute (Optionnelle)</Label>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="sm:col-span-2 space-y-1">
+                  <Label className="text-[10px] font-black text-slate-950 uppercase">Rémunération Brute (Optionnelle)</Label>
                   <Input 
                     placeholder="Ex: 600.000 F CFA - 900.000 F CFA / Mois" 
                     value={editSalary} 
                     onChange={(e) => setEditSalary(e.target.value)}
-                    className="h-11 rounded-lg border-slate-150 bg-white font-semibold"
+                    className="h-11 rounded-lg border-slate-200 bg-white font-semibold focus-visible:ring-[#e25c1d]"
                   />
                 </div>
 
                 <div className="space-y-1">
-                  <Label className="text-[10px] font-black text-slate-900 uppercase">Valorisation d'affichage</Label>
+                  <Label className="text-[10px] font-black text-slate-950 uppercase">Valorisation d'affichage</Label>
                   <select 
-                    className="w-full h-11 px-3 rounded-lg border border-slate-150 bg-white text-xs font-black uppercase text-slate-600 outline-none cursor-pointer"
+                    className="w-full h-11 px-3 rounded-lg border border-slate-200 bg-white text-xs font-bold text-slate-700 cursor-pointer focus:border-orange-500 transition-all outline-none"
                     value={editCategory}
                     onChange={(e) => setEditCategory(e.target.value)}
                   >
