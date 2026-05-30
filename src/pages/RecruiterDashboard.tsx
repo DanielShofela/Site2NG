@@ -469,6 +469,10 @@ export default function RecruiterDashboard() {
         createdAt: serverTimestamp(),
         isFeatured: false,
         is_anonymous: jobIsAnonymous,
+        views: 0,
+        shares: 0,
+        likes: 0,
+        applications: 0,
         
         // Expanded recruiting criteria
         studyLevels: jobStudyLevels,

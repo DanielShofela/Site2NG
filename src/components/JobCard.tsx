@@ -163,13 +163,19 @@ export default function JobCard({
     return localJob.external_apply_email || `recrutement@${cleanCompanyName.toLowerCase().replace(/[^a-zA-Z0-9]/g, "") || "entreprise"}.com`;
   }, [localJob.external_apply_email, cleanCompanyName]);
 
-  const handleCopyEmail = (e: React.MouseEvent) => {
+  const handleCopyEmail = async (e: React.MouseEvent) => {
     e.stopPropagation();
     try {
       navigator.clipboard.writeText(applyEmail);
       setCopiedEmail(true);
       triggerToast("Adresse email copiée avec succès.", "success");
       setTimeout(() => setCopiedEmail(false), 2000);
+
+      // Increment applications directly on the offer document as copying email signifies applying
+      const jobRef = doc(db, 'offers', localJob.id);
+      await updateDoc(jobRef, {
+        applications: increment(1)
+      });
     } catch (err) {
       console.error(err);
       triggerToast("Erreur lors de la copie de l'adresse email.", "error");
@@ -223,25 +229,11 @@ export default function JobCard({
     checkCompanyAccount();
   }, [localJob.recruiterId, (localJob as any).companyId, cleanCompanyName, isAnonymous]);
 
-  // Stable deterministic metrics seed hashes
-  const seedHash = useMemo(() => {
-    let hash = 0;
-    const str = localJob.id || "2ng_job";
-    for (let i = 0; i < str.length; i++) {
-      hash = str.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    return Math.abs(hash);
-  }, [localJob.id]);
-
-  const baseLikes = useMemo(() => (seedHash % 24) + 6, [seedHash]);
-  const baseShares = useMemo(() => Math.floor(baseLikes / 3) + (seedHash % 7), [baseLikes, seedHash]);
-  const baseApps = useMemo(() => Math.floor(baseLikes / 2) + (seedHash % 5) + (isApplied ? 1 : 0), [baseLikes, seedHash, isApplied]);
-  const baseViews = useMemo(() => (baseLikes * 9) + (seedHash % 89) + 42, [baseLikes, seedHash]);
-
-  const [likesCount, setLikesCount] = useState((localJob as any).likes !== undefined ? (localJob as any).likes : baseLikes + (isSaved ? 1 : 0));
-  const [sharesCount, setSharesCount] = useState((localJob as any).shares !== undefined ? (localJob as any).shares : baseShares);
-  const [viewsCount, setViewsCount] = useState(localJob.views !== undefined ? localJob.views : baseViews);
-  const [appsCount, setAppsCount] = useState(baseApps);
+  // Handle actual engagement metrics from the database with a 0 fallback
+  const [likesCount, setLikesCount] = useState((localJob as any).likes !== undefined ? (localJob as any).likes : 0);
+  const [sharesCount, setSharesCount] = useState((localJob as any).shares !== undefined ? (localJob as any).shares : 0);
+  const [viewsCount, setViewsCount] = useState(localJob.views !== undefined ? localJob.views : 0);
+  const [appsCount, setAppsCount] = useState((localJob as any).applications !== undefined ? (localJob as any).applications : 0);
 
   // Sync realtime engagement metrics directly from Firestore Database 
   useEffect(() => {
@@ -254,21 +246,14 @@ export default function JobCard({
         if (data.views !== undefined) setViewsCount(data.views);
         if (data.shares !== undefined) setSharesCount(data.shares);
         if (data.likes !== undefined) setLikesCount(data.likes);
+        if (data.applications !== undefined) setAppsCount(data.applications);
       }
     }, (err) => {
       console.log("Silent error from real-time job metrics listener", err);
     });
 
-    const appsQuery = query(collection(db, 'applications'), where('jobId', '==', localJob.id));
-    const unsubApps = onSnapshot(appsQuery, (snap) => {
-      setAppsCount(snap.size);
-    }, (err) => {
-      console.log("Silent error from real-time apps count listener", err);
-    });
-
     return () => {
       unsubJob();
-      unsubApps();
     };
   }, [localJob.id]);
 
@@ -361,6 +346,19 @@ export default function JobCard({
     }
   };
 
+  // Handle external apply click to increment the count
+  const handleExternalApplyIncrement = async () => {
+    setIsApplyModalOpen(false);
+    try {
+      const jobRef = doc(db, 'offers', localJob.id);
+      await updateDoc(jobRef, {
+        applications: increment(1)
+      });
+    } catch (err) {
+      console.log("Error incrementing external applications count:", err);
+    }
+  };
+
   // Immediate automatically apply candidate logic
   const handleImmediateApply = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -383,6 +381,13 @@ export default function JobCard({
     try {
       onApply(); // Execute standard candidate application script (addDoc collections inside Home/Jobs)
       setIsApplied(true);
+
+      // Increment applications directly on the offer document
+      const jobRef = doc(db, 'offers', localJob.id);
+      await updateDoc(jobRef, {
+        applications: increment(1)
+      });
+
       triggerToast("Félicitations! Votre candidature a été transmise immédiatement.", "success");
     } catch (error) {
       console.error(error);
@@ -401,7 +406,6 @@ export default function JobCard({
       } catch (err) {
         console.log("Local save toggled", err);
       }
-      setLikesCount(prev => Math.max(0, prev - 1));
     } else {
       localStorage.setItem(`saved_job_${localJob.id}`, 'true');
       setIsSaved(true);
@@ -410,7 +414,6 @@ export default function JobCard({
       } catch (err) {
         console.log("Local save toggled", err);
       }
-      setLikesCount(prev => prev + 1);
     }
   };
 
@@ -426,7 +429,6 @@ export default function JobCard({
     } catch (err) {
       console.log("Shares count saved locally", err);
     }
-    setSharesCount(prev => prev + 1);
 
     if (navigator.share) {
       try {
@@ -565,7 +567,6 @@ export default function JobCard({
       } catch (err) {
         console.log("View count incremented local copy");
       }
-      setViewsCount(prev => prev + 1);
     }
     setIsExpanded(!isExpanded);
   };
@@ -574,7 +575,7 @@ export default function JobCard({
   const docsToShow = localJob.requiredDocs || ["Curriculum Vitae (CV)", "Lettre de motivation (LM)"];
 
   return (
-    <div id={`card-${localJob.id}`} className="relative w-full max-w-lg mx-auto px-1 sm:px-3 mb-6 select-none leading-normal">
+    <div id={`card-${localJob.id}`} className="relative w-full max-w-[340px] xs:max-w-[370px] sm:max-w-md mx-auto mb-6 select-none bg-white border border-slate-150/70 rounded-[24px] sm:rounded-[28px] shadow-sm hover:shadow-lg transition-all duration-300 overflow-hidden flex flex-col justify-between leading-normal">
       
       {/* Toast Alert Canvas Banner inside Card */}
       <AnimatePresence>
@@ -597,20 +598,20 @@ export default function JobCard({
         )}
       </AnimatePresence>
 
-      <div className="flex flex-col items-stretch relative">
+      <div className="flex flex-col items-stretch">
         
-        {/* PARTIE 1: LA FEUILLE BLANCHE (FACE PRINCIPALE) */}
-        <div className="bg-white border border-slate-150/70 rounded-[28px] shadow-sm hover:shadow-lg transition-all duration-300 overflow-hidden flex flex-col justify-between p-6">
+        {/* PARTIE 1: CONTENU PRINCIPAL DE L'OFFRE (ESPACE BLANC) */}
+        <div className="p-4 xs:p-5 sm:p-6 pb-3">
           
-          <div className="flex flex-col text-left">
+          <div className="flex flex-col text-left min-w-0">
             {/* Cabal / Meta row */}
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-3">
+            <div className="flex items-center justify-between gap-1.5 min-w-0">
+              <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
                 {/* Logo company */}
-                <div className="w-12 h-12 rounded-2xl overflow-hidden shrink-0 shadow-sm leading-none flex items-center justify-center bg-white border border-slate-150/70">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl overflow-hidden shrink-0 shadow-sm leading-none flex items-center justify-center bg-white border border-slate-150/70">
                   {showDefaultIcon ? (
                     <div className="w-full h-full bg-orange-50/85 text-[#e25c1d] flex items-center justify-center">
-                      <Building2 className="h-6 w-6 stroke-[2]" />
+                      <Building2 className="h-5.5 w-5.5 sm:h-6 sm:w-6 stroke-[2]" />
                     </div>
                   ) : (
                     <img 
@@ -623,36 +624,36 @@ export default function JobCard({
                   )}
                 </div>
 
-                <div className="flex flex-col text-left">
-                  <div className="flex items-center gap-1">
+                <div className="flex flex-col text-left min-w-0 flex-1">
+                  <div className="flex items-center gap-1 min-w-0">
                     {matchingCompanyId ? (
                       <Link 
                         to={`/company/${matchingCompanyId}`} 
                         onClick={(e) => e.stopPropagation()}
-                        className="text-slate-800 hover:text-orange-600 font-black text-sm tracking-tight leading-none truncate max-w-[150px] inline-flex items-center gap-0.5 transition-all outline-none"
+                        className="text-slate-800 hover:text-orange-600 font-black text-xs sm:text-sm tracking-tight leading-none truncate max-w-[110px] sm:max-w-[150px] inline-flex items-center gap-0.5 transition-all outline-none"
                       >
-                        {cleanCompanyName} <ArrowUpRight className="h-3.5 w-3.5 mt-0.5" />
+                        {cleanCompanyName} <ArrowUpRight className="h-3 w-3 sm:h-3.5 sm:w-3.5 mt-0.5" />
                       </Link>
                     ) : (
-                      <span className="text-slate-800 font-extrabold text-sm tracking-tight leading-none truncate max-w-[150px]">
+                      <span className="text-slate-200 font-extrabold text-xs sm:text-sm tracking-tight leading-none truncate max-w-[110px] sm:max-w-[150px]">
                         {cleanCompanyName}
                       </span>
                     )}
 
                     {/* Verification blue check icon */}
                     <span className="text-sky-500 shrink-0" title="Recruteur Certifié 2NG">
-                      <CheckCircle2 className="h-3.5 w-3.5 fill-sky-500 text-white" />
+                      <CheckCircle2 className="h-3 w-3 sm:h-3.5 sm:w-3.5 fill-sky-500 text-white" />
                     </span>
                   </div>
 
-                  <span className="text-[10px] text-slate-400 font-bold block mt-1 uppercase tracking-wider leading-none">
+                  <span className="text-[9px] sm:text-[10px] text-slate-400 font-bold block mt-1 uppercase tracking-wider leading-none truncate max-w-[130px] sm:max-w-[180px]">
                     {localJob.field || "Secteur Général"}
                   </span>
                 </div>
               </div>
 
               {/* Sub-Badges and Editor Modifier tools */}
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1 shrink-0">
                 {canModify && (
                   <Button
                     size="sm"
@@ -661,132 +662,74 @@ export default function JobCard({
                       e.stopPropagation();
                       handleOpenEdit();
                     }}
-                    className="h-8 rounded-full border-orange-200 text-orange-600 hover:bg-orange-50/50 hover:text-orange-700 text-[10px] font-black uppercase flex items-center gap-1.5 shrink-0 px-2.5 transition-colors"
+                    className="h-7 sm:h-8 rounded-full border-orange-200 text-orange-600 hover:bg-orange-50/50 hover:text-orange-700 text-[9px] sm:text-[10px] font-black uppercase flex items-center gap-1 shrink-0 px-2 sm:px-2.5 transition-colors"
                   >
-                    <Pencil className="h-3 w-3 stroke-[2.5]" />
+                    <Pencil className="h-2.5 w-2.5 sm:h-3 sm:w-3 stroke-[2.5]" />
                     <span>Modifier</span>
                   </Button>
                 )}
 
-                <Badge variant="outline" className="border-slate-200 text-orange-600 bg-orange-50/50 font-black text-[9px] px-2 py-0.5 uppercase rounded-lg">
+                <Badge variant="outline" className="border-slate-200 text-orange-600 bg-orange-50/50 font-black text-[8px] sm:text-[9px] px-1.5 sm:px-2 py-0.5 uppercase rounded-lg shrink-0">
                   Offre {localJob.offer_type === 'external' ? 'relais' : 'interne'}
                 </Badge>
               </div>
             </div>
 
             {/* Post Job Name - Bold heading */}
-            <div className="mt-4">
-              <h3 className="text-lg sm:text-xl font-extrabold text-slate-900 tracking-tight leading-snug">
+            <div className="mt-3.5">
+              <h3 className="text-base sm:text-lg font-extrabold text-slate-900 tracking-tight leading-snug">
                 {localJob.title}
               </h3>
             </div>
 
             {/* Geographical details & publish date metadata */}
-            <div className="flex flex-wrap items-center gap-2 mt-2.5 text-[11px] font-bold text-slate-400">
+            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mt-2 text-[10px] sm:text-[11px] font-bold text-slate-400">
               <span className="flex items-center gap-1">
-                <MapPin className="h-3.5 w-3.5 text-slate-300 shrink-0" />
+                <MapPin className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-slate-300 shrink-0" />
                 <span>{localJob.location || "Abidjan, Côte d'Ivoire"}</span>
               </span>
               <span className="text-slate-200">|</span>
               <span className="flex items-center gap-1">
-                <Clock className="h-3.5 w-3.5 text-slate-300 shrink-0" />
+                <Clock className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-slate-300 shrink-0" />
                 <span>Publié {formattedDate()}</span>
               </span>
             </div>
 
             {/* Standard pastel tag badges */}
-            <div className="flex flex-wrap gap-1.5 mt-3">
-              <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-100 font-extrabold text-[10px] px-2.5 py-1 uppercase rounded-lg leading-none shrink-0 shadow-none">
+            <div className="flex flex-wrap gap-1 mt-2.5">
+              <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-100 font-extrabold text-[8px] sm:text-[9px] px-2 py-0.5 uppercase rounded-lg leading-none shrink-0 shadow-none">
                 {localJob.contractType || localJob.type || 'CDI'}
               </Badge>
-              <Badge className="bg-sky-50 text-sky-700 border border-sky-100 font-extrabold text-[10px] px-2.5 py-1 uppercase rounded-lg leading-none shrink-0 shadow-none">
+              <Badge className="bg-sky-50 text-sky-700 border border-sky-100 font-extrabold text-[8px] sm:text-[9px] px-2 py-0.5 uppercase rounded-lg leading-none shrink-0 shadow-none">
                 Temps plein
               </Badge>
-              <Badge className="bg-purple-50 text-purple-700 border border-purple-100 font-extrabold text-[10px] px-2.5 py-1 uppercase rounded-lg leading-none shrink-0 shadow-none">
+              <Badge className="bg-purple-50 text-purple-700 border border-purple-100 font-extrabold text-[8px] sm:text-[9px] px-2 py-0.5 uppercase rounded-lg leading-none shrink-0 shadow-none">
                 Exp. {localJob.experienceYears ? String(localJob.experienceYears) : "2 à 5 ans"}
               </Badge>
             </div>
 
             {/* Short summary snippet text (Max 2 lines) */}
             {localJob.description && (
-              <p className="text-slate-500 font-medium text-xs leading-relaxed line-clamp-2 mt-4 text-justify">
+              <p className="text-slate-500 font-medium text-[11px] leading-relaxed line-clamp-2 mt-3.5 text-justify">
                 {parsedDesc.descriptionText}
               </p>
             )}
-
-            {/* Divider */}
-            <div className="border-t border-slate-100 my-4" />
-
-            {/* ZONE DES ACTIONS ALIGNÉES HORIZONTALEMENT */}
-            <div className="grid grid-cols-3 divide-x divide-slate-100 gap-1 mt-1 border-b border-slate-50 pb-1">
-              
-              {/* ACTION 1: POSTULER (📩) */}
-              <button
-                onClick={handleImmediateApply}
-                disabled={isApplying || (!isExternalApply && loggedIn && userRole !== 'candidate')}
-                className="flex flex-col sm:flex-row items-center justify-center gap-1.5 py-2.5 hover:bg-slate-50/50 transition-all rounded-xl cursor-pointer"
-                title="Postuler à cette offre"
-              >
-                <Send className={`h-4.5 w-4.5 shrink-0 stroke-[2.5] ${isApplied ? 'text-emerald-500' : 'text-sky-500'}`} />
-                <span className={`text-[11px] sm:text-xs font-extrabold leading-none ${isApplied ? 'text-emerald-600' : 'text-slate-800'}`}>
-                  {isApplied ? 'Postulé' : 'Postuler'}
-                </span>
-                <span className="text-[9px] font-mono font-medium text-slate-400">({appsCount})</span>
-              </button>
-
-              {/* ACTION 2: PARTAGER (🔗) */}
-              <button
-                onClick={handleShare}
-                className="flex flex-col sm:flex-row items-center justify-center gap-1.5 py-2.5 hover:bg-slate-50/50 transition-all rounded-xl cursor-pointer"
-                title="Partager le lien de l'offre"
-              >
-                <Share2 className="h-4.5 w-4.5 shrink-0 text-sky-500 stroke-[2.5]" />
-                <span className="text-[11px] sm:text-xs font-extrabold text-slate-800 leading-none">Partager</span>
-                <span className="text-[9px] font-mono font-medium text-slate-400">({sharesCount})</span>
-              </button>
-
-              {/* ACTION 3: FAVORIS/LIKE (❤️) */}
-              <button
-                onClick={toggleSave}
-                className="flex flex-col sm:flex-row items-center justify-center gap-1.5 py-2.5 hover:bg-slate-50/50 transition-all rounded-xl cursor-pointer"
-                title="Ajouter aux favoris"
-              >
-                <Heart className={`h-4.5 w-4.5 shrink-0 transition-all ${isSaved ? 'fill-rose-500 text-rose-500' : 'text-slate-400 stroke-[2.5]'}`} />
-                <span className="text-[11px] sm:text-xs font-extrabold text-[#e25c1d] leading-none">_like</span>
-                <span className="text-[9px] font-mono font-semibold text-slate-400">({likesCount})</span>
-              </button>
-
-            </div>
 
           </div>
 
         </div>
 
-        {/* PARTIE 2: LA LANGUETTE DÉTAILS (ORANGE) */}
-        <button
-          onClick={handleToggleExpand}
-          className="w-full bg-[#e25c1d] hover:bg-[#c94d15] text-white py-3 px-6 rounded-b-[24px] shadow-sm hover:shadow-md transition-all duration-300 flex flex-col items-center justify-center gap-0.5 outline-none relative z-10 -mt-1 outline-none cursor-pointer"
-        >
-          <span className="text-xs font-extrabold flex items-center gap-1 justify-center uppercase tracking-wider">
-            {isExpanded ? 'Masquer ▲' : 'Détails ▼'}
-          </span>
-          <span className="text-[9px] sm:text-[10px] font-bold text-orange-100 flex items-center gap-1 justify-center opacity-90 font-mono">
-            <Eye className="h-3 w-3" />
-            {viewsCount} vues
-          </span>
-        </button>
-
-        {/* PARTIE 3: FEUILLE DE CONTENU DÉTAILLÉ (DÉPLIANT ACCORDÉON BIEN DESSINÉ) */}
+        {/* PARTIE 3: COMPOSANT DÉTAILLÉ S'OUVRANT VERS LE BAS DE MANIÈRE FLUIDE */}
         <AnimatePresence initial={false}>
           {isExpanded && (
             <motion.div
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: "auto", opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
-              className="overflow-hidden mt-2"
-              transition={{ type: "spring", stiffness: 350, damping: 30 }}
+              className="overflow-hidden"
+              transition={{ type: "spring", stiffness: 300, damping: 28 }}
             >
-              <div className="bg-white border border-slate-150/70 rounded-[24px] p-5 sm:p-6 shadow-md space-y-5 text-left text-slate-600">
+              <div className="bg-slate-50 border-t border-slate-200/60 p-5 sm:p-6 space-y-5 text-left text-slate-600 pb-8">
                 
                 {/* SECTION 1: Description du poste */}
                 <div className="space-y-1.5">
@@ -819,8 +762,8 @@ export default function JobCard({
                   </ul>
                 </div>
 
-                {/* TWO-COLUMN MATRIX SYSTEM */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-slate-100 pt-4">
+                {/* SEQUENTIAL WORKFLOW LIST */}
+                <div className="flex flex-col gap-5 border-t border-slate-100 pt-4">
                   
                   {/* SECTION 3: Profil recherché */}
                   <div className="space-y-1.5">
@@ -833,6 +776,23 @@ export default function JobCard({
                     <p className="text-xs text-slate-600 leading-relaxed font-semibold pl-1">
                       {parsedReqs.mainRequirements}
                     </p>
+                  </div>
+
+                  {/* SECTION 4: Compétences */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-2 text-slate-800 font-extrabold text-xs tracking-wider uppercase border-b border-slate-100 pb-1.5">
+                      <div className="w-6 h-6 rounded-lg bg-orange-100/50 flex items-center justify-center text-[#e25c1d] shrink-0">
+                        <Award className="w-3.5 h-3.5" />
+                      </div>
+                      <span>Section 4 : Compétences clefs</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 pl-1 pt-1">
+                      {parsedReqs.skills.slice(0, 6).map((skill, idx) => (
+                        <span key={idx} className="bg-slate-50 text-slate-700 text-[10px] font-bold px-2.5 py-1 rounded-lg border border-slate-150/50 tracking-wide">
+                          {skill}
+                        </span>
+                      ))}
+                    </div>
                   </div>
 
                   {/* SECTION 5: Niveaux d'études */}
@@ -867,6 +827,24 @@ export default function JobCard({
                     </p>
                   </div>
 
+                  {/* SECTION 7: Documents exigés */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-2 text-slate-800 font-extrabold text-xs tracking-wider uppercase border-b border-slate-100 pb-1.5">
+                      <div className="w-6 h-6 rounded-lg bg-orange-100/50 flex items-center justify-center text-[#e25c1d] shrink-0">
+                        <FileText className="w-3.5 h-3.5" />
+                      </div>
+                      <span>Section 7 : Documents exigés</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 pl-1 pt-1">
+                      {docsToShow.map((docItem, idx) => (
+                        <span key={idx} className="bg-white border border-orange-200/50 text-slate-700 font-bold text-[10px] px-2.5 py-1.5 rounded-xl flex items-center gap-1.5 shadow-none hover:bg-orange-50/20 transition-all">
+                          <FileText className="h-3.5 w-3.5 text-[#e25c1d] shrink-0" />
+                          <span>{docItem}</span>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
                   {/* SECTION 8: Salaire */}
                   <div className="space-y-1.5">
                     <div className="flex items-center gap-2 text-slate-800 font-extrabold text-xs tracking-wider uppercase border-b border-slate-100 pb-1.5">
@@ -882,41 +860,6 @@ export default function JobCard({
                     </p>
                   </div>
 
-                </div>
-
-                {/* SECTION 4: Compétences */}
-                <div className="space-y-1.5 border-t border-slate-100 pt-4">
-                  <div className="flex items-center gap-2 text-slate-800 font-extrabold text-xs tracking-wider uppercase border-b border-slate-100 pb-1.5">
-                    <div className="w-6 h-6 rounded-lg bg-orange-100/50 flex items-center justify-center text-[#e25c1d] shrink-0">
-                      <Award className="w-3.5 h-3.5" />
-                    </div>
-                    <span>Section 4 : Compétences clefs</span>
-                  </div>
-                  <div className="flex flex-wrap gap-1.5 pl-1 pt-1">
-                    {parsedReqs.skills.slice(0, 6).map((skill, idx) => (
-                      <span key={idx} className="bg-slate-50 text-slate-700 text-[10px] font-bold px-2.5 py-1 rounded-lg border border-slate-150/50 tracking-wide">
-                        {skill}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-
-                {/* SECTION 7: Documents exigés */}
-                <div className="space-y-1.5 border-t border-slate-100 pt-4">
-                  <div className="flex items-center gap-2 text-slate-800 font-extrabold text-xs tracking-wider uppercase border-b border-slate-100 pb-1.5">
-                    <div className="w-6 h-6 rounded-lg bg-orange-100/50 flex items-center justify-center text-[#e25c1d] shrink-0">
-                      <FileText className="w-3.5 h-3.5" />
-                    </div>
-                    <span>Section 7 : Documents exigés</span>
-                  </div>
-                  <div className="flex flex-wrap gap-1.5 pl-1 pt-1">
-                    {docsToShow.map((docItem, idx) => (
-                      <span key={idx} className="bg-white border border-orange-200/50 text-slate-700 font-bold text-[10px] px-2.5 py-1.5 rounded-xl flex items-center gap-1.5 shadow-none hover:bg-orange-50/20 transition-all">
-                        <FileText className="h-3.5 w-3.5 text-[#e25c1d] shrink-0" />
-                        <span>{docItem}</span>
-                      </span>
-                    ))}
-                  </div>
                 </div>
 
                 {/* SECTION 9: Date limite */}
@@ -968,6 +911,69 @@ export default function JobCard({
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* CONTENEUR DES ACTIONS PRINCIPALES (S'USTENSIONNE AU BAS ET S'AFFICHE SÉCURITAIREMENT) */}
+        <div className="bg-white px-4 xs:px-5 sm:px-6 pb-4 pt-1 z-10">
+          
+          {/* Divider */}
+          <div className="border-t border-slate-100 my-3.5" />
+
+          {/* ZONE DES ACTIONS ALIGNÉES HORIZONTALEMENT */}
+          <div className="grid grid-cols-3 divide-x divide-slate-100 gap-0.5 mt-1 border-b border-slate-50 pb-0.5">
+            
+            {/* ACTION 1: POSTULER (📩) */}
+            <button
+              onClick={handleImmediateApply}
+              disabled={isApplying || (!isExternalApply && loggedIn && userRole !== 'candidate')}
+              className="flex flex-col items-center justify-center gap-1 py-1.5 hover:bg-slate-50/50 transition-all rounded-xl cursor-pointer"
+              title="Postuler à cette offre"
+            >
+              <Send className={`h-4 w-4 shrink-0 stroke-[2.5] ${isApplied ? 'text-emerald-500' : 'text-[#e25c1d]'}`} />
+              <span className={`text-[10px] sm:text-[11px] font-extrabold leading-none ${isApplied ? 'text-emerald-600' : 'text-slate-800'}`}>
+                {isApplied ? 'Postulé' : 'Postuler'}
+              </span>
+              <span className="text-[8px] font-mono font-medium text-slate-400">({appsCount})</span>
+            </button>
+
+            {/* ACTION 2: PARTAGER (🔗) */}
+            <button
+              onClick={handleShare}
+              className="flex flex-col items-center justify-center gap-1 py-1.5 hover:bg-slate-50/50 transition-all rounded-xl cursor-pointer"
+              title="Partager le lien de l'offre"
+            >
+              <Share2 className="h-4 w-4 shrink-0 text-[#e25c1d] stroke-[2.5]" />
+              <span className="text-[10px] sm:text-[11px] font-extrabold text-slate-800 leading-none">Partager</span>
+              <span className="text-[8px] font-mono font-medium text-slate-400">({sharesCount})</span>
+            </button>
+
+            {/* ACTION 3: FAVORIS/LIKE (❤️) */}
+            <button
+              onClick={toggleSave}
+              className="flex flex-col items-center justify-center gap-1 py-1.5 hover:bg-slate-50/50 transition-all rounded-xl cursor-pointer"
+              title="Ajouter aux favoris"
+            >
+              <Heart className={`h-4 w-4 shrink-0 transition-all ${isSaved ? 'fill-rose-500 text-rose-500' : 'text-[#e25c1d]'}`} />
+              <span className={`text-[10px] sm:text-[11px] font-extrabold leading-none ${isSaved ? 'text-rose-600' : 'text-slate-800'}`}>Favoris</span>
+              <span className="text-[8px] font-mono font-semibold text-slate-400">({likesCount})</span>
+            </button>
+
+          </div>
+
+        </div>
+
+        {/* PARTIE 2: LA LANGUETTE DÉTAILS (ORANGE) PLACÉE EN COMPOSANT DE PIED DE CARTE INTERACTIVE */}
+        <button
+          onClick={handleToggleExpand}
+          className="w-full bg-[#e25c1d] hover:bg-[#c94d15] text-white py-2.5 sm:py-3 px-4 flex flex-col items-center justify-center gap-0.5 outline-none transition-all duration-300 cursor-pointer border-t border-slate-200"
+        >
+          <span className="text-[10px] sm:text-xs font-extrabold flex items-center gap-1 justify-center uppercase tracking-wider">
+            {isExpanded ? 'Masquer ▲' : 'Détails ▼'}
+          </span>
+          <span className="text-[8px] sm:text-[9px] font-bold text-orange-100 flex items-center gap-1 justify-center opacity-90 font-mono">
+            <Eye className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+            {viewsCount} vues
+          </span>
+        </button>
 
       </div>
 
@@ -1154,50 +1160,51 @@ export default function JobCard({
 
       {/* MODAL / DIALOG D'INFORMATION POUR CANDIDATURE EXTERNE / ANONYME */}
       <Dialog open={isApplyModalOpen} onOpenChange={setIsApplyModalOpen}>
-        <DialogContent className="max-w-md w-full rounded-[24px] p-0 border-none shadow-2xl overflow-hidden bg-white text-left">
+        <DialogContent className="max-w-md w-[calc(100%-1.5rem)] xs:w-[calc(100%-2rem)] rounded-[20px] sm:rounded-[24px] p-0 border-none shadow-2xl overflow-hidden bg-white text-left flex flex-col max-h-[85vh]">
           
           {/* Header Banner with Gradient / Icon */}
-          <div className="bg-gradient-to-r from-orange-50 to-amber-50 p-6 pb-4 border-b border-orange-100/50 flex items-start gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-orange-500/10 text-[#e25c1d] flex items-center justify-center shrink-0">
-              <AlertCircle className="h-6 w-6 stroke-[2.2]" />
+          <div className="bg-gradient-to-r from-orange-50 to-amber-50 p-4 xs:p-5 sm:p-6 pb-3 xs:pb-4 border-b border-orange-100/50 flex items-start gap-3 xs:gap-4 shrink-0">
+            <div className="w-10 h-10 xs:w-12 xs:h-12 rounded-xl xs:rounded-2xl bg-orange-500/10 text-[#e25c1d] flex items-center justify-center shrink-0">
+              <AlertCircle className="h-5 w-5 xs:h-6 xs:w-6 stroke-[2.2]" />
             </div>
-            <div>
-              <DialogTitle className="text-lg font-extrabold text-slate-900 flex items-center gap-2">
+            <div className="min-w-0">
+              <DialogTitle className="text-sm xs:text-base sm:text-lg font-extrabold text-slate-900 flex items-center gap-1.5 xs:gap-2">
                 📢 Information importante
               </DialogTitle>
-              <DialogDescription className="text-xs text-orange-700/80 font-bold mt-0.5 leading-normal">
+              <DialogDescription className="text-[10px] xs:text-xs text-orange-700/80 font-bold mt-0.5 leading-normal">
                 Offre relayée · Candidature externe par email
               </DialogDescription>
             </div>
           </div>
 
-          <div className="p-6 space-y-5">
+          {/* Scrollable Content Area */}
+          <div className="p-4 xs:p-6 space-y-4 xs:space-y-5 overflow-y-auto flex-1 scrollbar-thin">
             {/* Message section */}
-            <div className="space-y-2.5 text-xs text-slate-600 font-medium leading-relaxed">
-              <p className="font-bold text-orange-800 bg-orange-50/70 p-2.5 rounded-xl border border-orange-100 flex items-start gap-2">
-                <AlertCircle className="h-4.5 w-4.5 text-[#e25c1d] shrink-0 mt-0.5" />
+            <div className="space-y-2 text-[11px] xs:text-xs text-slate-600 font-medium leading-relaxed">
+              <p className="font-bold text-orange-850 bg-orange-50/70 p-3 rounded-xl xs:rounded-2xl border border-orange-100 flex items-start gap-2">
+                <AlertCircle className="h-4 w-4 text-[#e25c1d] shrink-0 mt-0.5" />
                 <span>
                   Cette offre a été enregistrée par l'administrateur de la plateforme pour le compte d'une entreprise anonyme ou externe non inscrite.
                 </span>
               </p>
               <p>
-                Pour cette raison, aucune candidature directe via notre plateforme n'est enregistrée. Vous êtes <strong>vivement prié(e) de postuler directement par email</strong> en transmettant votre dossier à l'adresse indiquée ci-dessous.
+                Pour cette raison, aucune candidature directe via notre plateforme n'est enregistrée. Vous êtes <strong className="text-slate-800">vivement prié(e) de postuler directement par email</strong> en transmettant votre dossier à l'adresse indiquée ci-dessous.
               </p>
-              <p className="font-bold text-slate-800">
+              <p className="font-bold text-slate-800 bg-slate-50/50 p-2 rounded-lg">
                 Merci de bien vouloir joindre l'ensemble des documents requis et demandés pour cette offre.
               </p>
             </div>
 
             {/* Documents requested section */}
-            <div className="space-y-2 bg-slate-50 p-4 rounded-2xl border border-slate-100 font-sans">
+            <div className="space-y-2 bg-slate-50 p-3.5 xs:p-4 rounded-xl xs:rounded-2xl border border-slate-100 font-sans">
               <h4 className="text-[10px] uppercase font-black text-slate-400 tracking-wider">
                 📄 Documents à fournir :
               </h4>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-1">
+              <div className="grid grid-cols-1 xs:grid-cols-2 gap-2 mt-1">
                 {docsToShow.map((docItem, idx) => (
-                  <div key={idx} className="flex items-center gap-2 bg-white px-3 py-2 rounded-xl border border-slate-200/60 shadow-xs">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
-                    <span className="text-xs font-bold text-slate-700 truncate" title={docItem}>
+                  <div key={idx} className="flex items-center gap-2 bg-white px-2.5 py-1.5 rounded-lg border border-slate-200/60 shadow-xs">
+                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                    <span className="text-[11px] font-bold text-slate-700 truncate" title={docItem}>
                       {docItem}
                     </span>
                   </div>
@@ -1210,10 +1217,10 @@ export default function JobCard({
               <h4 className="text-[10px] uppercase font-black text-slate-400 tracking-wider">
                 📧 Adresse email de candidature :
               </h4>
-              <div className="flex items-center justify-between gap-3 bg-orange-50/40 border border-orange-100/50 p-3.5 rounded-2xl">
+              <div className="flex flex-col xs:flex-row xs:items-center justify-between gap-2 xs:gap-3 bg-orange-50/40 border border-orange-100/50 p-3 rounded-xl xs:rounded-2xl">
                 <div className="flex items-center gap-2 min-w-0">
                   <Mail className="h-4.5 w-4.5 text-[#e25c1d] shrink-0" />
-                  <span className="text-xs font-black text-slate-800 truncate select-all">
+                  <span className="text-[11px] xs:text-xs font-black text-slate-800 truncate select-all">
                     {applyEmail}
                   </span>
                 </div>
@@ -1222,7 +1229,7 @@ export default function JobCard({
                   type="button"
                   variant="outline"
                   onClick={handleCopyEmail}
-                  className="h-8 rounded-full border-orange-200/50 hover:bg-orange-50 text-[10px] font-black uppercase text-[#e25c1d] shrink-0 px-2.5 flex items-center gap-1 leading-none shadow-none cursor-pointer"
+                  className="h-7 xs:h-8 rounded-full border-orange-200/50 hover:bg-orange-50 text-[9px] xs:text-[10px] font-black uppercase text-[#e25c1d] shrink-0 px-2.5 flex items-center justify-center gap-1 leading-none shadow-none cursor-pointer self-start xs:self-auto"
                 >
                   <Copy className="h-3 w-3 stroke-[2.5]" />
                   <span>Copier</span>
@@ -1232,19 +1239,19 @@ export default function JobCard({
           </div>
 
           {/* Footer Actions */}
-          <DialogFooter className="bg-slate-50 p-4 border-t border-slate-100 flex flex-col sm:flex-row gap-2 mt-0">
+          <DialogFooter className="bg-slate-50 p-3 xs:p-4 border-t border-slate-100 flex flex-col sm:flex-row gap-2 mt-0 shrink-0">
             <Button
               type="button"
               variant="outline"
               onClick={() => setIsApplyModalOpen(false)}
-              className="w-full sm:w-auto rounded-xl font-bold text-xs uppercase h-11 border-slate-200 text-slate-500 leading-none hover:bg-slate-100/50 cursor-pointer"
+              className="w-full sm:w-auto rounded-xl font-bold text-xs uppercase h-10 xs:h-11 border-slate-200 text-slate-500 leading-none hover:bg-slate-100/50 cursor-pointer"
             >
               Fermer
             </Button>
             <a
               href={`mailto:${applyEmail}?subject=Candidature - ${encodeURIComponent(localJob.title)}`}
-              onClick={() => setIsApplyModalOpen(false)}
-              className="w-full sm:flex-1 h-11 bg-[#e25c1d] hover:bg-orange-700 text-white font-extrabold text-xs uppercase rounded-xl flex items-center justify-center gap-2 shadow-sm transition-all text-center leading-none"
+              onClick={handleExternalApplyIncrement}
+              className="w-full sm:flex-1 h-10 xs:h-11 bg-[#e25c1d] hover:bg-orange-700 text-white font-extrabold text-[11px] xs:text-xs uppercase rounded-xl flex items-center justify-center gap-2 shadow-sm transition-all text-center leading-none"
             >
               <Mail className="h-4 w-4" />
               <span>Ouvrir mon application email</span>

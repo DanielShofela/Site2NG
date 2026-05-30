@@ -77,8 +77,8 @@ service cloud.firestore {
           existing().companyId == request.auth.uid
         )
       ) || (
-        // Allow view/anonymous view increments
-        incoming().diff(existing()).affectedKeys().hasOnly(['views'])
+        // Allow view/share/like/application engagement updates by anyone
+        incoming().diff(existing()).affectedKeys().hasOnly(['views', 'shares', 'likes', 'applications'])
       );
       allow delete: if isAdmin() || (
         isSignedIn() && (

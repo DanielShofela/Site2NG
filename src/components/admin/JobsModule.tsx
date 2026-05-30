@@ -309,6 +309,9 @@ export default function JobsModule({ jobs, onAction, recruiterNames }: JobsModul
         createdBy: "admin",
         expiresAt: new Date(newExpiresAt),
         views: 0,
+        shares: 0,
+        likes: 0,
+        applications: 0,
         
         // Expanded recruiting criteria
         studyLevels: newStudyLevels,

@@ -188,16 +188,6 @@ export default function Jobs() {
         next.add(job.id);
         return next;
       });
-
-      // Increment views count in parallel
-      try {
-        const jobRef = doc(db, 'offers', job.id);
-        await updateDoc(jobRef, {
-          views: increment(1)
-        });
-      } catch (e) {
-        console.error('Error incrementing job views:', e);
-      }
     } catch (error) {
       console.error('Error applying to job:', error);
     } finally {

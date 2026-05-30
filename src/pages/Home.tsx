@@ -751,7 +751,7 @@ export default function Home() {
             <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-600"></div>
           </div>
         ) : allHomeOffers.length > 0 ? (
-          <div className="relative w-full max-w-xl mx-auto py-4">
+          <div className="relative w-full max-w-md mx-auto py-4">
             
             {/* Visual Touch Pad Sandbox Container */}
             <div className="overflow-visible relative touch-pan-y min-h-[380px] sm:min-h-[400px]">
@@ -800,7 +800,7 @@ export default function Home() {
                       setCurrentOfferIndex((prevIdx) => (prevIdx - 1 + allHomeOffers.length) % allHomeOffers.length);
                     }
                   }}
-                  className="cursor-grab active:cursor-grabbing w-full"
+                  className="cursor-grab active:cursor-grabbing w-full flex justify-center items-center"
                 >
                   {(() => {
                     const job = allHomeOffers[currentOfferIndex];
