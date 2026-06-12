@@ -108,7 +108,7 @@ export default function CMSModule({ currentData, onSave }: CMSProps) {
         dataToSave.bannerImages = await compressListIfNecessary(dataToSave.bannerImages);
       }
       
-      const fieldsToCompress = ['founderPhotoUrl', 'logoUrl', 'iconUrl'];
+      const fieldsToCompress = ['founderPhotoUrl', 'logoUrl', 'iconUrl', 'heroBgUrl', 'heroVisualUrl'];
       for (const field of fieldsToCompress) {
         if (dataToSave[field] && dataToSave[field].startsWith('data:image/') && dataToSave[field].length > 150000) {
           dataToSave[field] = await compressImage(dataToSave[field], 700, 700, 0.70);
@@ -333,6 +333,100 @@ export default function CMSModule({ currentData, onSave }: CMSProps) {
                 placeholder="Ex: La plateforme de recrutement de premier ordre pour accélérer l'émergence des talents d'Afrique."
                 className="rounded-lg border-slate-100 bg-slate-50 font-semibold text-xs leading-relaxed"
               />
+            </div>
+
+            <div className="space-y-4 pt-4 border-t border-slate-100">
+              <h5 className="text-xs font-black text-slate-900 uppercase tracking-widest flex items-center gap-1.5 pb-2">
+                <ImageIcon className="h-4.5 w-4.5 text-orange-600" /> Options de fond d'écran & Visuel
+              </h5>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                {/* Hero Background */}
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-black uppercase text-slate-800">Image de fond de l'accueil (Hero Background)</Label>
+                  <div className="p-3 bg-slate-50 rounded-xl border border-dashed border-slate-200 flex flex-col items-center justify-center h-44 overflow-hidden relative">
+                    {localData.heroBgUrl ? (
+                      <>
+                        <img src={localData.heroBgUrl} className="max-h-full max-w-full object-cover rounded-lg" />
+                        <Button 
+                          variant="destructive"
+                          size="icon"
+                          className="absolute top-2 right-2 h-7 w-7 rounded-lg"
+                          type="button"
+                          onClick={() => setLocalData((prev: any) => ({ ...prev, heroBgUrl: "" }))}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </>
+                    ) : (
+                      <div className="text-center p-2">
+                        <ImageIcon className="h-8 w-8 text-slate-300 mx-auto mb-1" />
+                        <p className="text-[10px] font-bold text-slate-400">Aucun arrière-plan personnalisé</p>
+                        <p className="text-[9px] text-slate-350 mt-0.5">Le fond dégradé par défaut de l'application sera utilisé.</p>
+                      </div>
+                    )}
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    type="button"
+                    className="w-full h-9 rounded-lg font-black text-[10px] uppercase border-slate-100 bg-slate-50 text-slate-600 hover:bg-slate-100"
+                    onClick={() => document.getElementById('hero-bg-upload-input')?.click()}
+                  >
+                    Uploader un arrière-plan
+                  </Button>
+                  <input 
+                    id="hero-bg-upload-input"
+                    type="file" 
+                    accept="image/*" 
+                    className="hidden" 
+                    onChange={(e) => handleImageUpload(e, 'heroBgUrl')}
+                  />
+                  <p className="text-[9px] text-slate-400 italic">Recommandation : Choisissez une image peu contrastée et sombre/floutée ou abstraite pour conserver la parfaite lisibilité des textes noirs en premier plan.</p>
+                </div>
+
+                {/* Hero Visual (Right side Mockup helper/replacement) */}
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-black uppercase text-slate-800">Visuel principal de droite (Illustration/Remplacer Dashboard)</Label>
+                  <div className="p-3 bg-slate-50 rounded-xl border border-dashed border-slate-200 flex flex-col items-center justify-center h-44 overflow-hidden relative">
+                    {localData.heroVisualUrl ? (
+                      <>
+                        <img src={localData.heroVisualUrl} className="max-h-full max-w-full object-cover rounded-lg" />
+                        <Button 
+                          variant="destructive"
+                          size="icon"
+                          className="absolute top-2 right-2 h-7 w-7 rounded-lg"
+                          type="button"
+                          onClick={() => setLocalData((prev: any) => ({ ...prev, heroVisualUrl: "" }))}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </>
+                    ) : (
+                      <div className="text-center p-2">
+                        <ImageIcon className="h-8 w-8 text-slate-300 mx-auto mb-1" />
+                        <p className="text-[10px] font-bold text-slate-400">Tableau de bord par défaut (Mockup)</p>
+                        <p className="text-[9px] text-slate-350 mt-0.5">L'illustration animée interactive de droite s'affichera par défaut.</p>
+                      </div>
+                    )}
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    type="button"
+                    className="w-full h-9 rounded-lg font-black text-[10px] uppercase border-slate-100 bg-slate-50 text-slate-600 hover:bg-slate-100"
+                    onClick={() => document.getElementById('hero-visual-upload-input')?.click()}
+                  >
+                    Uploader un visuel de remplacement
+                  </Button>
+                  <input 
+                    id="hero-visual-upload-input"
+                    type="file" 
+                    accept="image/*" 
+                    className="hidden" 
+                    onChange={(e) => handleImageUpload(e, 'heroVisualUrl')}
+                  />
+                  <p className="text-[9px] text-slate-400 italic">Recommandation : Une belle image Corporate, Bureau, ou Equipe professionnelle qui incarne le recrutement et l'Afrique ouest.</p>
+                </div>
+              </div>
             </div>
           </div>
         )}

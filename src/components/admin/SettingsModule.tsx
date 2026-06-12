@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,7 +12,7 @@ import {
   Building,
   Key
 } from 'lucide-react';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
 interface SettingsProps {
@@ -24,6 +24,28 @@ export default function SettingsModule({ addLog }: SettingsProps) {
   const [supportPhone, setSupportPhone] = useState("+225 05 40 50 47 90");
   const [registrationsOpen, setRegistrationsOpen] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  // Load settings on mount
+  useEffect(() => {
+    async function loadSettings() {
+      try {
+        const docRef = doc(db, 'settings', 'general');
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          if (data.supportEmail) setSupportEmail(data.supportEmail);
+          if (data.supportPhone) setSupportPhone(data.supportPhone);
+          if (data.registrationsOpen !== undefined) setRegistrationsOpen(data.registrationsOpen);
+        }
+      } catch (err) {
+        console.error("Erreur lors de la récupération des paramètres :", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadSettings();
+  }, []);
 
   // Firestore integration
   const handleSaveSettings = async () => {

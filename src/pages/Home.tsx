@@ -48,7 +48,7 @@ interface Job {
 
 export default function Home() {
   const { user } = useAuth();
-  const { config } = useSiteConfig();
+  const { config, supportEmail, supportPhone } = useSiteConfig();
   const navigate = useNavigate();
 
   // Offers Query State
@@ -462,9 +462,23 @@ export default function Home() {
       
       {/* 1. HERO SECTION */}
       <section className="relative px-6 md:px-10 py-12 lg:py-24 bg-gradient-to-b from-orange-50/15 via-[#fcfbf9] to-transparent overflow-hidden">
-        {/* Futuristic glowing blur elements */}
-        <div className="absolute top-1/4 left-0 -translate-x-1/2 w-[350px] h-[350px] bg-orange-200/20 rounded-full blur-[100px] pointer-events-none" />
-        <div className="absolute top-1/2 right-0 translate-x-1/3 w-[450px] h-[450px] bg-orange-100/30 rounded-full blur-[120px] pointer-events-none" />
+        {config.heroBgUrl ? (
+          <>
+            <div 
+              className="absolute inset-x-0 top-0 bottom-0 bg-cover bg-center bg-no-repeat opacity-35 pointer-events-none transition-all duration-700 mix-blend-normal"
+              style={{ backgroundImage: `url(${config.heroBgUrl})` }}
+            />
+            {/* Elegant fade-out at the bottom to merge with page background */}
+            <div className="absolute inset-x-0 bottom-0 h-44 bg-gradient-to-t from-[#fcfbf9] to-transparent pointer-events-none" />
+          </>
+        ) : null}
+        {/* Futuristic glowing blur elements - only visible if there is no custom background to specify clarity */}
+        {!config.heroBgUrl && (
+          <>
+            <div className="absolute top-1/4 left-0 -translate-x-1/2 w-[350px] h-[350px] bg-orange-200/20 rounded-full blur-[100px] pointer-events-none" />
+            <div className="absolute top-1/2 right-0 translate-x-1/3 w-[450px] h-[450px] bg-orange-100/30 rounded-full blur-[120px] pointer-events-none" />
+          </>
+        )}
 
         <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-center relative z-10">
           
@@ -536,76 +550,89 @@ export default function Home() {
               transition={{ duration: 0.8, delay: 0.2 }}
               className="relative w-full max-w-[500px]"
             >
-              {/* Central Premium Mockup Dashboard */}
-              <div className="bg-white/70 backdrop-blur-xl border border-slate-200/80 rounded-3xl p-6 shadow-2xl relative overflow-hidden">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-4 mb-4">
-                  <div className="flex gap-1.5">
-                    <div className="w-3 h-3 rounded-full bg-slate-200" />
-                    <div className="w-3 h-3 rounded-full bg-slate-200" />
-                    <div className="w-3 h-3 rounded-full bg-slate-200" />
-                  </div>
-                  <span className="text-[10px] font-black tracking-widest text-[#a855f7] bg-[#f3e8ff] px-2.5 py-1 rounded-full uppercase">Talent Matcher Pro</span>
-                </div>
-
-                <div className="space-y-4">
-                  {/* Item 1 */}
-                  <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100/80 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center font-black text-orange-600 text-sm">
-                        AD
-                      </div>
-                      <div>
-                        <p className="text-xs font-black text-slate-800 leading-none">Amadou DIALLO</p>
-                        <p className="text-[10px] text-[#22c55e] font-bold mt-1">Match Rate : 98%</p>
-                      </div>
-                    </div>
-                    <Badge className="bg-[#e0f2fe] hover:bg-[#bae6fd] border-none text-sky-700 text-[10px] rounded-lg px-2">Entretien</Badge>
-                  </div>
-
-                  {/* Item 2 */}
-                  <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100/80 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-orange-600 flex items-center justify-center font-black text-white text-sm">
-                        KD
-                      </div>
-                      <div>
-                        <p className="text-xs font-black text-slate-800 leading-none">Kadiatou DIOP</p>
-                        <p className="text-[10px] text-slate-400 mt-1">Développeur Symfony</p>
-                      </div>
-                    </div>
-                    <Badge className="bg-[#dcfce7] hover:bg-[#bbf7d0] border-none text-[#166534] text-[10px] rounded-lg px-2">Sélectionné</Badge>
+              {config.heroVisualUrl ? (
+                <div className="relative rounded-3xl overflow-hidden border border-slate-200/60 bg-white p-2 text-slate-800 shadow-2xl">
+                  <img 
+                    src={config.heroVisualUrl} 
+                    alt="2NG Groupe Entreprises" 
+                    className="w-full h-auto aspect-[4/3] object-cover rounded-2xl"
+                    referrerPolicy="no-referrer"
+                  />
+                  <div className="absolute top-5 right-5 bg-orange-600 text-white text-[9px] uppercase font-black px-2.5 py-1 rounded-full shadow-md">
+                    2NG Élite
                   </div>
                 </div>
+              ) : (
+                /* Central Premium Mockup Dashboard */
+                <div className="bg-white/70 backdrop-blur-xl border border-slate-200/80 rounded-3xl p-6 shadow-2xl relative overflow-hidden">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-4 mb-4">
+                    <div className="flex gap-1.5">
+                      <div className="w-3 h-3 rounded-full bg-slate-200" />
+                      <div className="w-3 h-3 rounded-full bg-slate-200" />
+                      <div className="w-3 h-3 rounded-full bg-slate-200" />
+                    </div>
+                    <span className="text-[10px] font-black tracking-widest text-[#a855f7] bg-[#f3e8ff] px-2.5 py-1 rounded-full uppercase">Talent Matcher Pro</span>
+                  </div>
 
-                {/* Floating Metric 1 */}
-                <motion.div 
-                  animate={{ y: [0, -10, 0] }}
-                  transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
-                  className="absolute -top-6 -right-5 bg-orange-500 text-white rounded-2xl p-3 shadow-xl flex items-center gap-3 border border-orange-400"
-                >
-                  <TrendingUp className="h-5 w-5" />
-                  <div className="text-left">
-                    <p className="text-[8px] uppercase tracking-widest font-black opacity-80 leading-none">Recrutements</p>
-                    <p className="text-sm font-black mt-0.5">+140%</p>
-                  </div>
-                </motion.div>
+                  <div className="space-y-4">
+                    {/* Item 1 */}
+                    <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100/80 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center font-black text-orange-600 text-sm">
+                          AD
+                        </div>
+                        <div>
+                          <p className="text-xs font-black text-slate-800 leading-none">Amadou DIALLO</p>
+                          <p className="text-[10px] text-[#22c55e] font-bold mt-1">Match Rate : 98%</p>
+                        </div>
+                      </div>
+                      <Badge className="bg-[#e0f2fe] hover:bg-[#bae6fd] border-none text-sky-700 text-[10px] rounded-lg px-2">Entretien</Badge>
+                    </div>
 
-                {/* Floating Recruiter Card */}
-                <motion.div 
-                  animate={{ y: [0, 8, 0] }}
-                  transition={{ repeat: Infinity, duration: 5, ease: "easeInOut" }}
-                  className="absolute -bottom-6 -left-8 bg-slate-900 border border-slate-800 text-white rounded-2xl p-4 shadow-xl flex items-center gap-3 max-w-[200px]"
-                >
-                  <div className="p-2.5 rounded-xl bg-orange-600 text-white">
-                    <Building className="h-5 w-5" />
+                    {/* Item 2 */}
+                    <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100/80 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-orange-600 flex items-center justify-center font-black text-white text-sm">
+                          KD
+                        </div>
+                        <div>
+                          <p className="text-xs font-black text-slate-800 leading-none">Kadiatou DIOP</p>
+                          <p className="text-[10px] text-slate-400 mt-1">Développeur Symfony</p>
+                        </div>
+                      </div>
+                      <Badge className="bg-[#dcfce7] hover:bg-[#bbf7d0] border-none text-[#166534] text-[10px] rounded-lg px-2">Sélectionné</Badge>
+                    </div>
                   </div>
-                  <div className="text-left">
-                    <p className="text-[9px] uppercase tracking-widest font-black text-slate-400 leading-none">Entreprises</p>
-                    <p className="text-xs font-semibold mt-1 truncate">840+ Partenaires</p>
-                  </div>
-                </motion.div>
-                
-              </div>
+
+                  {/* Floating Metric 1 */}
+                  <motion.div 
+                    animate={{ y: [0, -10, 0] }}
+                    transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
+                    className="absolute -top-6 -right-5 bg-orange-500 text-white rounded-2xl p-3 shadow-xl flex items-center gap-3 border border-orange-400"
+                  >
+                    <TrendingUp className="h-5 w-5" />
+                    <div className="text-left">
+                      <p className="text-[8px] uppercase tracking-widest font-black opacity-80 leading-none">Recrutements</p>
+                      <p className="text-sm font-black mt-0.5">+140%</p>
+                    </div>
+                  </motion.div>
+
+                  {/* Floating Recruiter Card */}
+                  <motion.div 
+                    animate={{ y: [0, 8, 0] }}
+                    transition={{ repeat: Infinity, duration: 5, ease: "easeInOut" }}
+                    className="absolute -bottom-6 -left-8 bg-slate-900 border border-slate-800 text-white rounded-2xl p-4 shadow-xl flex items-center gap-3 max-w-[200px]"
+                  >
+                    <div className="p-2.5 rounded-xl bg-orange-600 text-white">
+                      <Building className="h-5 w-5" />
+                    </div>
+                    <div className="text-left">
+                      <p className="text-[9px] uppercase tracking-widest font-black text-slate-400 leading-none">Entreprises</p>
+                      <p className="text-xs font-semibold mt-1 truncate">840+ Partenaires</p>
+                    </div>
+                  </motion.div>
+                </div>
+              )}
             </motion.div>
           </div>
         </div>
@@ -1323,13 +1350,13 @@ export default function Home() {
               </p>
               
               <div className="pt-2 flex flex-col gap-2 font-semibold text-xs text-slate-400">
-                <a href="mailto:support@2ngentreprises.com" className="flex items-center gap-2 hover:text-orange-500 transition-colors">
+                <a href={`mailto:${supportEmail}`} className="flex items-center gap-2 hover:text-orange-500 transition-colors">
                   <Mail className="h-4 w-4 text-orange-500" />
-                  support@2ngentreprises.com
+                  {supportEmail}
                 </a>
-                <a href="tel:+2250540504790" className="flex items-center gap-2 hover:text-orange-500 transition-colors">
+                <a href={`tel:${supportPhone.replace(/\s+/g, '')}`} className="flex items-center gap-2 hover:text-orange-500 transition-colors">
                   <Phone className="h-4 w-4 text-orange-500" />
-                  +225 054 050 47 90
+                  {supportPhone}
                 </a>
               </div>
             </div>

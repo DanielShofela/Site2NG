@@ -17,6 +17,8 @@ interface SiteConfig {
   founderSpecialisation?: string;
   founderPoste?: string;
   founderBio?: string;
+  heroBgUrl?: string;
+  heroVisualUrl?: string;
   
   // Banner fields
   bannerEnabled?: boolean;
@@ -52,6 +54,8 @@ const defaultContent: SiteConfig = {
   founderSpecialisation: "",
   founderPoste: "",
   founderBio: "",
+  heroBgUrl: "",
+  heroVisualUrl: "",
   bannerEnabled: false,
   bannerContent: "🌟 Offre Élite 2NG : Recrutez de nouveaux talents dès aujourd'hui !",
   bannerBgColor: "#ea580c",
@@ -74,11 +78,17 @@ const SiteConfigContext = createContext<{
   config: SiteConfig;
   maintenanceEnabled: boolean;
   maintenanceMessage: string;
+  supportEmail: string;
+  supportPhone: string;
+  registrationsOpen: boolean;
   loading: boolean;
 }>({
   config: defaultContent,
   maintenanceEnabled: false,
   maintenanceMessage: "",
+  supportEmail: "support@2ngentreprises.com",
+  supportPhone: "+225 05 40 50 47 90",
+  registrationsOpen: true,
   loading: true
 });
 
@@ -86,8 +96,12 @@ export function SiteConfigProvider({ children }: { children: React.ReactNode }) 
   const [config, setConfig] = useState<SiteConfig>(defaultContent);
   const [maintenanceEnabled, setMaintenanceEnabled] = useState(false);
   const [maintenanceMessage, setMaintenanceMessage] = useState("");
+  const [supportEmail, setSupportEmail] = useState("support@2ngentreprises.com");
+  const [supportPhone, setSupportPhone] = useState("+225 05 40 50 47 90");
+  const [registrationsOpen, setRegistrationsOpen] = useState(true);
   const [configLoading, setConfigLoading] = useState(true);
   const [maintenanceLoading, setMaintenanceLoading] = useState(true);
+  const [settingsLoading, setSettingsLoading] = useState(true);
 
   useEffect(() => {
     const unsubConfig = onSnapshot(doc(db, 'site_config', 'home'), (snapshot) => {
@@ -167,16 +181,38 @@ export function SiteConfigProvider({ children }: { children: React.ReactNode }) 
       setMaintenanceLoading(false);
     });
 
+    const unsubSettings = onSnapshot(doc(db, 'settings', 'general'), (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.data();
+        if (data.supportEmail) setSupportEmail(data.supportEmail);
+        if (data.supportPhone) setSupportPhone(data.supportPhone);
+        if (data.registrationsOpen !== undefined) setRegistrationsOpen(data.registrationsOpen);
+      }
+      setSettingsLoading(false);
+    }, (error) => {
+      console.error("Error reading general settings:", error);
+      setSettingsLoading(false);
+    });
+
     return () => {
       unsubConfig();
       unsubMaintenance();
+      unsubSettings();
     };
   }, []);
 
-  const loading = configLoading || maintenanceLoading;
+  const loading = configLoading || maintenanceLoading || settingsLoading;
 
   return (
-    <SiteConfigContext.Provider value={{ config, maintenanceEnabled, maintenanceMessage, loading }}>
+    <SiteConfigContext.Provider value={{ 
+      config, 
+      maintenanceEnabled, 
+      maintenanceMessage, 
+      supportEmail, 
+      supportPhone, 
+      registrationsOpen, 
+      loading 
+    }}>
       {children}
     </SiteConfigContext.Provider>
   );

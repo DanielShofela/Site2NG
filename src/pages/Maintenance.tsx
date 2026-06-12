@@ -1,8 +1,11 @@
 import React from 'react';
 import { motion } from 'motion/react';
 import { Sparkles, Mail, ShieldAlert, Phone, Clock } from 'lucide-react';
+import { useSiteConfig } from '@/contexts/SiteConfigContext';
 
 export default function Maintenance() {
+  const { supportEmail, supportPhone } = useSiteConfig();
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center justify-center p-6 text-center select-none overflow-hidden relative">
       {/* Premium glowing backgrounds */}
@@ -77,7 +80,7 @@ export default function Maintenance() {
           <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Besoin d'assistance urgente ?</p>
           <div className="flex flex-col gap-3">
             <a 
-              href="mailto:support@2ngentreprises.com" 
+              href={`mailto:${supportEmail}`} 
               className="flex items-center justify-between p-3 rounded-2xl bg-slate-950 hover:bg-slate-800 border border-slate-800 hover:border-orange-500/50 transition-all group"
             >
               <div className="flex items-center gap-3">
@@ -86,13 +89,13 @@ export default function Maintenance() {
                 </div>
                 <div className="text-left">
                   <p className="text-xs text-slate-400 font-black uppercase tracking-wider">Email Support</p>
-                  <p className="text-sm font-bold text-white group-hover:text-orange-400 transition-colors">support@2ngentreprises.com</p>
+                  <p className="text-sm font-bold text-white group-hover:text-orange-400 transition-colors">{supportEmail}</p>
                 </div>
               </div>
             </a>
 
             <a 
-              href="tel:+2250540504790" 
+              href={`tel:${supportPhone.replace(/\s+/g, '')}`} 
               className="flex items-center justify-between p-3 rounded-2xl bg-slate-950 hover:bg-slate-800 border border-slate-800 hover:border-orange-500/50 transition-all group"
             >
               <div className="flex items-center gap-3">
@@ -101,7 +104,7 @@ export default function Maintenance() {
                 </div>
                 <div className="text-left">
                   <p className="text-xs text-slate-400 font-black uppercase tracking-wider">Téléphone Support</p>
-                  <p className="text-sm font-bold text-white group-hover:text-orange-400 transition-colors">+225 054 050 47 90</p>
+                  <p className="text-sm font-bold text-white group-hover:text-orange-400 transition-colors">{supportPhone}</p>
                 </div>
               </div>
             </a>

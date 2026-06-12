@@ -10,9 +10,11 @@ import { Button } from '@/components/ui/button';
 import { Clock, CheckCircle, ShieldCheck, Mail, LogOut } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Link, useNavigate } from 'react-router-dom';
+import { useSiteConfig } from '@/contexts/SiteConfigContext';
 
 export default function PendingApproval() {
   const { logout, user, loading } = useAuth();
+  const { supportEmail, supportPhone } = useSiteConfig();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -91,7 +93,7 @@ export default function PendingApproval() {
             <div className={`p-8 rounded-[32px] border ${isRejected ? 'bg-red-50 border-red-100/50' : 'bg-orange-50 border-orange-100/50'}`}>
               <p className={`text-sm font-bold ${isRejected ? 'text-red-800' : 'text-orange-800'}`}>
                 {isRejected 
-                  ? "Contactez le support : support@2ngentreprises.com ou par téléphone au +225 054 050 47 90"
+                  ? `Contactez le support : ${supportEmail} ou par téléphone au ${supportPhone}`
                   : "Une fois validé, vous pourrez publier des offres et accéder à notre CVthèque."
                 }
               </p>
