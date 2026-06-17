@@ -48,7 +48,7 @@ export default function Login() {
     try {
       await loginWithGoogle();
     } catch (error: any) {
-      console.error(error);
+      console.warn("Google login exception (handled):", error.message || error);
       setError(getFirebaseFriendlyError(error));
     } finally {
       setIsLoading(false);
@@ -62,7 +62,7 @@ export default function Login() {
     try {
       await loginWithEmail(email, password);
     } catch (error: any) {
-      console.error(error);
+      console.warn("Login exception (handled):", error.message || error);
       setError(getFirebaseFriendlyError(error));
     } finally {
       setIsLoading(false);

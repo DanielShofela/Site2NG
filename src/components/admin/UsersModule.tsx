@@ -28,6 +28,12 @@ import {
 } from 'lucide-react';
 import { UserProfile } from '@/types';
 import { motion, AnimatePresence } from 'motion/react';
+import { initializeApp, getApps } from 'firebase/app';
+import { getAuth, createUserWithEmailAndPassword, signOut } from 'firebase/auth';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import { getFirebaseFriendlyError } from '@/lib/utils';
+import firebaseConfig from '../../../firebase-applet-config.json';
 
 interface UsersModuleProps {
   users: UserProfile[];
@@ -51,6 +57,108 @@ export default function UsersModule({ users, onAction, addLog }: UsersModuleProp
   
   const [adminNotesText, setAdminNotesText] = useState("");
   const [isSendingCorrection, setIsSendingCorrection] = useState(false);
+
+  // Create Company States
+  const [isAddCompanyOpen, setIsAddCompanyOpen] = useState(false);
+  const [addCompanyLoading, setAddCompanyLoading] = useState(false);
+  
+  const [newCompany, setNewCompany] = useState({
+    email: "",
+    password: "",
+    companyName: "",
+    sectorActivity: "",
+    registrationNumber: "",
+    phone: "",
+    city: "",
+    companyDescription: "",
+    companySize: "11-50",
+    companyType: "PME",
+    website: "",
+  });
+
+  const handleCreateCompany = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!newCompany.email || !newCompany.password || !newCompany.companyName) {
+      alert("Veuillez remplir l'adresse e-mail, le mot de passe et le nom de l'entreprise.");
+      return;
+    }
+    
+    if (newCompany.password.length < 6) {
+      alert("Le mot de passe doit contenir au moins 6 caractères.");
+      return;
+    }
+    
+    setAddCompanyLoading(true);
+    try {
+      // 1. Create secondary auth account
+      let secondaryApp;
+      const apps = getApps();
+      const existingApp = apps.find(app => app.name === 'secondary-admin-create');
+      if (existingApp) {
+        secondaryApp = existingApp;
+      } else {
+        secondaryApp = initializeApp(firebaseConfig, 'secondary-admin-create');
+      }
+      const secondaryAuth = getAuth(secondaryApp);
+      
+      const userCredential = await createUserWithEmailAndPassword(secondaryAuth, newCompany.email, newCompany.password);
+      const uid = userCredential.user.uid;
+      
+      // Sign out from the secondary instance to free memory/prevent session caching
+      await signOut(secondaryAuth);
+      
+      // 2. Write the user's profile to Firestore db
+      const profileData: UserProfile = {
+        uid: uid,
+        email: newCompany.email,
+        role: "recruiter" as const,
+        status: "approved" as const, // Direct approval since created by admin
+        accountStatus: "active" as const,
+        displayName: newCompany.companyName,
+        companyName: newCompany.companyName,
+        phone: newCompany.phone || "",
+        location: newCompany.city || "",
+        city: newCompany.city || "",
+        sectorActivity: newCompany.sectorActivity || "",
+        registrationNumber: newCompany.registrationNumber || "",
+        companyDescription: newCompany.companyDescription || "",
+        companySize: newCompany.companySize || "11-50",
+        companyType: newCompany.companyType || "PME",
+        website: newCompany.website || "",
+        profileComplete: true,
+        createdAt: serverTimestamp() as any,
+      };
+      
+      await setDoc(doc(db, 'users', uid), profileData);
+      
+      await addLog("Création d'entreprise", `L'entreprise "${newCompany.companyName}" a été créée par l'administrateur (${newCompany.email})`, "info");
+      
+      alert(`L'entreprise "${newCompany.companyName}" a été créée avec succès et son compte est directement approuvé.`);
+      
+      // Clear forms
+      setNewCompany({
+        email: "",
+        password: "",
+        companyName: "",
+        sectorActivity: "",
+        registrationNumber: "",
+        phone: "",
+        city: "",
+        companyDescription: "",
+        companySize: "11-50",
+        companyType: "PME",
+        website: "",
+      });
+      setIsAddCompanyOpen(false);
+    } catch (err: any) {
+      console.warn("Company creation failed (handled):", err.message || err);
+      const friendlyError = getFirebaseFriendlyError(err);
+      alert(`Erreur lors de la création de l'entreprise : ${friendlyError}`);
+    } finally {
+      setAddCompanyLoading(false);
+    }
+  };
 
   const filteredUsers = useMemo(() => {
     // 1. Filter
@@ -138,13 +246,21 @@ export default function UsersModule({ users, onAction, addLog }: UsersModuleProp
               <CardTitle className="text-xl font-black text-slate-900 animate-fade-in">Annuaire des Adhérents</CardTitle>
               <CardDescription className="text-xs font-semibold text-slate-400 mt-1">Supervisez, suspendez ou supprimez les comptes inscrits.</CardDescription>
             </div>
-            <Button 
-              onClick={handleExportCSV}
-              variant="outline" 
-              className="h-11 rounded-xl font-black text-xs uppercase px-4 border-slate-100 bg-slate-50 flex items-center gap-2 text-slate-600 hover:bg-slate-100 w-full md:w-auto justify-center"
-            >
-              <Download className="h-4 w-4 text-orange-600" /> Export CSV
-            </Button>
+            <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
+              <Button 
+                onClick={() => setIsAddCompanyOpen(true)}
+                className="h-11 rounded-xl font-black text-xs uppercase px-4 bg-orange-600 hover:bg-orange-700 text-white flex items-center gap-2 w-full sm:w-auto justify-center shadow-lg shadow-orange-600/10"
+              >
+                <Building2 className="h-4 w-4" /> Ajouter une Entreprise
+              </Button>
+              <Button 
+                onClick={handleExportCSV}
+                variant="outline" 
+                className="h-11 rounded-xl font-black text-xs uppercase px-4 border-slate-100 bg-slate-50 flex items-center gap-2 text-slate-600 hover:bg-slate-100 w-full sm:w-auto justify-center"
+              >
+                <Download className="h-4 w-4 text-orange-600" /> Export CSV
+              </Button>
+            </div>
           </div>
 
           {/* ADVANCED FILTER GRID */}
@@ -539,6 +655,215 @@ export default function UsersModule({ users, onAction, addLog }: UsersModuleProp
               Oui, Supprimer
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialogue d'ajout d'entreprise */}
+      <Dialog open={isAddCompanyOpen} onOpenChange={setIsAddCompanyOpen}>
+        <DialogContent className="max-w-3xl w-full rounded-[32px] p-8 border-none shadow-2xl overflow-y-auto max-h-[90vh] bg-white">
+          <DialogHeader className="border-b border-slate-150 pb-6">
+            <DialogTitle className="text-2xl font-black text-slate-900 flex items-center gap-3">
+              <div className="h-12 w-12 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center font-black">
+                <Building2 className="h-6 w-6" />
+              </div>
+              <div className="text-left">
+                <p>Créer un compte Entreprise</p>
+                <p className="text-xs font-bold text-slate-400 mt-1 uppercase tracking-widest">Ajouter un nouveau profil recruteur</p>
+              </div>
+            </DialogTitle>
+            <DialogDescription className="text-left font-semibold text-sm text-slate-500">
+              Remplissez les informations ci-dessous pour inscrire et approuver directement une nouvelle entreprise partenaire.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleCreateCompany} className="space-y-6 pt-4 text-left">
+            {/* Section 1: Connexion et Accès */}
+            <div className="space-y-4">
+              <h4 className="text-xs font-black text-orange-600 uppercase tracking-wider">1. Identifiants d'accès</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="company-email" className="text-xs font-black text-slate-700 uppercase">Adresse E-mail de connexion *</Label>
+                  <Input 
+                    id="company-email"
+                    type="email" 
+                    placeholder="contact@entreprise.com" 
+                    required
+                    className="h-11 border-slate-200 rounded-xl text-xs font-semibold"
+                    value={newCompany.email}
+                    onChange={(e) => setNewCompany(prev => ({ ...prev, email: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="company-pass" className="text-xs font-black text-slate-700 uppercase">Mot de passe provisoire *</Label>
+                  <Input 
+                    id="company-pass"
+                    type="password" 
+                    placeholder="Minimum 6 caractères" 
+                    required
+                    className="h-11 border-slate-200 rounded-xl text-xs font-semibold"
+                    value={newCompany.password}
+                    onChange={(e) => setNewCompany(prev => ({ ...prev, password: e.target.value }))}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Section 2: Profil et Entreprise */}
+            <div className="space-y-4 pt-4 border-t border-slate-100">
+              <h4 className="text-xs font-black text-orange-600 uppercase tracking-wider">2. Fiche d'identité de l'entreprise</h4>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="company-name" className="text-xs font-black text-slate-700 uppercase">Nom de l'entreprise *</Label>
+                  <Input 
+                    id="company-name"
+                    type="text" 
+                    placeholder="Ex: Orange Côte d'Ivoire" 
+                    required
+                    className="h-11 border-slate-200 rounded-xl text-xs font-semibold"
+                    value={newCompany.companyName}
+                    onChange={(e) => setNewCompany(prev => ({ ...prev, companyName: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="company-rccm" className="text-xs font-black text-slate-700 uppercase">Numéro RCCM / Enregistrement</Label>
+                  <Input 
+                    id="company-rccm"
+                    type="text" 
+                    placeholder="Ex: CI-ABJ-2024-B-XXXX" 
+                    className="h-11 border-slate-200 rounded-xl text-xs font-semibold"
+                    value={newCompany.registrationNumber}
+                    onChange={(e) => setNewCompany(prev => ({ ...prev, registrationNumber: e.target.value }))}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="company-sector" className="text-xs font-black text-slate-700 uppercase">Secteur d'activité</Label>
+                  <select 
+                    id="company-sector"
+                    className="w-full h-11 px-3.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 outline-none cursor-pointer"
+                    value={newCompany.sectorActivity}
+                    onChange={(e) => setNewCompany(prev => ({ ...prev, sectorActivity: e.target.value }))}
+                  >
+                    <option value="">Sélectionner un secteur</option>
+                    <option value="Banque & Microfinance">Banque & Microfinance</option>
+                    <option value="Bâtiment & Travaux Publics (BTP)">Bâtiment & Travaux Publics (BTP)</option>
+                    <option value="Commerce & Distribution">Commerce & Distribution</option>
+                    <option value="Communication, Publicité & Média">Communication, Publicité & Média</option>
+                    <option value="Éducation & Formation">Éducation & Formation</option>
+                    <option value="Hôtellerie, Restauration & Loisirs">Hôtellerie, Restauration & Loisirs</option>
+                    <option value="Industrie, Énergie & Mines">Industrie, Énergie & Mines</option>
+                    <option value="Informatique & Télécoms (T.I.C)">Informatique & Télécoms (T.I.C)</option>
+                    <option value="Logistique, Transports & Transit">Logistique, Transports & Transit</option>
+                    <option value="Santé, Pharmacie & Social">Santé, Pharmacie & Social</option>
+                    <option value="Services aux Entreprises & Conseil">Services aux Entreprises & Conseil</option>
+                    <option value="Autre">Autre secteur</option>
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="company-phone" className="text-xs font-black text-slate-700 uppercase">Téléphone professionnel</Label>
+                  <Input 
+                    id="company-phone"
+                    type="tel" 
+                    placeholder="Ex: +225 07 00 00 00 00" 
+                    className="h-11 border-slate-200 rounded-xl text-xs font-semibold"
+                    value={newCompany.phone}
+                    onChange={(e) => setNewCompany(prev => ({ ...prev, phone: e.target.value }))}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="company-city" className="text-xs font-black text-slate-700 uppercase">Ville / Commune / Localisation</Label>
+                  <Input 
+                    id="company-city"
+                    type="text" 
+                    placeholder="Ex: Abidjan, Cocody" 
+                    className="h-11 border-slate-200 rounded-xl text-xs font-semibold"
+                    value={newCompany.city}
+                    onChange={(e) => setNewCompany(prev => ({ ...prev, city: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="company-web" className="text-xs font-black text-slate-700 uppercase">Site Internet (URL)</Label>
+                  <Input 
+                    id="company-web"
+                    type="url" 
+                    placeholder="Ex: https://www.entreprise.com" 
+                    className="h-11 border-slate-200 rounded-xl text-xs font-semibold"
+                    value={newCompany.website}
+                    onChange={(e) => setNewCompany(prev => ({ ...prev, website: e.target.value }))}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="company-size" className="text-xs font-black text-slate-700 uppercase">Taille de l'effectif</Label>
+                  <select 
+                    id="company-size"
+                    className="w-full h-11 px-3.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 outline-none cursor-pointer"
+                    value={newCompany.companySize}
+                    onChange={(e) => setNewCompany(prev => ({ ...prev, companySize: e.target.value }))}
+                  >
+                    <option value="1-10">1 à 10 employés (TPE)</option>
+                    <option value="11-50">11 à 50 employés (Petite Entreprise)</option>
+                    <option value="51-200">51 à 200 employés (Moyenne Entreprise)</option>
+                    <option value="201-500">201 à 500 employés (ETI)</option>
+                    <option value="+500">Plus de 500 employés (Grande Entreprise)</option>
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="company-type" className="text-xs font-black text-slate-700 uppercase">Catégorie juridique / Type</Label>
+                  <select 
+                    id="company-type"
+                    className="w-full h-11 px-3.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 outline-none cursor-pointer"
+                    value={newCompany.companyType}
+                    onChange={(e) => setNewCompany(prev => ({ ...prev, companyType: e.target.value }))}
+                  >
+                    <option value="PME">PME (Petite et Moyenne Entreprise)</option>
+                    <option value="Grande Entreprise">Grande Entreprise</option>
+                    <option value="Multinationale">Multinationale</option>
+                    <option value="TPE">TPE / Individuelle</option>
+                    <option value="Institutionnel / ONG / Service Public">Institutionnel / ONG / Service Public</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="company-desc" className="text-xs font-black text-slate-700 uppercase">Description succincte de l'entreprise</Label>
+                <Textarea 
+                  id="company-desc"
+                  placeholder="Présentez les activités majeures de l'entreprise en quelques mots-clés..." 
+                  className="rounded-xl border-slate-200 text-xs font-semibold min-h-[90px]"
+                  value={newCompany.companyDescription}
+                  onChange={(e) => setNewCompany(prev => ({ ...prev, companyDescription: e.target.value }))}
+                />
+              </div>
+            </div>
+
+            <div className="border-t border-slate-100 pt-6 flex justify-end gap-3">
+              <Button 
+                type="button" 
+                variant="outline" 
+                className="rounded-xl font-black text-[10px] uppercase h-11 px-6 border-slate-150 text-slate-500"
+                onClick={() => setIsAddCompanyOpen(false)}
+                disabled={addCompanyLoading}
+              >
+                Annuler
+              </Button>
+              <Button 
+                type="submit" 
+                className="rounded-xl font-black text-[10px] uppercase bg-orange-600 text-white h-11 px-8 hover:bg-orange-700 shadow-lg shadow-orange-600/10 flex items-center gap-2"
+                disabled={addCompanyLoading}
+              >
+                {addCompanyLoading ? "Création en cours..." : "Créer et Approuver"}
+              </Button>
+            </div>
+          </form>
         </DialogContent>
       </Dialog>
     </>

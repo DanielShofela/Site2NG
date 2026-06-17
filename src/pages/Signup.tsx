@@ -125,7 +125,7 @@ export default function Signup() {
       
       await signupWithEmail(formData.email, formData.password, userData);
     } catch (error: any) {
-      console.error(error);
+      console.warn("Signup exception (handled):", error.message || error);
       setError(getFirebaseFriendlyError(error));
     } finally {
       setIsLoading(false);
@@ -137,7 +137,7 @@ export default function Signup() {
     try {
       await loginWithGoogle(role);
     } catch (error: any) {
-      console.error(error);
+      console.warn("Google signup exception (handled):", error.message || error);
       setError(getFirebaseFriendlyError(error));
     } finally {
       setIsLoading(false);
