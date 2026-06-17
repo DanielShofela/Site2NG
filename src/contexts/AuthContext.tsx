@@ -198,7 +198,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       }
     } catch (error) {
-      console.error('Login error:', error);
+      console.warn('Login exception occurred (handled in UI):', error);
       setLoading(false);
       throw error;
     }
@@ -233,7 +233,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await setDoc(doc(db, 'users', firebaseUser.uid), cleanUndefined(newProfile));
       setUser(newProfile);
     } catch (error) {
-      console.error('Signup error:', error);
+      console.warn('Signup exception occurred (handled in UI):', error);
       throw error;
     } finally {
       setLoading(false);
@@ -264,7 +264,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(newProfile);
       }
     } catch (error) {
-      console.error('Login error:', error);
+      console.warn('Login with email exception occurred (handled in UI):', error);
       throw error;
     } finally {
       setLoading(false);

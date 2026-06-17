@@ -29,7 +29,7 @@ import {
 import { UserProfile } from '@/types';
 import { motion, AnimatePresence } from 'motion/react';
 import { initializeApp, getApps } from 'firebase/app';
-import { getAuth, createUserWithEmailAndPassword, signOut } from 'firebase/auth';
+import { getAuth, createUserWithEmailAndPassword, signOut, initializeAuth, inMemoryPersistence } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { getFirebaseFriendlyError } from '@/lib/utils';
@@ -100,7 +100,15 @@ export default function UsersModule({ users, onAction, addLog }: UsersModuleProp
       } else {
         secondaryApp = initializeApp(firebaseConfig, 'secondary-admin-create');
       }
-      const secondaryAuth = getAuth(secondaryApp);
+      
+      let secondaryAuth;
+      try {
+        secondaryAuth = initializeAuth(secondaryApp, {
+          persistence: inMemoryPersistence
+        });
+      } catch (e) {
+        secondaryAuth = getAuth(secondaryApp);
+      }
       
       const userCredential = await createUserWithEmailAndPassword(secondaryAuth, newCompany.email, newCompany.password);
       const uid = userCredential.user.uid;

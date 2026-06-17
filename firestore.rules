@@ -48,14 +48,16 @@ service cloud.firestore {
     // 3. User Rules
     match /users/{userId} {
       allow read: if isSignedIn() || resource.data.role == 'recruiter';
-      allow create: if isOwner(userId) && 
+      allow create: if isAdmin() || (
+                      isOwner(userId) && 
                       incoming().uid == userId &&
                       incoming().role in ['candidate', 'recruiter', 'admin'] &&
                       (
                         (incoming().role == 'recruiter' && (incoming().status == 'pending' || incoming().status == 'submitted')) ||
                         (incoming().role == 'candidate' && incoming().status == 'approved') ||
                         (incoming().role == 'admin' && incoming().status == 'approved')
-                      );
+                      )
+                    );
       
       allow update: if isAdmin() || (
         isOwner(userId) && 

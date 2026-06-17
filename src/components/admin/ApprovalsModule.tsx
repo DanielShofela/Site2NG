@@ -18,7 +18,8 @@ import {
   X, 
   AlertTriangle,
   ExternalLink,
-  MessageSquare
+  MessageSquare,
+  Download
 } from 'lucide-react';
 import { UserProfile } from '@/types';
 
@@ -34,12 +35,41 @@ export default function ApprovalsModule({ pending, onAction }: ApprovalsProps) {
   const [correctionNotes, setCorrectionNotes] = useState("");
   const [submittingNote, setSubmittingNote] = useState(false);
 
-  const handleApprove = async (uid: string) => {
-    if (confirm("Voulez-vous valider et approuver administrativement cette entreprise ? Ses représentants recevront un email et auront plein accès aux dépôts d'offres.")) {
-      await onAction(uid, 'approve');
+  // Success and Error logs/states for safe in-app display (bypassing native UI alerts)
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [approvingProfile, setApprovingProfile] = useState<UserProfile | null>(null);
+  const [previewDoc, setPreviewDoc] = useState<{ url: string; title: string; filename?: string } | null>(null);
+
+  const handleDownload = (url: string, defaultFilename: string) => {
+    try {
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = defaultFilename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (e) {
+      console.warn("Download exception:", e);
+      window.open(url, '_blank');
+    }
+  };
+
+  const handleApproveClick = (profile: UserProfile) => {
+    setApprovingProfile(profile);
+  };
+
+  const handleConfirmApprove = async () => {
+    if (!approvingProfile) return;
+    try {
+      await onAction(approvingProfile.uid, 'approve');
+      setApprovingProfile(null);
       setIsReviewOpen(false);
       setSelectedReview(null);
-      alert("L'organisation a été approuvée avec succès !");
+      setSuccessMsg("L'organisation a été approuvée avec succès ! Un e-mail a été préparé pour ses représentants.");
+      setTimeout(() => setSuccessMsg(null), 5000);
+    } catch (e: any) {
+      console.error(e);
+      alert("Une erreur s'est produite lors de l'approbation : " + (e.message || e));
     }
   };
 
@@ -56,7 +86,8 @@ export default function ApprovalsModule({ pending, onAction }: ApprovalsProps) {
       setSelectedReview(null);
       setShowRejectForm(false);
       setCorrectionNotes("");
-      alert("Demande de correction transmise avec succès ! L'entreprise a été mise en statut 'brouillon/correction' avec vos notes explicatives.");
+      setSuccessMsg("Demande de correction transmise avec succès ! L'entreprise a été mise en statut 'brouillon/correction' avec vos notes explicatives.");
+      setTimeout(() => setSuccessMsg(null), 6000);
     } catch (e) {
       console.error(e);
     } finally {
@@ -66,6 +97,13 @@ export default function ApprovalsModule({ pending, onAction }: ApprovalsProps) {
 
   return (
     <>
+      {successMsg && (
+        <div className="mb-6 p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold rounded-2xl flex items-center gap-2 shadow-sm animate-fade-in">
+          <Check className="h-5 w-5 text-emerald-600 shrink-0" />
+          <p>{successMsg}</p>
+        </div>
+      )}
+
       <Card className="border-none shadow-sm rounded-[32px] overflow-hidden bg-white">
         <CardHeader className="p-6 md:p-8 border-b border-slate-50">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -85,7 +123,7 @@ export default function ApprovalsModule({ pending, onAction }: ApprovalsProps) {
               <div key={r.uid} className="p-6 md:p-8 flex flex-col lg:flex-row lg:items-center justify-between gap-6 hover:bg-slate-50/20 transition-all group">
                 <div className="space-y-4">
                   <div className="flex items-center gap-4">
-                    <div className="h-12 w-12 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center font-black">
+                    <div className="h-12 w-12 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center font-black overflow-hidden shrink-0">
                       {r.photoUrl ? (
                         <img src={r.photoUrl} className="w-full h-full object-cover rounded-xl" />
                       ) : (
@@ -123,7 +161,7 @@ export default function ApprovalsModule({ pending, onAction }: ApprovalsProps) {
                   <Button 
                     size="icon" 
                     className="h-11 w-11 rounded-xl bg-orange-600 hover:bg-orange-700 text-white shadow-xl shadow-orange-600/15"
-                    onClick={() => handleApprove(r.uid)}
+                    onClick={() => handleApproveClick(r)}
                   >
                     <Check className="h-5 w-5" />
                   </Button>
@@ -191,21 +229,24 @@ export default function ApprovalsModule({ pending, onAction }: ApprovalsProps) {
                 <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Pièces de vérification téléchargées</h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {selectedReview.legalDocuments?.rccmUrl ? (
-                    <a 
-                      href={selectedReview.legalDocuments.rccmUrl} 
-                      target="_blank" 
-                      rel="noopener"
-                      className="flex items-center justify-between p-4 bg-white border border-slate-150 rounded-2xl hover:border-orange-500 hover:shadow-sm transition-all group/doc"
+                    <button 
+                      type="button"
+                      onClick={() => setPreviewDoc({ 
+                        url: selectedReview.legalDocuments!.rccmUrl!, 
+                        title: "Registre du Commerce (RCCM)", 
+                        filename: selectedReview.legalDocuments!.rccmName || "RCCM.pdf" 
+                      })}
+                      className="w-full flex items-center justify-between p-4 bg-white border border-slate-150 rounded-2xl hover:border-orange-500 hover:shadow-sm transition-all group/doc text-left"
                     >
                       <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 bg-orange-50 font-black text-xs text-orange-600 rounded-xl flex items-center justify-center">RCCM</div>
+                        <div className="h-10 w-10 bg-orange-50 font-black text-xs text-orange-600 rounded-xl flex items-center justify-center shrink-0">RCCM</div>
                         <div>
                           <p className="text-xs font-black text-slate-800">Registre du Commerce</p>
                           <p className="text-[10px] text-slate-400 font-bold">N° {selectedReview.registrationNumber || "RCCM File"}</p>
                         </div>
                       </div>
-                      <Eye className="h-4 w-4 text-slate-300 group-hover/doc:text-orange-600" />
-                    </a>
+                      <Eye className="h-4 w-4 text-slate-300 group-hover/doc:text-orange-600 shrink-0" />
+                    </button>
                   ) : (
                     <div className="p-4 bg-slate-50 border border-slate-100 rounded-2xl text-center text-xs font-bold text-slate-400">
                       Registre du Commerce non fourni
@@ -213,21 +254,24 @@ export default function ApprovalsModule({ pending, onAction }: ApprovalsProps) {
                   )}
 
                   {selectedReview.legalDocuments?.taxStatusUrl ? (
-                    <a 
-                      href={selectedReview.legalDocuments.taxStatusUrl} 
-                      target="_blank" 
-                      rel="noopener"
-                      className="flex items-center justify-between p-4 bg-white border border-slate-150 rounded-2xl hover:border-blue-500 hover:shadow-sm transition-all group/doc"
+                    <button 
+                      type="button"
+                      onClick={() => setPreviewDoc({ 
+                        url: selectedReview.legalDocuments!.taxStatusUrl!, 
+                        title: "Attestation Fiscale", 
+                        filename: selectedReview.legalDocuments!.taxStatusName || "Attestation_Fiscale.pdf" 
+                      })}
+                      className="w-full flex items-center justify-between p-4 bg-white border border-slate-150 rounded-2xl hover:border-blue-500 hover:shadow-sm transition-all group/doc text-left"
                     >
                       <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 bg-blue-50 font-black text-xs text-blue-600 rounded-xl flex items-center justify-center">TAX</div>
+                        <div className="h-10 w-10 bg-blue-50 font-black text-xs text-blue-600 rounded-xl flex items-center justify-center shrink-0">TAX</div>
                         <div>
                           <p className="text-xs font-black text-slate-800">Attestation Fiscale</p>
                           <p className="text-[10px] text-slate-400 font-bold">Document Impôts</p>
                         </div>
                       </div>
-                      <Eye className="h-4 w-4 text-slate-300 group-hover/doc:text-blue-600" />
-                    </a>
+                      <Eye className="h-4 w-4 text-slate-300 group-hover/doc:text-blue-600 shrink-0" />
+                    </button>
                   ) : (
                     <div className="p-4 bg-slate-50 border border-slate-100 rounded-2xl text-center text-xs font-bold text-slate-400">
                       Attestation Impôts/DGI non fournie
@@ -285,7 +329,7 @@ export default function ApprovalsModule({ pending, onAction }: ApprovalsProps) {
                     </Button>
                     <Button 
                       className="h-11 rounded-xl bg-orange-600 text-white font-black hover:bg-orange-700 text-xs px-6 shadow-xl shadow-orange-600/10"
-                      onClick={() => handleApprove(selectedReview.uid)}
+                      onClick={() => handleApproveClick(selectedReview)}
                     >
                       Valider & Activer
                     </Button>
@@ -296,6 +340,119 @@ export default function ApprovalsModule({ pending, onAction }: ApprovalsProps) {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Confirmation Dialog (Bypasses window.confirm so it doesn't break under sandboxed iframe) */}
+      <Dialog open={approvingProfile !== null} onOpenChange={(open) => { if(!open) setApprovingProfile(null); }}>
+        <DialogContent className="max-w-md w-full rounded-[24px] p-6 border-none shadow-2xl">
+          <DialogHeader className="pb-4">
+            <div className="h-12 w-12 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center mx-auto mb-3">
+              <Check className="h-6 w-6" />
+            </div>
+            <DialogTitle className="text-lg font-black text-slate-900 text-center">Approuver l'entreprise ?</DialogTitle>
+            <DialogDescription className="text-center text-xs font-semibold text-slate-400 mt-2">
+              Voulez-vous valider et approuver administrativement l'entreprise <strong>"{approvingProfile?.companyName}"</strong> ? Ses représentants recevront un plein accès aux dépôts d'offres d'emploi.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex gap-2 sm:justify-center">
+            <Button 
+              variant="ghost" 
+              className="h-10 rounded-xl font-bold text-xs px-4"
+              onClick={() => setApprovingProfile(null)}
+            >
+              Annuler
+            </Button>
+            <Button 
+              className="h-10 rounded-xl bg-orange-600 text-white font-black hover:bg-orange-700 text-xs px-5 shadow-lg shadow-orange-600/10"
+              onClick={handleConfirmApprove}
+            >
+              Confirmer & Activer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Inside-App Document Preview Modal (Bypasses top-level target="_blank" restrictions for base64 PDFs and images) */}
+      <Dialog open={previewDoc !== null} onOpenChange={(open) => { if(!open) setPreviewDoc(null); }}>
+        <DialogContent className="max-w-4xl w-full rounded-[24px] p-6 border-none shadow-2xl flex flex-col max-h-[90vh]">
+          <DialogHeader className="border-b border-slate-100 pb-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <DialogTitle className="text-base font-black text-slate-900">{previewDoc?.title}</DialogTitle>
+                <DialogDescription className="text-xs font-semibold text-slate-400 mt-1">
+                  Nom du fichier original : {previewDoc?.filename || "Inconnu"}
+                </DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto py-6 flex items-center justify-center min-h-[350px] bg-slate-50 rounded-2xl border border-slate-100 p-4">
+            {previewDoc?.url ? (
+              previewDoc.url.startsWith("data:application/pdf") || previewDoc.url.includes(".pdf") ? (
+                <div className="w-full h-full flex flex-col items-center justify-center gap-4">
+                  <iframe 
+                    src={previewDoc.url} 
+                    title={previewDoc.title} 
+                    className="w-full h-[55vh] rounded-xl border border-slate-200 shadow-inner bg-white" 
+                  />
+                  <div className="p-4 bg-orange-50 border border-orange-100 rounded-2xl w-full text-center flex items-center justify-between gap-4">
+                    <div className="text-left">
+                      <p className="text-xs font-black text-orange-800">Visualisation PDF Sécurisée</p>
+                      <p className="text-[10px] font-bold text-orange-600">Si le document n'est pas ou mal affiché par votre navigateur, cliquez pour télécharger direct.</p>
+                    </div>
+                    <Button
+                      onClick={() => handleDownload(previewDoc.url, previewDoc.filename || "document.pdf")}
+                      className="bg-orange-600 hover:bg-orange-700 text-white font-black text-xs h-10 px-4 rounded-xl flex items-center gap-1.5 shadow-lg shadow-orange-600/10"
+                    >
+                      <Download className="h-4 w-4" />
+                      Télécharger PDF
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center gap-4 w-full">
+                  <div className="max-w-full overflow-hidden rounded-xl border border-slate-200 bg-white p-2">
+                    <img 
+                      src={previewDoc.url} 
+                      alt={previewDoc.title} 
+                      className="max-h-[55vh] object-contain rounded-lg" 
+                    />
+                  </div>
+                  <Button
+                    onClick={() => handleDownload(previewDoc.url, previewDoc.filename || "document.png")}
+                    className="bg-slate-950 hover:bg-slate-800 text-white font-black text-xs h-10 px-5 rounded-xl flex items-center gap-1.5 shadow-lg shadow-slate-950/10"
+                  >
+                    <Download className="h-4 w-4" />
+                    Télécharger Image
+                  </Button>
+                </div>
+              )
+            ) : (
+              <p className="text-xs font-bold text-slate-400">Aucun document chargé ou format invalide.</p>
+            )}
+          </div>
+
+          <DialogFooter className="pt-4 border-t border-slate-100 flex justify-between gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                if (previewDoc) {
+                  handleDownload(previewDoc.url, previewDoc.filename || "document.dat");
+                }
+              }}
+              className="h-10 rounded-xl font-black text-xs border-slate-200"
+            >
+              Télécharger l'original
+            </Button>
+            <Button 
+              className="h-10 rounded-xl bg-slate-950 text-white font-black hover:bg-slate-800 text-xs px-5"
+              onClick={() => setPreviewDoc(null)}
+            >
+              Fermer l'aperçu
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
+
