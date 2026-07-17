@@ -54,6 +54,10 @@ export default function UsersModule({ users, onAction, addLog }: UsersModuleProp
   const [isViewOpen, setIsViewOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<UserProfile | null>(null);
+
+  // Custom Promote Admin Confirmation State
+  const [promoteConfirmOpen, setPromoteConfirmOpen] = useState(false);
+  const [promoteUserId, setPromoteUserId] = useState<string | null>(null);
   
   const [adminNotesText, setAdminNotesText] = useState("");
   const [isSendingCorrection, setIsSendingCorrection] = useState(false);
@@ -238,10 +242,20 @@ export default function UsersModule({ users, onAction, addLog }: UsersModuleProp
     }
   };
 
-  const handlePromoteAdmin = async (uid: string) => {
-    if (confirm("Voulez-vous vraiment promouvoir cet utilisateur comme administrateur principal ?")) {
-      await onAction(uid, 'promote'); // will be handled or update role directly
+  const handlePromoteAdmin = (uid: string) => {
+    setPromoteUserId(uid);
+    setPromoteConfirmOpen(true);
+  };
+
+  const handleExecutePromoteAdmin = async () => {
+    if (!promoteUserId) return;
+    try {
+      await onAction(promoteUserId, 'promote');
       alert("Utilisateur promu avec succès !");
+      setPromoteConfirmOpen(false);
+      setPromoteUserId(null);
+    } catch (e) {
+      console.error(e);
     }
   };
 
@@ -661,6 +675,38 @@ export default function UsersModule({ users, onAction, addLog }: UsersModuleProp
               }}
             >
               Oui, Supprimer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Custom Co-Admin Promotion Prompt */}
+      <Dialog open={promoteConfirmOpen} onOpenChange={setPromoteConfirmOpen}>
+        <DialogContent className="max-w-md w-full rounded-[30px] p-6 border-none shadow-2xl text-center bg-white">
+          <DialogHeader>
+            <div className="h-14 w-14 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <Award className="h-7 w-7" />
+            </div>
+            <DialogTitle className="text-xl font-black text-slate-900 text-center">Promouvoir Co-Admin</DialogTitle>
+            <DialogDescription className="text-center text-sm text-slate-500 mt-2 font-medium leading-relaxed">
+              Voulez-vous vraiment promouvoir cet utilisateur comme administrateur principal ? Il obtiendra des accès complets de supervision sur toute la plateforme.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-6 flex sm:justify-center gap-3 w-full">
+            <Button 
+              type="button" 
+              variant="outline" 
+              className="rounded-xl font-black text-xs uppercase h-11 flex-1 border-slate-100" 
+              onClick={() => setPromoteConfirmOpen(false)}
+            >
+              Annuler
+            </Button>
+            <Button 
+              type="button" 
+              className="rounded-xl font-black text-xs uppercase h-11 flex-1 bg-amber-600 hover:bg-amber-700 text-white shadow-xl shadow-amber-600/10" 
+              onClick={handleExecutePromoteAdmin}
+            >
+              Confirmer
             </Button>
           </DialogFooter>
         </DialogContent>

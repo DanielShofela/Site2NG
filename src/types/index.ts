@@ -195,6 +195,9 @@ export interface Job {
   is_hidden?: boolean;
   is_restricted?: boolean;
   is_anonymous?: boolean;
+  phone?: string;
+  whatsapp?: string;
+  external_apply_link?: string;
 }
 
 export interface Application {

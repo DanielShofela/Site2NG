@@ -38,6 +38,10 @@ export default function ApplicationsModule({ applications, users, jobs, onUpdate
   const [isViewOpen, setIsViewOpen] = useState(false);
   const [updating, setUpdating] = useState(false);
 
+  // Custom Delete Confirmation Dialog State
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleteAppId, setDeleteAppId] = useState<string | null>(null);
+
   const filteredApps = useMemo(() => {
     return applications.filter(app => {
       const candidateName = (app.candidateProfile?.displayName || app.candidateName || "").toLowerCase();
@@ -82,19 +86,24 @@ export default function ApplicationsModule({ applications, users, jobs, onUpdate
     }
   };
 
-  const handleDeleteApplication = async (appId: string) => {
-    if (!confirm("Voulez-vous rejeter et supprimer définitivement cette candidature de la liste ?")) {
-      return;
-    }
+  const handleDeleteApplication = (appId: string) => {
+    setDeleteAppId(appId);
+    setDeleteConfirmOpen(true);
+  };
+
+  const handleExecuteDelete = async () => {
+    if (!deleteAppId) return;
     try {
       if (onDelete) {
-        await onDelete(appId);
+        await onDelete(deleteAppId);
       } else {
-        await deleteDoc(doc(db, 'applications', appId));
+        await deleteDoc(doc(db, 'applications', deleteAppId));
         alert("Candidature supprimée de la plateforme avec succès.");
       }
       setIsViewOpen(false);
       setSelectedApp(null);
+      setDeleteConfirmOpen(false);
+      setDeleteAppId(null);
     } catch (e) {
       console.error(e);
       alert("Erreur lors de la suppression.");
@@ -389,6 +398,37 @@ export default function ApplicationsModule({ applications, users, jobs, onUpdate
               </DialogFooter>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Custom Delete Confirmation Dialog */}
+      <Dialog open={deleteConfirmOpen} onOpenChange={(open) => { if(!open) { setDeleteConfirmOpen(false); setDeleteAppId(null); } }}>
+        <DialogContent className="max-w-md rounded-[32px] p-8 border-none shadow-2xl bg-white">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-black text-slate-900 flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-red-500" />
+              Confirmer la suppression
+            </DialogTitle>
+            <DialogDescription className="text-slate-500 text-xs font-bold pt-2 leading-relaxed">
+              Êtes-vous absolument sûr de vouloir rejeter et supprimer définitivement cette candidature de la liste ? Cette action est irréversible.
+            </DialogDescription>
+          </DialogHeader>
+
+          <DialogFooter className="pt-6 border-t border-slate-50 flex gap-2 justify-end">
+            <Button 
+              variant="ghost" 
+              onClick={() => { setDeleteConfirmOpen(false); setDeleteAppId(null); }}
+              className="h-11 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-50"
+            >
+              Annuler
+            </Button>
+            <Button
+              onClick={handleExecuteDelete}
+              className="bg-red-600 hover:bg-red-700 text-white font-black text-xs h-11 px-5 rounded-xl shadow-lg shadow-red-600/10"
+            >
+              Supprimer définitivement
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </>

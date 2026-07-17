@@ -137,6 +137,14 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // Editorial Offers & Assisted Candidates Rules (Admin Only)
+    match /editorial_offers/{offerId} {
+      allow read, write: if isAdmin();
+    }
+    match /assisted_candidates/{candidateId} {
+      allow read, write: if isAdmin();
+    }
+
     // 6. System Logs Rules (Admin Only)
     match /system_logs/{logId} {
       allow read, write: if isAdmin();

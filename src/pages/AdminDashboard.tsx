@@ -33,7 +33,9 @@ import {
   Menu,
   X,
   ChevronRight,
-  HardDrive
+  HardDrive,
+  Sparkles,
+  UploadCloud
 } from 'lucide-react';
 
 import { Card } from '@/components/ui/card';
@@ -53,8 +55,9 @@ import MaintenanceModule from '@/components/admin/MaintenanceModule';
 import SettingsModule from '@/components/admin/SettingsModule';
 import LogsModule from '@/components/admin/LogsModule';
 import SupportModule from '@/components/admin/SupportModule';
+import EditorialModule from '@/components/admin/EditorialModule';
 
-type AdminModule = 'overview' | 'users' | 'approvals' | 'jobs' | 'applications' | 'cms' | 'media' | 'analytics' | 'notifications' | 'maintenance' | 'settings' | 'logs' | 'support';
+type AdminModule = 'overview' | 'users' | 'approvals' | 'jobs' | 'applications' | 'cms' | 'media' | 'analytics' | 'notifications' | 'maintenance' | 'settings' | 'logs' | 'support' | 'editorial' | 'import_jobs';
 
 enum OperationType {
   CREATE = 'create',
@@ -378,9 +381,11 @@ export default function AdminDashboard() {
   // Sidebar Menu Items Definition
   const sidebarItems = [
     { id: 'overview', label: "Vue d'ensemble", icon: LayoutDashboard },
+    { id: 'editorial', label: "Espace Éditorial", icon: Sparkles },
     { id: 'users', label: "Utilisateurs", icon: Users },
     { id: 'approvals', label: "File d'attente", icon: ShieldCheck, badge: stats.pendingApprovals },
     { id: 'jobs', label: "Offres d'emploi", icon: Briefcase },
+    { id: 'import_jobs', label: "Importer des offres", icon: UploadCloud },
     { id: 'applications', label: "Candidatures", icon: FileText },
     { id: 'cms', label: "Homepage CMS", icon: Globe },
     { id: 'media', label: "Médiathèque", icon: HardDrive },
@@ -601,6 +606,11 @@ export default function AdminDashboard() {
                     onNavigate={(mod) => setActiveModule(mod)}
                   />
                 )}
+                {activeModule === 'editorial' && (
+                  <EditorialModule 
+                    addLog={addLog}
+                  />
+                )}
                 {activeModule === 'users' && (
                   <UsersModule 
                     users={allUsers} 
@@ -619,6 +629,12 @@ export default function AdminDashboard() {
                     jobs={allJobs} 
                     onAction={handleJobAction} 
                     recruiterNames={recruiterNames}
+                  />
+                )}
+                {activeModule === 'import_jobs' && (
+                  <EditorialModule 
+                    addLog={addLog}
+                    initialTab="inbox"
                   />
                 )}
                 {activeModule === 'applications' && (

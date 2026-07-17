@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { 
   Bell, 
   Send, 
@@ -12,7 +13,8 @@ import {
   ShieldAlert, 
   Plus, 
   Clock,
-  Volume2
+  Volume2,
+  AlertCircle
 } from 'lucide-react';
 import { collection, onSnapshot, addDoc, doc, deleteDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -30,6 +32,10 @@ export default function NotificationsModule({ logs, pendingRecruiters, applicati
   const [newNoticeBody, setNewNoticeBody] = useState("");
   const [targetAudience, setTargetAudience] = useState("all"); // all, recruiter, candidate
   const [sending, setSending] = useState(false);
+
+  // Custom Delete Confirmation Dialog State
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleteNoticeId, setDeleteNoticeId] = useState<string | null>(null);
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'system_notifications'), (snapshot) => {
@@ -77,13 +83,18 @@ export default function NotificationsModule({ logs, pendingRecruiters, applicati
     }
   };
 
-  const handleDeleteNotice = async (id: string) => {
-    if (!confirm("Voulez-vous révoquer et détruire cet avis système ?")) {
-      return;
-    }
+  const handleDeleteNotice = (id: string) => {
+    setDeleteNoticeId(id);
+    setDeleteConfirmOpen(true);
+  };
+
+  const handleExecuteDeleteNotice = async () => {
+    if (!deleteNoticeId) return;
     try {
-      await deleteDoc(doc(db, 'system_notifications', id));
+      await deleteDoc(doc(db, 'system_notifications', deleteNoticeId));
       alert("Avis système détruit.");
+      setDeleteConfirmOpen(false);
+      setDeleteNoticeId(null);
     } catch (e) {
       console.error(e);
     }
@@ -204,6 +215,37 @@ export default function NotificationsModule({ logs, pendingRecruiters, applicati
           )}
         </div>
       </Card>
+
+      {/* Custom Delete Confirmation Dialog */}
+      <Dialog open={deleteConfirmOpen} onOpenChange={(open) => { if(!open) { setDeleteConfirmOpen(false); setDeleteNoticeId(null); } }}>
+        <DialogContent className="max-w-md rounded-[32px] p-8 border-none shadow-2xl bg-white">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-black text-slate-900 flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-red-500" />
+              Confirmer la suppression
+            </DialogTitle>
+            <DialogDescription className="text-slate-500 text-xs font-bold pt-2 leading-relaxed">
+              Êtes-vous absolument sûr de vouloir révoquer et détruire cet avis système ? Cette action est irréversible.
+            </DialogDescription>
+          </DialogHeader>
+
+          <DialogFooter className="pt-6 border-t border-slate-50 flex gap-2 justify-end">
+            <Button 
+              variant="ghost" 
+              onClick={() => { setDeleteConfirmOpen(false); setDeleteNoticeId(null); }}
+              className="h-11 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-50"
+            >
+              Annuler
+            </Button>
+            <Button
+              onClick={handleExecuteDeleteNotice}
+              className="bg-red-600 hover:bg-red-700 text-white font-black text-xs h-11 px-5 rounded-xl shadow-lg shadow-red-600/10"
+            >
+              Supprimer définitivement
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

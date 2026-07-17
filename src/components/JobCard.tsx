@@ -27,7 +27,10 @@ import {
   Calendar,
   User,
   Send,
-  Sparkles
+  Sparkles,
+  Phone,
+  ExternalLink,
+  MessageCircle
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Badge } from '@/components/ui/badge';
@@ -1236,6 +1239,72 @@ export default function JobCard({
                 </Button>
               </div>
             </div>
+
+            {/* Optional parsed direct link */}
+            {localJob.external_apply_link && (
+              <div className="space-y-2">
+                <h4 className="text-[10px] uppercase font-black text-slate-400 tracking-wider">
+                  🔗 Lien direct de candidature :
+                </h4>
+                <div className="flex flex-col xs:flex-row xs:items-center justify-between gap-2 xs:gap-3 bg-blue-50/40 border border-blue-100/50 p-3 rounded-xl xs:rounded-2xl">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <ExternalLink className="h-4.5 w-4.5 text-blue-600 shrink-0" />
+                    <span className="text-[11px] xs:text-xs font-black text-slate-800 truncate select-all">
+                      {localJob.external_apply_link}
+                    </span>
+                  </div>
+                  <a
+                    href={localJob.external_apply_link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="h-7 xs:h-8 rounded-full bg-blue-600 hover:bg-blue-700 text-white text-[9px] xs:text-[10px] font-black uppercase shrink-0 px-3 flex items-center justify-center gap-1 leading-none shadow-none cursor-pointer text-center"
+                  >
+                    Postuler ici
+                  </a>
+                </div>
+              </div>
+            )}
+
+            {/* Optional parsed phone / whatsapp */}
+            {(localJob.phone || localJob.whatsapp) && (
+              <div className="space-y-2">
+                <h4 className="text-[10px] uppercase font-black text-slate-400 tracking-wider">
+                  📞 Contacts directs de l'offre :
+                </h4>
+                <div className="grid grid-cols-1 xs:grid-cols-2 gap-2">
+                  {localJob.phone && (
+                    <a
+                      href={`tel:${localJob.phone}`}
+                      className="flex items-center gap-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-200/60 p-3 rounded-xl text-left transition-colors cursor-pointer"
+                    >
+                      <div className="h-8 w-8 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center shrink-0">
+                        <Phone className="h-4 w-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-[9px] font-black uppercase text-slate-400 leading-none">Téléphone</p>
+                        <p className="text-xs font-black text-slate-800 mt-1 select-all">{localJob.phone}</p>
+                      </div>
+                    </a>
+                  )}
+                  {localJob.whatsapp && (
+                    <a
+                      href={`https://wa.me/${localJob.whatsapp.replace(/[^0-9]/g, '')}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200/40 p-3 rounded-xl text-left transition-colors cursor-pointer"
+                    >
+                      <div className="h-8 w-8 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
+                        <MessageCircle className="h-4 w-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-[9px] font-black uppercase text-emerald-600 leading-none">WhatsApp</p>
+                        <p className="text-xs font-black text-slate-800 mt-1 select-all">{localJob.whatsapp}</p>
+                      </div>
+                    </a>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Footer Actions */}

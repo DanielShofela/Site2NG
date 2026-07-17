@@ -56,6 +56,10 @@ export default function JobsModule({ jobs, onAction, recruiterNames }: JobsModul
   const [isViewOpen, setIsViewOpen] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
 
+  // Custom Delete Confirmation Dialog State
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleteJobId, setDeleteJobId] = useState<string | null>(null);
+
   // Floating Toast Notification Engine
   const [toasts, setToasts] = useState<{ id: string; message: string; type: 'success' | 'error' | 'info' }[]>([]);
   const [loadingMap, setLoadingMap] = useState<Record<string, boolean>>({});
@@ -631,9 +635,8 @@ export default function JobsModule({ jobs, onAction, recruiterNames }: JobsModul
                             variant="ghost" 
                             className="h-8 w-8 text-red-500 hover:bg-red-50 hover:text-red-700 rounded-lg p-0"
                             onClick={() => {
-                              if (window.confirm("Êtes-vous absolument sûr de vouloir supprimer définitivement cette offre d'emploi ? Cette action supprimera également toutes les candidatures rattachées et est irréversible.")) {
-                                triggerAction(j.id, 'delete');
-                              }
+                              setDeleteJobId(j.id);
+                              setDeleteConfirmOpen(true);
                             }}
                             title="Supprimer définitivement du système"
                             disabled={loadingMap[`${j.id}-delete`]}
@@ -1234,10 +1237,9 @@ export default function JobsModule({ jobs, onAction, recruiterNames }: JobsModul
                       size="sm"
                       className="h-9 font-black text-[10px] uppercase rounded-xl bg-rose-600 text-white hover:bg-rose-700 hover:shadow-lg shadow-rose-600/10 flex items-center"
                       onClick={() => {
-                        if (window.confirm("Voulez-vous supprimer définitivement cette offre ainsi que tous les dossiers de candidature ?")) {
-                          triggerAction(selectedJob.id, 'delete');
-                          setIsViewOpen(false);
-                        }
+                        setDeleteJobId(selectedJob.id);
+                        setDeleteConfirmOpen(true);
+                        setIsViewOpen(false);
                       }}
                       disabled={loadingMap[`${selectedJob.id}-delete`]}
                     >
@@ -1595,6 +1597,43 @@ export default function JobsModule({ jobs, onAction, recruiterNames }: JobsModul
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Custom Delete Confirmation Dialog */}
+      <Dialog open={deleteConfirmOpen} onOpenChange={(open) => { if(!open) { setDeleteConfirmOpen(false); setDeleteJobId(null); } }}>
+        <DialogContent className="max-w-md rounded-[32px] p-8 border-none shadow-2xl bg-white">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-black text-slate-900 flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-red-500" />
+              Confirmer la suppression
+            </DialogTitle>
+            <DialogDescription className="text-slate-500 text-xs font-bold pt-2 leading-relaxed">
+              Êtes-vous absolument sûr de vouloir supprimer définitivement cette offre d'emploi ? Cette action supprimera également toutes les candidatures rattachées et est irréversible.
+            </DialogDescription>
+          </DialogHeader>
+
+          <DialogFooter className="pt-6 border-t border-slate-50 flex gap-2 justify-end">
+            <Button 
+              variant="ghost" 
+              onClick={() => { setDeleteConfirmOpen(false); setDeleteJobId(null); }}
+              className="h-11 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-50"
+            >
+              Annuler
+            </Button>
+            <Button
+              onClick={() => {
+                if (deleteJobId) {
+                  triggerAction(deleteJobId, 'delete');
+                  setDeleteConfirmOpen(false);
+                  setDeleteJobId(null);
+                }
+              }}
+              className="bg-red-600 hover:bg-red-700 text-white font-black text-xs h-11 px-5 rounded-xl shadow-lg shadow-red-600/10"
+            >
+              Supprimer définitivement
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </>

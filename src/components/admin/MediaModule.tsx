@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { 
   Folder, 
   ImageIcon, 
@@ -13,7 +14,8 @@ import {
   FileText, 
   Search, 
   ExternalLink,
-  HardDrive
+  HardDrive,
+  AlertCircle
 } from 'lucide-react';
 import { collection, onSnapshot, addDoc, doc, deleteDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -28,6 +30,11 @@ export default function MediaModule({ addLog }: MediaProps) {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [customTitle, setCustomTitle] = useState("");
+
+  // Custom Delete Confirmation Dialog State
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleteMediaId, setDeleteMediaId] = useState<string | null>(null);
+  const [deleteMediaName, setDeleteMediaName] = useState<string>("");
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'media'), (snapshot) => {
@@ -80,16 +87,23 @@ export default function MediaModule({ addLog }: MediaProps) {
     }
   };
 
-  const handleDeleteMedia = async (id: string, name: string) => {
-    if (!confirm(`Voulez-vous détruire l'actif média "${name}" ? Les liens ou logos l'utilisant ne s'afficheront plus.`)) {
-      return;
-    }
+  const handleDeleteMedia = (id: string, name: string) => {
+    setDeleteMediaId(id);
+    setDeleteMediaName(name);
+    setDeleteConfirmOpen(true);
+  };
+
+  const handleExecuteDeleteMedia = async () => {
+    if (!deleteMediaId) return;
     try {
-      await deleteDoc(doc(db, 'media', id));
+      await deleteDoc(doc(db, 'media', deleteMediaId));
       if (addLog) {
-        await addLog("Média supprimé", `Destruction du fichier ${name} dans la médiathèque`, "warning");
+        await addLog("Média supprimé", `Destruction du fichier ${deleteMediaName} dans la médiathèque`, "warning");
       }
       alert("Fichier média supprimé définitivement.");
+      setDeleteConfirmOpen(false);
+      setDeleteMediaId(null);
+      setDeleteMediaName("");
     } catch (err) {
       console.error(err);
     }
@@ -241,6 +255,37 @@ export default function MediaModule({ addLog }: MediaProps) {
           </div>
         )}
       </div>
+
+      {/* Custom Delete Confirmation Dialog */}
+      <Dialog open={deleteConfirmOpen} onOpenChange={(open) => { if(!open) { setDeleteConfirmOpen(false); setDeleteMediaId(null); } }}>
+        <DialogContent className="max-w-md rounded-[32px] p-8 border-none shadow-2xl bg-white">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-black text-slate-900 flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-red-500" />
+              Confirmer la suppression
+            </DialogTitle>
+            <DialogDescription className="text-slate-500 text-xs font-bold pt-2 leading-relaxed">
+              Voulez-vous détruire l'actif média <span className="font-extrabold text-slate-800">"{deleteMediaName}"</span> ? Les liens ou logos l'utilisant ne s'afficheront plus. Cette action est irréversible.
+            </DialogDescription>
+          </DialogHeader>
+
+          <DialogFooter className="pt-6 border-t border-slate-50 flex gap-2 justify-end">
+            <Button 
+              variant="ghost" 
+              onClick={() => { setDeleteConfirmOpen(false); setDeleteMediaId(null); }}
+              className="h-11 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-50"
+            >
+              Annuler
+            </Button>
+            <Button
+              onClick={handleExecuteDeleteMedia}
+              className="bg-red-600 hover:bg-red-700 text-white font-black text-xs h-11 px-5 rounded-xl shadow-lg shadow-red-600/10"
+            >
+              Supprimer définitivement
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { 
   Clock, 
   Search, 
@@ -23,6 +24,9 @@ export default function LogsModule({ logs }: LogsProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
 
+  // Custom Delete Confirmation Dialog State
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+
   const filteredLogs = useMemo(() => {
     return logs.filter(l => {
       const action = (l.action || "").toLowerCase();
@@ -34,10 +38,11 @@ export default function LogsModule({ logs }: LogsProps) {
     });
   }, [logs, searchTerm, typeFilter]);
 
-  const handleClearLogs = async () => {
-    if (!confirm("Voulez-vous vider l'ensemble de l'historique d'audit ainsi que les logs d'activité administrateur ?")) {
-      return;
-    }
+  const handleClearLogs = () => {
+    setDeleteConfirmOpen(true);
+  };
+
+  const handleExecuteClearLogs = async () => {
     try {
       // Clear logs from firestore in batch
       const snapshot = await getDocs(collection(db, 'system_logs'));
@@ -47,6 +52,7 @@ export default function LogsModule({ logs }: LogsProps) {
       });
       await batch.commit();
       alert("Historique des logs purgé avec succès !");
+      setDeleteConfirmOpen(false);
     } catch (e) {
       console.error(e);
     }
@@ -151,6 +157,37 @@ export default function LogsModule({ logs }: LogsProps) {
           </div>
         )}
       </div>
+
+      {/* Custom Delete Confirmation Dialog */}
+      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <DialogContent className="max-w-md rounded-[32px] p-8 border-none shadow-2xl bg-white">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-black text-slate-900 flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-red-500" />
+              Confirmer la purge des logs
+            </DialogTitle>
+            <DialogDescription className="text-slate-500 text-xs font-bold pt-2 leading-relaxed">
+              Êtes-vous absolument sûr de vouloir vider l'ensemble de l'historique d'audit ainsi que les logs d'activité administrateur ? Cette action est irréversible.
+            </DialogDescription>
+          </DialogHeader>
+
+          <DialogFooter className="pt-6 border-t border-slate-50 flex gap-2 justify-end">
+            <Button 
+              variant="ghost" 
+              onClick={() => setDeleteConfirmOpen(false)}
+              className="h-11 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-50"
+            >
+              Annuler
+            </Button>
+            <Button
+              onClick={handleExecuteClearLogs}
+              className="bg-red-600 hover:bg-red-700 text-white font-black text-xs h-11 px-5 rounded-xl shadow-lg shadow-red-600/10"
+            >
+              Purger définitivement
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
