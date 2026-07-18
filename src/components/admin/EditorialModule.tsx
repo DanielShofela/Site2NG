@@ -28,10 +28,7 @@ import {
   ArrowRight,
   Filter,
   CheckCircle2,
-  AlertCircle,
-  Copy,
-  ExternalLink,
-  Share2
+  AlertCircle
 } from 'lucide-react';
 import { collection, onSnapshot, doc, addDoc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -39,7 +36,6 @@ import { Job } from '@/types';
 
 interface EditorialModuleProps {
   addLog: (action: string, target: string, type: string) => Promise<void>;
-  initialTab?: 'inbox' | 'bank' | 'candidates';
 }
 
 export interface EditorialOffer {
@@ -56,14 +52,6 @@ export interface EditorialOffer {
   updatedAt: any;
   sourceText?: string;
   notes?: string;
-  type?: string;
-  experienceYears?: string;
-  studyLevels?: string[];
-  requiredDocs?: string[];
-  phone?: string;
-  whatsapp?: string;
-  external_apply_link?: string;
-  external_apply_email?: string;
 }
 
 export interface AssistedCandidate {
@@ -79,106 +67,14 @@ export interface AssistedCandidate {
   updatedAt: any;
 }
 
-export default function EditorialModule({ addLog, initialTab }: EditorialModuleProps) {
-  const [activeTab, setActiveTab] = useState<'inbox' | 'bank' | 'candidates'>(initialTab || 'inbox');
-
-  useEffect(() => {
-    if (initialTab) {
-      setActiveTab(initialTab);
-    }
-  }, [initialTab]);
+export default function EditorialModule({ addLog }: EditorialModuleProps) {
+  const [activeTab, setActiveTab] = useState<'inbox' | 'bank' | 'candidates'>('inbox');
 
   // Firebase Real-time states
   const [editorialOffers, setEditorialOffers] = useState<EditorialOffer[]>([]);
   const [assistedCandidates, setAssistedCandidates] = useState<AssistedCandidate[]>([]);
   const [loadingOffers, setLoadingOffers] = useState(true);
   const [loadingCandidates, setLoadingCandidates] = useState(true);
-
-  // WhatsApp Preview States
-  const [isWhatsAppPreviewOpen, setIsWhatsAppPreviewOpen] = useState(false);
-  const [whatsAppPreviewText, setWhatsAppPreviewText] = useState("");
-  const [whatsAppCopied, setWhatsAppCopied] = useState(false);
-
-  const generateWhatsAppMessage = (offer: Partial<EditorialOffer>) => {
-    const title = offer.title?.toUpperCase() || 'OFFRE';
-    const company = offer.companyName || 'Non spécifiée';
-    const loc = offer.location || "Abidjan, Côte d'Ivoire";
-    const type = offer.type || 'CDI';
-    const exp = offer.experienceYears || '';
-    const sal = offer.salary || '';
-    const studies = offer.studyLevels && offer.studyLevels.length > 0 ? offer.studyLevels.join(', ') : '';
-    const docs = offer.requiredDocs && offer.requiredDocs.length > 0 ? offer.requiredDocs.join(', ') : '';
-    
-    let msg = `📢 *OFFRE D'EMPLOI : ${title}*\n`;
-    msg += `━━━━━━━━━━━━━━━━━━━\n`;
-    msg += `🏢 *Entreprise :* ${company}\n`;
-    msg += `📍 *Localisation :* ${loc}\n`;
-    msg += `💼 *Type de contrat :* ${type}\n`;
-    if (exp) msg += `⏳ *Expérience :* ${exp}\n`;
-    if (sal) msg += `💰 *Salaire :* ${sal}\n`;
-    if (studies) msg += `🎓 *Niveau d'études :* ${studies}\n`;
-    
-    if (offer.description) {
-      msg += `\n📝 *Description du poste :*\n${offer.description}\n`;
-    }
-    
-    if (offer.requirements) {
-      msg += `\n🎯 *Missions & Exigences :*\n${offer.requirements}\n`;
-    }
-    
-    if (docs) {
-      msg += `\n📁 *Documents demandés :*\n${docs}\n`;
-    }
-    
-    msg += `\n📩 *Canal de candidature :*\n`;
-    let hasContact = false;
-    if (offer.whatsapp) {
-      msg += `• WhatsApp : ${offer.whatsapp}\n`;
-      hasContact = true;
-    }
-    if (offer.phone) {
-      msg += `• Téléphone : ${offer.phone}\n`;
-      hasContact = true;
-    }
-    if (offer.external_apply_email) {
-      msg += `• Email : ${offer.external_apply_email}\n`;
-      hasContact = true;
-    }
-    if (offer.external_apply_link) {
-      msg += `• Lien direct : ${offer.external_apply_link}\n`;
-      hasContact = true;
-    }
-    if (!hasContact && offer.contactInfo) {
-      msg += `• ${offer.contactInfo}\n`;
-    } else if (!hasContact && !offer.contactInfo) {
-      msg += `• Contactez l'administrateur\n`;
-    }
-    msg += `━━━━━━━━━━━━━━━━━━━\n`;
-    msg += `_Partagé via 2NG Entreprises_`;
-    return msg;
-  };
-
-  const handleOpenWhatsAppPreview = (offer: Partial<EditorialOffer>) => {
-    const text = generateWhatsAppMessage(offer);
-    setWhatsAppPreviewText(text);
-    setWhatsAppCopied(false);
-    setIsWhatsAppPreviewOpen(true);
-  };
-
-  const handleCopyWhatsAppText = async () => {
-    try {
-      await navigator.clipboard.writeText(whatsAppPreviewText);
-      setWhatsAppCopied(true);
-      setTimeout(() => setWhatsAppCopied(false), 2000);
-    } catch (err) {
-      console.error("Failed to copy text: ", err);
-    }
-  };
-
-  const handleShareOnWhatsApp = () => {
-    const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(whatsAppPreviewText)}`;
-    window.open(url, '_blank');
-  };
 
   // Smart Inbox States
   const [rawText, setRawText] = useState("");
@@ -321,14 +217,6 @@ export default function EditorialModule({ addLog, initialTab }: EditorialModuleP
         location: draft.location || "",
         salary: draft.salary || "",
         contactInfo: draft.contactInfo || "",
-        type: draft.type || "CDI",
-        experienceYears: draft.experienceYears || "",
-        studyLevels: draft.studyLevels || [],
-        requiredDocs: draft.requiredDocs || [],
-        phone: draft.phone || "",
-        whatsapp: draft.whatsapp || "",
-        external_apply_link: draft.external_apply_link || "",
-        external_apply_email: draft.external_apply_email || "",
         status: "Nouvelle" as const,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
@@ -345,39 +233,54 @@ export default function EditorialModule({ addLog, initialTab }: EditorialModuleP
     }
   };
 
-  // Import all drafts at once
-  const handleImportAllDrafts = async () => {
+  // Publish Editorial Offer directly to public job listings
+  const handlePublishOffer = async (offer: Partial<EditorialOffer>, indexToDelete?: number, editOfferId?: string) => {
     try {
-      setIsParsing(true);
-      for (const draft of parsedDrafts) {
-        const payload = {
-          title: draft.title || "Titre non spécifié",
-          companyName: draft.companyName || "Non spécifié",
-          description: draft.description || "",
-          requirements: draft.requirements || "",
-          location: draft.location || "",
-          salary: draft.salary || "",
-          contactInfo: draft.contactInfo || "",
-          type: draft.type || "CDI",
-          experienceYears: draft.experienceYears || "",
-          studyLevels: draft.studyLevels || [],
-          requiredDocs: draft.requiredDocs || [],
-          phone: draft.phone || "",
-          whatsapp: draft.whatsapp || "",
-          external_apply_link: draft.external_apply_link || "",
-          external_apply_email: draft.external_apply_email || "",
-          status: "Nouvelle" as const,
+      // 1. Save to main "offers" collection for the public site
+      const jobPayload = {
+        title: offer.title || "Titre non spécifié",
+        companyName: offer.companyName || "Non spécifié",
+        description: offer.description || "",
+        requirements: offer.requirements || "",
+        location: offer.location || "Côte d'Ivoire",
+        salary: offer.salary || "",
+        status: "active" as const,
+        createdAt: serverTimestamp(),
+        createdBy: "admin",
+        offer_type: "external" as const,
+        contactInfo: offer.contactInfo || "",
+        type: "CDI", // default values for required public schema
+        field: "Autre", 
+        views: 0
+      };
+      
+      const jobRef = await addDoc(collection(db, 'offers'), jobPayload);
+
+      // 2. Add or update in "editorial_offers" with status "Publiée"
+      if (editOfferId) {
+        // It's an existing editorial offer being published
+        await updateDoc(doc(db, 'editorial_offers', editOfferId), {
+          status: "Publiée",
+          updatedAt: serverTimestamp()
+        });
+      } else {
+        // It's a new draft from inbox published directly
+        await addDoc(collection(db, 'editorial_offers'), {
+          ...jobPayload,
+          status: "Publiée",
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp()
-        };
-        await addDoc(collection(db, 'editorial_offers'), payload);
-        await addLog("Fiche éditoriale créée", `Offre "${payload.title}" ajoutée en brouillon dans la banque`, "success");
+        });
       }
-      setParsedDrafts([]);
-      setIsParsing(false);
+
+      if (indexToDelete !== undefined) {
+        setParsedDrafts(prev => prev.filter((_, i) => i !== indexToDelete));
+      }
+
+      await addLog("Offre éditoriale publiée", `L'offre "${jobPayload.title}" a été publiée en ligne avec succès`, "success");
+      alert("L'offre a été publiée avec succès sur l'application publique !");
     } catch (e: any) {
-      setIsParsing(false);
-      alert("Erreur lors de la sauvegarde groupée : " + e.message);
+      alert("Erreur lors de la publication : " + e.message);
     }
   };
 
@@ -393,14 +296,6 @@ export default function EditorialModule({ addLog, initialTab }: EditorialModuleP
         location: selectedOffer.location || "",
         salary: selectedOffer.salary || "",
         contactInfo: selectedOffer.contactInfo || "",
-        type: selectedOffer.type || "CDI",
-        experienceYears: selectedOffer.experienceYears || "",
-        studyLevels: selectedOffer.studyLevels || [],
-        requiredDocs: selectedOffer.requiredDocs || [],
-        phone: selectedOffer.phone || "",
-        whatsapp: selectedOffer.whatsapp || "",
-        external_apply_link: selectedOffer.external_apply_link || "",
-        external_apply_email: selectedOffer.external_apply_email || "",
         status: selectedOffer.status,
         updatedAt: serverTimestamp()
       });
@@ -681,32 +576,16 @@ RECRUTEMENT URGENT :
                   <p className="text-slate-400 text-[11px] font-bold mt-0.5">Vérifiez les données extraites par l'IA avant de les insérer dans votre banque éditoriale.</p>
                 </div>
                 {parsedDrafts.length > 0 && (
-                  <div className="flex items-center gap-2">
-                    <Button 
-                      onClick={handleImportAllDrafts}
-                      disabled={isParsing}
-                      className="bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs h-9 rounded-2xl px-4 shrink-0 shadow-sm"
-                    >
-                      {isParsing ? (
-                        <>
-                          <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
-                          Importation...
-                        </>
-                      ) : (
-                        `Tout importer (${parsedDrafts.length})`
-                      )}
-                    </Button>
-                    <Button 
-                      variant="ghost" 
-                      onClick={() => {
-                        setParsedDrafts([]);
-                        setParseWarning(null);
-                      }}
-                      className="text-xs font-black text-red-500 hover:text-red-600 hover:bg-red-50 h-9 rounded-2xl px-3"
-                    >
-                      Vider la liste
-                    </Button>
-                  </div>
+                  <Button 
+                    variant="ghost" 
+                    onClick={() => {
+                      setParsedDrafts([]);
+                      setParseWarning(null);
+                    }}
+                    className="text-xs font-black text-red-500 hover:text-red-600 hover:bg-red-50"
+                  >
+                    Vider la liste
+                  </Button>
                 )}
               </div>
 
@@ -780,97 +659,17 @@ RECRUTEMENT URGENT :
                             </div>
                           </div>
 
-                          <div className="grid grid-cols-2 gap-3">
-                            <div className="space-y-1">
-                              <Label className="text-[10px] font-black uppercase text-slate-400">Type de contrat</Label>
-                              <Input 
-                                value={editingDraftData?.type || ""} 
-                                onChange={(e) => setEditingDraftData(prev => ({ ...prev, type: e.target.value }))}
-                                placeholder="Ex: CDI, CDD, Stage"
-                                className="h-9 rounded-xl text-xs font-semibold"
-                              />
-                            </div>
-                            <div className="space-y-1">
-                              <Label className="text-[10px] font-black uppercase text-slate-400">Expérience requise</Label>
-                              <Input 
-                                value={editingDraftData?.experienceYears || ""} 
-                                onChange={(e) => setEditingDraftData(prev => ({ ...prev, experienceYears: e.target.value }))}
-                                placeholder="Ex: 2 ans"
-                                className="h-9 rounded-xl text-xs font-semibold"
-                              />
-                            </div>
-                          </div>
-
-                          <div className="grid grid-cols-2 gap-3">
-                            <div className="space-y-1">
-                              <Label className="text-[10px] font-black uppercase text-slate-400">Niveaux d'études (séparés par des virgules)</Label>
-                              <Input 
-                                value={(editingDraftData?.studyLevels || []).join(', ')} 
-                                onChange={(e) => setEditingDraftData(prev => ({ ...prev, studyLevels: e.target.value.split(',').map(s => s.trim()).filter(Boolean) }))}
-                                placeholder="Ex: BAC+2, Licence"
-                                className="h-9 rounded-xl text-xs font-semibold"
-                              />
-                            </div>
-                            <div className="space-y-1">
-                              <Label className="text-[10px] font-black uppercase text-slate-400">Documents demandés (séparés par des virgules)</Label>
-                              <Input 
-                                value={(editingDraftData?.requiredDocs || []).join(', ')} 
-                                onChange={(e) => setEditingDraftData(prev => ({ ...prev, requiredDocs: e.target.value.split(',').map(s => s.trim()).filter(Boolean) }))}
-                                placeholder="Ex: CV, Lettre de motivation"
-                                className="h-9 rounded-xl text-xs font-semibold"
-                              />
-                            </div>
-                          </div>
-
-                          <div className="grid grid-cols-2 gap-3">
-                            <div className="space-y-1">
-                              <Label className="text-[10px] font-black uppercase text-slate-400">Téléphone</Label>
-                              <Input 
-                                value={editingDraftData?.phone || ""} 
-                                onChange={(e) => setEditingDraftData(prev => ({ ...prev, phone: e.target.value }))}
-                                className="h-9 rounded-xl text-xs font-semibold"
-                              />
-                            </div>
-                            <div className="space-y-1">
-                              <Label className="text-[10px] font-black uppercase text-slate-400">WhatsApp</Label>
-                              <Input 
-                                value={editingDraftData?.whatsapp || ""} 
-                                onChange={(e) => setEditingDraftData(prev => ({ ...prev, whatsapp: e.target.value }))}
-                                className="h-9 rounded-xl text-xs font-semibold"
-                              />
-                            </div>
-                          </div>
-
-                          <div className="grid grid-cols-2 gap-3">
-                            <div className="space-y-1">
-                              <Label className="text-[10px] font-black uppercase text-slate-400">Email de candidature</Label>
-                              <Input 
-                                value={editingDraftData?.external_apply_email || ""} 
-                                onChange={(e) => setEditingDraftData(prev => ({ ...prev, external_apply_email: e.target.value }))}
-                                className="h-9 rounded-xl text-xs font-semibold"
-                              />
-                            </div>
-                            <div className="space-y-1">
-                              <Label className="text-[10px] font-black uppercase text-slate-400">Lien de candidature</Label>
-                              <Input 
-                                value={editingDraftData?.external_apply_link || ""} 
-                                onChange={(e) => setEditingDraftData(prev => ({ ...prev, external_apply_link: e.target.value }))}
-                                className="h-9 rounded-xl text-xs font-semibold"
-                              />
-                            </div>
-                          </div>
-
                           <div className="space-y-1">
-                            <Label className="text-[10px] font-black uppercase text-slate-400">Missions & Exigences</Label>
-                            <Textarea 
+                            <Label className="text-[10px] font-black uppercase text-slate-400">Exigences / Prérequis</Label>
+                            <Input 
                               value={editingDraftData?.requirements || ""} 
                               onChange={(e) => setEditingDraftData(prev => ({ ...prev, requirements: e.target.value }))}
-                              className="min-h-[60px] rounded-xl text-xs leading-relaxed"
+                              className="h-9 rounded-xl text-xs font-semibold"
                             />
                           </div>
 
                           <div className="space-y-1">
-                            <Label className="text-[10px] font-black uppercase text-slate-400">Autres infos de contact</Label>
+                            <Label className="text-[10px] font-black uppercase text-slate-400">Contacts de candidature</Label>
                             <Input 
                               value={editingDraftData?.contactInfo || ""} 
                               onChange={(e) => setEditingDraftData(prev => ({ ...prev, contactInfo: e.target.value }))}
@@ -938,57 +737,9 @@ RECRUTEMENT URGENT :
                               <Coins className="h-3.5 w-3.5 text-slate-400" />
                               <span>{draft.salary || 'Salaire non spécifié'}</span>
                             </div>
-                            {draft.type && (
-                              <div className="flex items-center gap-1.5">
-                                <FileText className="h-3.5 w-3.5 text-slate-400" />
-                                <span>Contrat : {draft.type}</span>
-                              </div>
-                            )}
-                            {draft.experienceYears && (
-                              <div className="flex items-center gap-1.5">
-                                <Sparkles className="h-3.5 w-3.5 text-slate-400" />
-                                <span>Exp : {draft.experienceYears}</span>
-                              </div>
-                            )}
-                            {draft.studyLevels && draft.studyLevels.length > 0 && (
-                              <div className="col-span-2 flex items-center gap-1.5">
-                                <span className="text-[10px] font-black uppercase text-slate-400">Études :</span>
-                                <span className="font-semibold truncate text-slate-600">{draft.studyLevels.join(', ')}</span>
-                              </div>
-                            )}
-                            {draft.requiredDocs && draft.requiredDocs.length > 0 && (
-                              <div className="col-span-2 flex items-center gap-1.5">
-                                <span className="text-[10px] font-black uppercase text-slate-400">Docs :</span>
-                                <span className="font-semibold truncate text-slate-600">{draft.requiredDocs.join(', ')}</span>
-                              </div>
-                            )}
-                            {draft.phone && (
-                              <div className="flex items-center gap-1.5 text-slate-600">
-                                <Phone className="h-3.5 w-3.5 text-slate-400" />
-                                <span className="truncate">{draft.phone}</span>
-                              </div>
-                            )}
-                            {draft.whatsapp && (
-                              <div className="flex items-center gap-1.5 text-emerald-600">
-                                <MessageSquare className="h-3.5 w-3.5 text-emerald-400" />
-                                <span className="truncate">WA: {draft.whatsapp}</span>
-                              </div>
-                            )}
-                            {draft.external_apply_email && (
-                              <div className="col-span-2 flex items-center gap-1.5 text-blue-600">
-                                <span className="text-[10px] font-black uppercase text-slate-400">Email :</span>
-                                <span className="font-semibold truncate">{draft.external_apply_email}</span>
-                              </div>
-                            )}
-                            {draft.external_apply_link && (
-                              <div className="col-span-2 flex items-center gap-1.5 text-blue-600">
-                                <span className="text-[10px] font-black uppercase text-slate-400">Lien :</span>
-                                <span className="font-semibold truncate text-xs underline">{draft.external_apply_link}</span>
-                              </div>
-                            )}
                             {draft.contactInfo && (
-                              <div className="col-span-2 flex items-center gap-1.5 text-slate-600">
-                                <span className="text-[10px] font-black uppercase text-slate-400">Contact :</span>
+                              <div className="col-span-2 flex items-center gap-1.5 text-orange-600">
+                                <Phone className="h-3.5 w-3.5" />
                                 <span className="font-semibold truncate">{draft.contactInfo}</span>
                               </div>
                             )}
@@ -1000,14 +751,14 @@ RECRUTEMENT URGENT :
                               onClick={() => handleSaveDraftToBank(draft, idx)}
                               className="text-[10px] font-black uppercase tracking-wider h-8 rounded-xl border-slate-200 text-slate-600"
                             >
-                              Importer dans la banque
+                              Banque d'offres (Brouillon)
                             </Button>
                             <Button
-                              onClick={() => handleOpenWhatsAppPreview(draft)}
-                              className="bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-black uppercase tracking-wider h-8 rounded-xl px-3 shadow-sm shadow-emerald-600/10 flex items-center gap-1"
+                              onClick={() => handlePublishOffer(draft, idx)}
+                              className="bg-orange-600 hover:bg-orange-700 text-white text-[10px] font-black uppercase tracking-wider h-8 rounded-xl px-3 shadow-sm shadow-orange-600/10 flex items-center gap-1"
                             >
-                              <MessageSquare className="h-3.5 w-3.5" />
-                              Préparer WhatsApp
+                              <Send className="h-3.5 w-3.5" />
+                              Valider & Publier
                             </Button>
                           </div>
                         </>
@@ -1105,69 +856,15 @@ RECRUTEMENT URGENT :
                       {offer.description}
                     </p>
 
-                    <div className="grid grid-cols-2 gap-x-4 gap-y-2 pt-2 border-t border-slate-100 text-[11px] font-bold text-slate-500">
-                      <div className="flex items-center gap-1.5">
-                        <MapPin className="h-3.5 w-3.5 text-slate-400" />
-                        <span>{offer.location || 'Lieu non spécifié'}</span>
+                    <div className="grid grid-cols-2 gap-2 text-[11px] font-bold text-slate-400 border-t border-slate-50 pt-3">
+                      <div className="flex items-center gap-1">
+                        <MapPin className="h-3 w-3 text-slate-350" />
+                        <span className="truncate">{offer.location || 'Côte d\'Ivoire'}</span>
                       </div>
-                      <div className="flex items-center gap-1.5">
-                        <Coins className="h-3.5 w-3.5 text-slate-400" />
-                        <span>{offer.salary || 'Salaire non spécifié'}</span>
+                      <div className="flex items-center gap-1">
+                        <Coins className="h-3 w-3 text-slate-350" />
+                        <span className="truncate">{offer.salary || 'Non spécifié'}</span>
                       </div>
-                      {offer.type && (
-                        <div className="flex items-center gap-1.5">
-                          <FileText className="h-3.5 w-3.5 text-slate-400" />
-                          <span>Contrat : {offer.type}</span>
-                        </div>
-                      )}
-                      {offer.experienceYears && (
-                        <div className="flex items-center gap-1.5">
-                          <Sparkles className="h-3.5 w-3.5 text-slate-400" />
-                          <span>Exp : {offer.experienceYears}</span>
-                        </div>
-                      )}
-                      {offer.studyLevels && offer.studyLevels.length > 0 && (
-                        <div className="col-span-2 flex items-center gap-1.5">
-                          <span className="text-[10px] font-black uppercase text-slate-400">Études :</span>
-                          <span className="font-semibold truncate text-slate-600">{offer.studyLevels.join(', ')}</span>
-                        </div>
-                      )}
-                      {offer.requiredDocs && offer.requiredDocs.length > 0 && (
-                        <div className="col-span-2 flex items-center gap-1.5">
-                          <span className="text-[10px] font-black uppercase text-slate-400">Docs :</span>
-                          <span className="font-semibold truncate text-slate-600">{offer.requiredDocs.join(', ')}</span>
-                        </div>
-                      )}
-                      {offer.phone && (
-                        <div className="flex items-center gap-1.5 text-slate-600">
-                          <Phone className="h-3.5 w-3.5 text-slate-400" />
-                          <span className="truncate">{offer.phone}</span>
-                        </div>
-                      )}
-                      {offer.whatsapp && (
-                        <div className="flex items-center gap-1.5 text-emerald-600">
-                          <MessageSquare className="h-3.5 w-3.5 text-emerald-400" />
-                          <span className="truncate">WA: {offer.whatsapp}</span>
-                        </div>
-                      )}
-                      {offer.external_apply_email && (
-                        <div className="col-span-2 flex items-center gap-1.5 text-blue-600">
-                          <span className="text-[10px] font-black uppercase text-slate-400">Email :</span>
-                          <span className="font-semibold truncate">{offer.external_apply_email}</span>
-                        </div>
-                      )}
-                      {offer.external_apply_link && (
-                        <div className="col-span-2 flex items-center gap-1.5 text-blue-600">
-                          <span className="text-[10px] font-black uppercase text-slate-400">Lien :</span>
-                          <span className="font-semibold truncate text-xs underline">{offer.external_apply_link}</span>
-                        </div>
-                      )}
-                      {offer.contactInfo && (
-                        <div className="col-span-2 flex items-center gap-1.5 text-slate-600">
-                          <span className="text-[10px] font-black uppercase text-slate-400">Contact :</span>
-                          <span className="font-semibold truncate">{offer.contactInfo}</span>
-                        </div>
-                      )}
                     </div>
 
                     {/* Auto-matching Candidate alert */}
@@ -1233,13 +930,16 @@ RECRUTEMENT URGENT :
                           <Trash2 className="h-4 w-4" />
                         </Button>
 
-                        <Button
-                          onClick={() => handleOpenWhatsAppPreview(offer)}
-                          className="h-8 rounded-lg bg-emerald-600 text-white font-black text-[10px] uppercase tracking-wider px-3 hover:bg-emerald-700 flex items-center gap-1"
-                        >
-                          <MessageSquare className="h-3.5 w-3.5" />
-                          Partager WhatsApp
-                        </Button>
+                        {/* Publish live button */}
+                        {offer.status !== 'Publiée' && (
+                          <Button
+                            onClick={() => handlePublishOffer(offer, undefined, offer.id)}
+                            className="h-8 rounded-lg bg-slate-950 text-white font-black text-[10px] uppercase tracking-wider px-3 hover:bg-slate-800 flex items-center gap-1"
+                          >
+                            <CheckCircle2 className="h-3.5 w-3.5 text-orange-500 shrink-0" />
+                            Diffuser en Ligne
+                          </Button>
+                        )}
                       </div>
 
                     </div>
@@ -1480,88 +1180,8 @@ RECRUTEMENT URGENT :
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-black text-slate-750">Type de contrat</Label>
-                  <Input
-                    value={selectedOffer.type || ""}
-                    onChange={(e) => setSelectedOffer(prev => prev ? ({ ...prev, type: e.target.value }) : null)}
-                    placeholder="Ex: CDI, CDD, Stage"
-                    className="h-10 rounded-xl font-bold text-xs"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-black text-slate-750">Expérience requise</Label>
-                  <Input
-                    value={selectedOffer.experienceYears || ""}
-                    onChange={(e) => setSelectedOffer(prev => prev ? ({ ...prev, experienceYears: e.target.value }) : null)}
-                    placeholder="Ex: 2 ans"
-                    className="h-10 rounded-xl font-bold text-xs"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-black text-slate-750">Niveaux d'études (séparés par des virgules)</Label>
-                  <Input
-                    value={(selectedOffer.studyLevels || []).join(', ')}
-                    onChange={(e) => setSelectedOffer(prev => prev ? ({ ...prev, studyLevels: e.target.value.split(',').map(s => s.trim()).filter(Boolean) }) : null)}
-                    placeholder="Ex: BAC+2, Licence"
-                    className="h-10 rounded-xl font-bold text-xs"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-black text-slate-750">Documents demandés (séparés par des virgules)</Label>
-                  <Input
-                    value={(selectedOffer.requiredDocs || []).join(', ')}
-                    onChange={(e) => setSelectedOffer(prev => prev ? ({ ...prev, requiredDocs: e.target.value.split(',').map(s => s.trim()).filter(Boolean) }) : null)}
-                    placeholder="Ex: CV, Lettre de motivation"
-                    className="h-10 rounded-xl font-bold text-xs"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-black text-slate-750">Téléphone de contact</Label>
-                  <Input
-                    value={selectedOffer.phone || ""}
-                    onChange={(e) => setSelectedOffer(prev => prev ? ({ ...prev, phone: e.target.value }) : null)}
-                    className="h-10 rounded-xl font-bold text-xs"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-black text-slate-750">WhatsApp de contact</Label>
-                  <Input
-                    value={selectedOffer.whatsapp || ""}
-                    onChange={(e) => setSelectedOffer(prev => prev ? ({ ...prev, whatsapp: e.target.value }) : null)}
-                    className="h-10 rounded-xl font-bold text-xs"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-black text-slate-750">Email de candidature</Label>
-                  <Input
-                    value={selectedOffer.external_apply_email || ""}
-                    onChange={(e) => setSelectedOffer(prev => prev ? ({ ...prev, external_apply_email: e.target.value }) : null)}
-                    className="h-10 rounded-xl font-bold text-xs"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-black text-slate-750">Lien de candidature</Label>
-                  <Input
-                    value={selectedOffer.external_apply_link || ""}
-                    onChange={(e) => setSelectedOffer(prev => prev ? ({ ...prev, external_apply_link: e.target.value }) : null)}
-                    className="h-10 rounded-xl font-bold text-xs"
-                  />
-                </div>
-              </div>
-
               <div className="space-y-1.5">
-                <Label className="text-xs font-black text-slate-750">Autres informations de contact</Label>
+                <Label className="text-xs font-black text-slate-750">Moyens de contact</Label>
                 <Input
                   value={selectedOffer.contactInfo || ""}
                   onChange={(e) => setSelectedOffer(prev => prev ? ({ ...prev, contactInfo: e.target.value }) : null)}
@@ -1839,66 +1459,6 @@ RECRUTEMENT URGENT :
               Supprimer définitivement
             </Button>
           </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* WhatsApp Preview Modal */}
-      <Dialog open={isWhatsAppPreviewOpen} onOpenChange={(open) => { if(!open) setIsWhatsAppPreviewOpen(false); }}>
-        <DialogContent className="max-w-xl rounded-[32px] p-8 border-none shadow-2xl bg-white">
-          <DialogHeader>
-            <DialogTitle className="text-lg font-black text-slate-900 flex items-center gap-2">
-              <MessageSquare className="h-5 w-5 text-emerald-500" />
-              Aperçu de la publication WhatsApp
-            </DialogTitle>
-            <DialogDescription className="text-slate-450 text-xs font-bold">
-              Voici le texte formaté prêt à être publié dans vos groupes ou contacts WhatsApp.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4 pt-4">
-            <div className="relative">
-              <Textarea
-                value={whatsAppPreviewText}
-                onChange={(e) => setWhatsAppPreviewText(e.target.value)}
-                className="min-h-[300px] font-mono text-xs leading-relaxed rounded-2xl border-slate-200 focus:border-emerald-500 bg-slate-50 p-4 font-bold"
-              />
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handleCopyWhatsAppText}
-                className="absolute right-3 bottom-3 text-xs bg-white font-bold h-8 rounded-lg flex items-center gap-1 border-slate-200 text-slate-600 hover:bg-slate-50"
-              >
-                {whatsAppCopied ? (
-                  <>
-                    <Check className="h-3.5 w-3.5 text-emerald-500" />
-                    Copié !
-                  </>
-                ) : (
-                  <>
-                    <Copy className="h-3.5 w-3.5" />
-                    Copier
-                  </>
-                )}
-              </Button>
-            </div>
-
-            <DialogFooter className="pt-4 border-t border-slate-50 flex gap-2">
-              <Button 
-                variant="ghost" 
-                onClick={() => setIsWhatsAppPreviewOpen(false)}
-                className="h-11 rounded-xl text-xs font-bold text-slate-500"
-              >
-                Fermer
-              </Button>
-              <Button
-                onClick={handleShareOnWhatsApp}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs h-11 px-5 rounded-xl shadow-lg shadow-emerald-600/10 flex items-center gap-2"
-              >
-                <Share2 className="h-4 w-4" />
-                Partager sur WhatsApp
-              </Button>
-            </DialogFooter>
-          </div>
         </DialogContent>
       </Dialog>
 

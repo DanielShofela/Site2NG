@@ -56,6 +56,7 @@ import SettingsModule from '@/components/admin/SettingsModule';
 import LogsModule from '@/components/admin/LogsModule';
 import SupportModule from '@/components/admin/SupportModule';
 import EditorialModule from '@/components/admin/EditorialModule';
+import ImportJobsModule from '@/components/admin/ImportJobsModule';
 
 type AdminModule = 'overview' | 'users' | 'approvals' | 'jobs' | 'applications' | 'cms' | 'media' | 'analytics' | 'notifications' | 'maintenance' | 'settings' | 'logs' | 'support' | 'editorial' | 'import_jobs';
 
@@ -632,9 +633,9 @@ export default function AdminDashboard() {
                   />
                 )}
                 {activeModule === 'import_jobs' && (
-                  <EditorialModule 
+                  <ImportJobsModule 
                     addLog={addLog}
-                    initialTab="inbox"
+                    onSuccess={() => setActiveModule('jobs')}
                   />
                 )}
                 {activeModule === 'applications' && (
