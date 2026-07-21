@@ -67,6 +67,7 @@ import { Job, Application, SupportTicket, UserProfile } from '@/types';
 import { generateCV } from '@/lib/pdfUtils';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import NotificationCenter from '@/components/dashboard/NotificationCenter';
 
 export default function RecruiterDashboard() {
   const { user } = useAuth();
@@ -652,7 +653,8 @@ export default function RecruiterDashboard() {
               </div>
             </div>
             
-            <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
+            <div className="flex flex-col sm:flex-row items-center gap-3 w-full lg:w-auto">
+              <NotificationCenter />
               <Button 
                 variant="outline" 
                 className="bg-orange-650 text-white hover:bg-orange-700 border-none h-11 md:h-12 rounded-xl md:rounded-2xl font-black flex-1 md:flex-none shadow-lg shadow-orange-650/35"

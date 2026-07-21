@@ -1132,12 +1132,18 @@ export default function Home() {
               ))}
             </ul>
 
-            <div className="pt-4">
+            <div className="pt-4 flex flex-wrap gap-4">
               <Button 
                 onClick={() => navigate('/signup')}
                 className="h-12 px-6 bg-orange-600 hover:bg-orange-700 text-white font-extrabold rounded-2xl text-xs transition-all duration-300 hover:scale-[1.02]"
               >
                 Tester l'espace membre
+              </Button>
+              <Button 
+                onClick={() => navigate('/cvlm')}
+                className="h-12 px-6 bg-slate-800 border border-slate-700 hover:bg-slate-700 text-white font-extrabold rounded-2xl text-xs transition-all duration-300 hover:scale-[1.02] flex items-center gap-2"
+              >
+                <Sparkles className="h-4.5 w-4.5 text-orange-500 animate-pulse" /> Rédiger un CV/Lettre (IA)
               </Button>
             </div>
           </div>

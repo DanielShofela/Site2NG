@@ -57,8 +57,9 @@ import LogsModule from '@/components/admin/LogsModule';
 import SupportModule from '@/components/admin/SupportModule';
 import EditorialModule from '@/components/admin/EditorialModule';
 import ImportJobsModule from '@/components/admin/ImportJobsModule';
+import CVLMModule from '@/components/admin/CVLMModule';
 
-type AdminModule = 'overview' | 'users' | 'approvals' | 'jobs' | 'applications' | 'cms' | 'media' | 'analytics' | 'notifications' | 'maintenance' | 'settings' | 'logs' | 'support' | 'editorial' | 'import_jobs';
+type AdminModule = 'overview' | 'users' | 'approvals' | 'jobs' | 'applications' | 'cms' | 'media' | 'analytics' | 'notifications' | 'maintenance' | 'settings' | 'logs' | 'support' | 'editorial' | 'import_jobs' | 'cvlm';
 
 enum OperationType {
   CREATE = 'create',
@@ -383,6 +384,7 @@ export default function AdminDashboard() {
   const sidebarItems = [
     { id: 'overview', label: "Vue d'ensemble", icon: LayoutDashboard },
     { id: 'editorial', label: "Espace Éditorial", icon: Sparkles },
+    { id: 'cvlm', label: "Modèles CV & Lettres", icon: FileText },
     { id: 'users', label: "Utilisateurs", icon: Users },
     { id: 'approvals', label: "File d'attente", icon: ShieldCheck, badge: stats.pendingApprovals },
     { id: 'jobs', label: "Offres d'emploi", icon: Briefcase },
@@ -609,6 +611,11 @@ export default function AdminDashboard() {
                 )}
                 {activeModule === 'editorial' && (
                   <EditorialModule 
+                    addLog={addLog}
+                  />
+                )}
+                {activeModule === 'cvlm' && (
+                  <CVLMModule 
                     addLog={addLog}
                   />
                 )}

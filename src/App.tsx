@@ -22,6 +22,7 @@ import CompaniesRegistry from './pages/CompaniesRegistry';
 import Suspended from './pages/Suspended';
 import NotFound from './pages/NotFound';
 import Maintenance from './pages/Maintenance';
+import CVLM from './pages/CVLM';
 import Navbar from './components/layout/Navbar';
 import ScrollToTop from './components/layout/ScrollToTop';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -131,6 +132,7 @@ function AppLayout() {
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/company/:id" element={<CompanyProfile />} />
           <Route path="/suspended" element={<Suspended />} />
+          <Route path="/cvlm" element={<CVLM />} />
 
           {/* Wildcard 404 Route */}
           <Route path="*" element={<NotFound />} />

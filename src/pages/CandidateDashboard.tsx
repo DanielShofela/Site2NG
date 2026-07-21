@@ -34,7 +34,8 @@ import {
   MessageSquare,
   HelpCircle,
   Check,
-  Building2
+  Building2,
+  Sparkles
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -64,6 +65,7 @@ import {
 import { calculateCompletionScore, getProfileSuggestions } from '@/lib/profileUtils';
 import { generateCV } from '@/lib/pdfUtils';
 import { motion } from 'motion/react';
+import NotificationCenter from '@/components/dashboard/NotificationCenter';
 
 const CandidateCompanyLogo = ({ app, companyLogoUrl, className = "h-16 w-16 rounded-2xl" }: { app: any; companyLogoUrl?: string; className?: string }) => {
   const [imgError, setImgError] = useState(false);
@@ -335,16 +337,19 @@ export default function CandidateDashboard() {
             </div>
           </div>
           <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
-            <Button className="w-full h-11 md:h-12 bg-orange-600 text-white hover:bg-orange-700 border-none font-black rounded-xl md:rounded-2xl shadow-xl shadow-orange-600/10 transition-all" asChild nativeButton={false}>
-              <Link to="/">
-                <ExternalLink className="mr-2 h-4 w-4" /> Retour au site
-              </Link>
-            </Button>
-            <Button className="w-full h-11 md:h-12 bg-slate-900 text-white md:bg-white md:text-slate-900 border-none hover:bg-slate-800 md:hover:bg-slate-100 font-bold rounded-xl md:rounded-2xl shadow-xl transition-all" asChild nativeButton={false}>
-              <Link to="/onboarding">
-                <Settings className="mr-2 h-4 w-4" /> Profil
-              </Link>
-            </Button>
+            <NotificationCenter />
+            <Link 
+              to="/cvlm" 
+              className="w-full md:w-auto h-11 md:h-12 bg-gradient-to-r from-orange-600 to-amber-500 text-white hover:opacity-95 flex items-center justify-center font-black rounded-xl md:rounded-2xl shadow-xl shadow-orange-600/20 px-5 transition-all text-xs uppercase tracking-wide"
+            >
+              <Sparkles className="mr-2 h-4 w-4 animate-pulse" /> Rédiger un CV/Lettre (IA)
+            </Link>
+            <Link 
+              to="/onboarding" 
+              className="w-full md:w-auto h-11 md:h-12 bg-slate-900 text-white md:bg-white md:text-slate-900 hover:bg-slate-800 md:hover:bg-slate-100 flex items-center justify-center font-bold rounded-xl md:rounded-2xl shadow-xl px-5 transition-all text-xs uppercase tracking-wide"
+            >
+              <Settings className="mr-2 h-4 w-4" /> Profil
+            </Link>
             <Button onClick={handleExportCV} variant="outline" className="w-full h-11 md:h-12 sm:w-auto bg-white text-slate-700 border-slate-200 hover:bg-slate-50 rounded-xl md:rounded-2xl font-bold shadow-lg transition-all">
               <Download className="mr-2 h-4 w-4" /> CV PDF
             </Button>

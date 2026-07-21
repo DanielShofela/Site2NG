@@ -46,6 +46,7 @@ export default function Navbar() {
     { name: 'Accueil', href: '/' },
     { name: 'Services', href: '/services' },
     { name: 'Opportunités', href: '/opportunites' },
+    { name: 'Rédiger CV/Lettre (IA)', href: '/cvlm' },
     { name: 'Entreprises', href: '/entreprises' },
     { name: 'À Propos', href: '/about' },
     { name: 'Contact', href: '/contact' },

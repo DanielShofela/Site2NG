@@ -222,6 +222,46 @@ ${rawText}`;
     }
   });
 
+  // Gemini API CVLM Advice Endpoint
+  app.post('/api/cvlm/generate-advice', async (req, res) => {
+    try {
+      const { type, jobTitle, content } = req.body;
+      const key = process.env.GEMINI_API_KEY;
+      if (!key) {
+        // Return structured backup advice if Gemini is not configured
+        if (type === 'cv') {
+          res.json({
+            advice: `### 💡 Conseils pour le poste de **${jobTitle || 'Candidat'}** (Mode hors-ligne)\n\n1. **Valorisez vos réalisations concrètes** : Utilisez des chiffres précis (ex: augmentation du chiffre d'affaires de 15% ou gestion de 5 projets simultanés).\n2. **Mots-clés pertinents** : Intégrez les termes recherchés par les recruteurs du secteur dans votre CV pour passer les filtres d'algorithmes (ATS).\n3. **Clarté & concision** : Optez pour un CV d'une seule page, aéré, structuré et facile à lire.`
+          });
+        } else {
+          res.json({
+            advice: `### ✍️ Suggestions de style professionnel (Mode hors-ligne)\n\n- **Impact d'accroche** : Expliquez clairement ce que vous pouvez apporter à l'entreprise dès l'introduction.\n- **Lien de valeur** : Faites concorder l'actualité de l'entreprise ou ses défis avec vos compétences uniques.\n- **Appel à l'action** : Terminez par une formule dynamique mais polie pour solliciter un entretien direct.`
+          });
+        }
+        return;
+      }
+
+      const ai = getGeminiClient();
+      let prompt = '';
+      if (type === 'cv') {
+        prompt = `Donne-moi 3 conseils percutants pour améliorer un CV de "${jobTitle || 'Candidat'}" pour le marché professionnel francophone. Sois très direct, inspirant et concret. Formate ta réponse en markdown structuré.`;
+      } else {
+        prompt = `Améliore ou critique de manière constructive cette lettre de motivation avec un style professionnel, élégant et mémorable en français :\n\n${content || ''}\n\nDonne-moi des points clés d'amélioration et des conseils de tournures de phrase en markdown structuré.`;
+      }
+
+      const response = await ai.models.generateContent({
+        model: "gemini-3.5-flash",
+        contents: prompt,
+      });
+
+      const parsedText = response.text;
+      res.json({ advice: parsedText || 'Aucun conseil généré.' });
+    } catch (error: any) {
+      console.error('Error in CVLM advice generation:', error);
+      res.status(500).json({ error: error.message || 'Une erreur est survenue lors de la génération de conseils.' });
+    }
+  });
+
   // 2. Serve Client application based on environment
   if (process.env.NODE_ENV !== 'production') {
     console.log('Starting development server wrapper with Vite...');
