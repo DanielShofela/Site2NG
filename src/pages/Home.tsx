@@ -178,7 +178,12 @@ export default function Home() {
         setPopularOffers(popular);
         setUniqueOffers(unique);
 
-        const combined = [...fetchedOffers].sort((a, b) => getOfferCreatedAtTime(b) - getOfferCreatedAtTime(a));
+        const combined = [...fetchedOffers]
+          .sort((a, b) => getOfferCreatedAtTime(b) - getOfferCreatedAtTime(a))
+          .slice(0, 5);
+        if (combined.length > 0) {
+          combined.push({ id: 'see_all_placeholder', isPlaceholder: true });
+        }
         setAllHomeOffers(combined);
 
         // 4. Fallback for partner logos - we now use the actual registered recruiters!
@@ -778,10 +783,10 @@ export default function Home() {
             <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-600"></div>
           </div>
         ) : allHomeOffers.length > 0 ? (
-          <div className="relative w-full max-w-md mx-auto py-4">
+          <div className="relative w-full max-w-md mx-auto py-4 px-4 flex flex-col items-center justify-center">
             
             {/* Visual Touch Pad Sandbox Container */}
-            <div className="overflow-visible relative touch-pan-y min-h-[380px] sm:min-h-[400px]">
+            <div className="overflow-visible relative touch-pan-y min-h-[380px] sm:min-h-[400px] w-full flex justify-center items-center">
               <AnimatePresence mode="wait" custom={direction}>
                 <motion.div
                   key={currentOfferIndex}
@@ -831,6 +836,36 @@ export default function Home() {
                 >
                   {(() => {
                     const job = allHomeOffers[currentOfferIndex];
+                    if (!job) return null;
+                    
+                    if (job.isPlaceholder) {
+                      return (
+                        <div className="relative w-full max-w-[320px] xs:max-w-[340px] sm:max-w-md mx-auto mb-6 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950 text-white border border-slate-700/50 rounded-[24px] sm:rounded-[28px] shadow-xl p-8 flex flex-col justify-between min-h-[380px] sm:min-h-[400px]">
+                          <div className="flex flex-col items-center text-center justify-center flex-1 space-y-6">
+                            <div className="h-16 w-16 bg-orange-500/10 text-orange-500 rounded-2xl flex items-center justify-center shrink-0 border border-orange-500/20 shadow-lg shadow-orange-500/5 animate-pulse">
+                              <Briefcase className="h-8 w-8 stroke-[2.5]" />
+                            </div>
+                            <div className="space-y-2">
+                              <h3 className="text-xl sm:text-2xl font-black tracking-tight text-white leading-tight">
+                                Découvrir plus d'opportunités
+                              </h3>
+                              <p className="text-xs sm:text-sm text-slate-400 font-bold max-w-xs mx-auto leading-relaxed">
+                                De nombreuses offres d'emploi actives vous attendent sur notre plateforme. Trouvez celle qui correspond à vos aspirations professionnelles.
+                              </p>
+                            </div>
+                          </div>
+                          
+                          <Button 
+                            onClick={() => navigate('/jobs')}
+                            className="w-full py-4 bg-orange-600 hover:bg-orange-700 text-white font-extrabold text-xs sm:text-sm tracking-widest uppercase rounded-2xl border-none shadow-lg shadow-orange-600/20 hover:scale-[1.02] transition-all cursor-pointer flex items-center justify-center gap-2 mt-4"
+                          >
+                            Voir toutes les offres
+                            <ArrowRight className="h-4 w-4 animate-pulse" />
+                          </Button>
+                        </div>
+                      );
+                    }
+
                     const partnerProfile = job.recruiterId ? companiesMap[job.recruiterId] : null;
                     const isRegistered = partnerProfile && partnerProfile.role === 'recruiter' && partnerProfile.companyName;
                     const isAnonymous = !!job.is_anonymous || 

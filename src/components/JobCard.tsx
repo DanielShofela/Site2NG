@@ -578,7 +578,7 @@ export default function JobCard({
   const docsToShow = localJob.requiredDocs || ["Curriculum Vitae (CV)", "Lettre de motivation (LM)"];
 
   return (
-    <div id={`card-${localJob.id}`} className="relative w-full max-w-[340px] xs:max-w-[370px] sm:max-w-md mx-auto mb-6 select-none bg-white border border-slate-150/70 rounded-[24px] sm:rounded-[28px] shadow-sm hover:shadow-lg transition-all duration-300 overflow-hidden flex flex-col justify-between leading-normal">
+    <div id={`card-${localJob.id}`} className="relative w-full max-w-[310px] xs:max-w-[350px] sm:max-w-md mx-auto mb-6 select-none bg-white border border-slate-150/70 rounded-[24px] sm:rounded-[28px] shadow-sm hover:shadow-lg transition-all duration-300 overflow-hidden flex flex-col justify-between leading-normal">
       
       {/* Toast Alert Canvas Banner inside Card */}
       <AnimatePresence>
