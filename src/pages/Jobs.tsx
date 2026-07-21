@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useSiteConfig } from '@/contexts/SiteConfigContext';
 import BannerRotator from '@/components/BannerRotator';
 import { Link, useNavigate } from 'react-router-dom';
@@ -18,7 +18,10 @@ import {
   ChevronRight,
   ArrowRight,
   Sparkles,
-  Heart
+  Heart,
+  Eye,
+  Award,
+  ListFilter
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Job } from '@/types';
@@ -57,6 +60,7 @@ export default function Jobs() {
   const [selectedLocation, setSelectedLocation] = useState('all');
   const [selectedExperience, setSelectedExperience] = useState('all');
   const [selectedType, setSelectedType] = useState('all');
+  const [selectedSector, setSelectedSector] = useState('all');
   const [salaryFilter, setSalaryFilter] = useState('all'); // 'all', 'specified', 'unspecified'
   const [showMobileFilters, setShowMobileFilters] = useState(false);
 
@@ -200,7 +204,47 @@ export default function Jobs() {
     return companyNames[rId || ''] || job.companyName || 'Entreprise Partenaire';
   };
 
-  // Highly responsive 5-dimension filter mechanism
+  // Dynamically extract all unique sectors/fields in the database
+  const availableSectors = useMemo(() => {
+    const fields = new Set<string>();
+    jobs.forEach(job => {
+      if (job.field) {
+        fields.add(job.field.trim());
+      }
+    });
+    return Array.from(fields).sort();
+  }, [jobs]);
+
+  // Count jobs per sector
+  const sectorCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    jobs.forEach(job => {
+      const field = job.field || 'Général';
+      counts[field] = (counts[field] || 0) + 1;
+    });
+    return counts;
+  }, [jobs]);
+
+  // Application Tracking Metrics ("Suivi")
+  const trackingMetrics = useMemo(() => {
+    let viewedCount = 0;
+    jobs.forEach(job => {
+      if (localStorage.getItem(`viewed_job_${job.id}`)) {
+        viewedCount++;
+      }
+    });
+
+    const savedCount = jobs.filter(job => localStorage.getItem(`saved_job_${job.id}`)).length;
+
+    return {
+      totalAvailable: jobs.length,
+      totalViewed: viewedCount,
+      totalApplied: appliedJobIds.size,
+      totalSaved: savedCount
+    };
+  }, [jobs, appliedJobIds]);
+
+  // Highly responsive multi-dimension filter mechanism
   const filteredJobs = jobs.filter(job => {
     // 0. Screen out hidden or restricted jobs (unless user is an admin or the owner recruiter)
     const isAdmin = user?.role === 'admin';
@@ -262,6 +306,14 @@ export default function Jobs() {
       if (salaryFilter === 'unspecified' && !isNegotiable) return false;
     }
 
+    // 7. Sector Filter (Classification)
+    if (selectedSector !== 'all') {
+      const jobField = (job.field || '').toLowerCase();
+      if (!jobField.includes(selectedSector.toLowerCase()) && !selectedSector.toLowerCase().includes(jobField)) {
+        return false;
+      }
+    }
+
     return true;
   });
 
@@ -270,6 +322,7 @@ export default function Jobs() {
     setSelectedLocation('all');
     setSelectedExperience('all');
     setSelectedType('all');
+    setSelectedSector('all');
     setSalaryFilter('all');
     setSearchTerm('');
   };
@@ -279,35 +332,53 @@ export default function Jobs() {
     (selectedLocation !== 'all' ? 1 : 0) +
     (selectedExperience !== 'all' ? 1 : 0) +
     (selectedType !== 'all' ? 1 : 0) +
+    (selectedSector !== 'all' ? 1 : 0) +
     (salaryFilter !== 'all' ? 1 : 0);
 
   // Render the inner filters content (reused in desktop sidebar and mobile drawer)
   const renderFiltersContent = () => (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-black uppercase text-slate-400 tracking-wider flex items-center gap-2">
+    <div className="space-y-6 text-left">
+      <div className="flex items-center justify-between border-b border-slate-50 pb-3">
+        <h3 className="text-sm font-black uppercase text-slate-800 tracking-wider flex items-center gap-2">
           <SlidersHorizontal className="h-4 w-4 text-orange-600" />
           Filtres de recherche
         </h3>
         {activeFiltersCount > 0 && (
           <button 
             onClick={clearAllFilters}
-            className="text-[10px] text-orange-600 hover:text-orange-700 font-extrabold uppercase bg-orange-50 px-2 py-0.5 rounded-md"
+            className="text-[10px] text-orange-600 hover:text-orange-700 font-extrabold uppercase bg-orange-50 px-2 py-0.5 rounded-md transition-colors"
           >
             Réinitialiser
           </button>
         )}
       </div>
 
+      {/* Sector Selection inside Sidebar */}
+      <div className="space-y-2">
+        <label className="text-[11px] font-black uppercase text-slate-500 tracking-wide block">Secteur d'activité</label>
+        <select
+          value={selectedSector}
+          onChange={(e) => setSelectedSector(e.target.value)}
+          className="w-full h-10 px-3 text-xs font-bold rounded-lg border border-slate-200 bg-white text-slate-800 outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all cursor-pointer"
+        >
+          <option value="all">Tous les secteurs ({jobs.length})</option>
+          {availableSectors.map(sect => (
+            <option key={sect} value={sect}>
+              {sect} ({sectorCounts[sect] || 0})
+            </option>
+          ))}
+        </select>
+      </div>
+
       {/* Contract type */}
       <div className="space-y-2">
-        <label className="text-[11px] font-black uppercase text-slate-500 tracking-wide">Type de contrat</label>
+        <label className="text-[11px] font-black uppercase text-slate-500 tracking-wide block">Type de contrat</label>
         <div className="flex flex-wrap gap-1.5">
           {['all', 'CDI', 'CDD', 'Stage', 'Freelance'].map(type => (
             <button
               key={type}
               onClick={() => setSelectedContract(type.toLowerCase() === 'all' ? 'all' : type)}
-              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
+              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
                 (type.toLowerCase() === 'all' ? selectedContract === 'all' : selectedContract.toLowerCase() === type.toLowerCase())
                   ? 'bg-slate-900 text-white'
                   : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
@@ -321,7 +392,7 @@ export default function Jobs() {
 
       {/* Location */}
       <div className="space-y-2">
-        <label className="text-[11px] font-black uppercase text-slate-500 tracking-wide">Localisation</label>
+        <label className="text-[11px] font-black uppercase text-slate-500 tracking-wide block">Localisation</label>
         <div className="flex flex-wrap gap-1.5">
           {[
             { id: 'all', name: 'Partout' },
@@ -333,7 +404,7 @@ export default function Jobs() {
             <button
               key={loc.id}
               onClick={() => setSelectedLocation(loc.id)}
-              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
+              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
                 selectedLocation === loc.id
                   ? 'bg-slate-900 text-white'
                   : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
@@ -347,7 +418,7 @@ export default function Jobs() {
 
       {/* Experience level */}
       <div className="space-y-2">
-        <label className="text-[11px] font-black uppercase text-slate-500 tracking-wide">Niveau d'expérience</label>
+        <label className="text-[11px] font-black uppercase text-slate-500 tracking-wide block">Niveau d'expérience</label>
         <div className="flex flex-wrap gap-1.5">
           {[
             { id: 'all', name: 'Indifférent' },
@@ -358,7 +429,7 @@ export default function Jobs() {
             <button
               key={exp.id}
               onClick={() => setSelectedExperience(exp.id)}
-              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
+              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
                 selectedExperience === exp.id
                   ? 'bg-slate-900 text-white'
                   : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
@@ -372,7 +443,7 @@ export default function Jobs() {
 
       {/* Job category categories */}
       <div className="space-y-2">
-        <label className="text-[11px] font-black uppercase text-slate-500 tracking-wide">Catégorie d'offres</label>
+        <label className="text-[11px] font-black uppercase text-slate-500 tracking-wide block">Catégorie d'offres</label>
         <div className="flex flex-wrap gap-1.5">
           {[
             { id: 'all', name: 'Toutes' },
@@ -383,9 +454,9 @@ export default function Jobs() {
             <button
               key={cat.id}
               onClick={() => setSelectedType(cat.id)}
-              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
+              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
                 selectedType === cat.id
-                  ? 'bg-slate-900 text-white animate-pulse-once'
+                  ? 'bg-slate-900 text-white'
                   : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
               }`}
             >
@@ -397,7 +468,7 @@ export default function Jobs() {
 
       {/* Salary selection */}
       <div className="space-y-2">
-        <label className="text-[11px] font-black uppercase text-slate-500 tracking-wide">Salaire</label>
+        <label className="text-[11px] font-black uppercase text-slate-500 tracking-wide block">Salaire</label>
         <div className="flex flex-wrap gap-1.5">
           {[
             { id: 'all', name: 'Tous les salaires' },
@@ -407,7 +478,7 @@ export default function Jobs() {
             <button
               key={sal.id}
               onClick={() => setSalaryFilter(sal.id)}
-              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
+              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
                 salaryFilter === sal.id
                   ? 'bg-slate-900 text-white'
                   : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
@@ -449,16 +520,16 @@ export default function Jobs() {
       )}
 
       {/* 1. HEADER HERO BANNER & SEARCH */}
-      <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6 mb-10">
-        <div className="text-left">
-          <Badge variant="outline" className="border-orange-200/80 text-orange-600 bg-orange-50 font-black uppercase text-[9px] px-3 py-1 rounded-full mb-3">
+      <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6 mb-8 border-b border-slate-100 pb-8">
+        <div className="text-left flex-1">
+          <Badge variant="outline" className="border-orange-200/80 text-orange-600 bg-orange-50 font-black uppercase text-[10px] px-3.5 py-1 rounded-full mb-3 shadow-sm">
             Recrutement 2NG Groupe
           </Badge>
-          <h1 className="text-2xl sm:text-4xl font-black tracking-tight text-slate-905 leading-none">
-            Opportunités Actives
+          <h1 className="text-3xl sm:text-5xl font-black tracking-tight text-slate-900 leading-none">
+            Espace Opportunités
           </h1>
-          <p className="text-slate-500 font-bold text-xs sm:text-sm mt-2 leading-relaxed">
-            Consultez toutes nos catégories d'emplois, filtrez à la carte, et postulez instantanément.
+          <p className="text-slate-500 font-bold text-xs sm:text-sm mt-2.5 leading-relaxed max-w-2xl">
+            Découvrez les meilleures offres sélectionnées par secteur. Suivez vos consultations, sauvegardez vos favoris et postulez en quelques secondes.
           </p>
         </div>
 
@@ -467,10 +538,132 @@ export default function Jobs() {
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           <Input 
             placeholder="Rechercher par poste, entreprise, ville..." 
-            className="pl-11 pr-4 h-12 bg-white border-slate-150 rounded-2xl shadow-sm focus:ring-2 focus:ring-orange-500 focus:border-orange-500 font-medium text-xs sm:text-sm"
+            className="pl-11 pr-4 h-12 bg-white border-slate-200 rounded-2xl shadow-sm focus:ring-2 focus:ring-orange-500 focus:border-orange-500 font-bold text-xs sm:text-sm"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
+        </div>
+      </div>
+
+      {/* 1.5. TABLEAU DE BORD DE SUIVI DE CANDIDATURE (Progress tracking bar) */}
+      <div className="max-w-7xl mx-auto mb-10">
+        <div className="flex items-center gap-2 mb-4">
+          <Award className="h-4 w-4 text-orange-600 animate-pulse" />
+          <h2 className="text-xs sm:text-sm font-black text-slate-800 uppercase tracking-widest leading-none">
+            Mon tableau de suivi de recherche
+          </h2>
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {/* Total Disponible */}
+          <div className="bg-slate-900 text-white rounded-2xl p-4 sm:p-5 flex flex-col justify-between shadow-sm hover:shadow transition-all border border-slate-800">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] sm:text-xs font-black uppercase text-slate-400 tracking-wider">Offres Actives</span>
+              <div className="p-1.5 bg-slate-800 rounded-xl text-orange-500">
+                <Briefcase className="h-4 w-4" />
+              </div>
+            </div>
+            <div className="mt-4">
+              <span className="text-2xl sm:text-3xl font-black leading-none">{trackingMetrics.totalAvailable}</span>
+              <p className="text-[10px] sm:text-xs text-slate-400 font-bold mt-1">Opportunités en ligne</p>
+            </div>
+          </div>
+
+          {/* Consultées */}
+          <div className="bg-white border border-slate-150/70 rounded-2xl p-4 sm:p-5 flex flex-col justify-between shadow-sm hover:shadow transition-all">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] sm:text-xs font-black uppercase text-slate-500 tracking-wider">Déjà Consultées</span>
+              <div className="p-1.5 bg-sky-50 rounded-xl text-sky-600">
+                <Eye className="h-4 w-4" />
+              </div>
+            </div>
+            <div className="mt-4">
+              <span className="text-2xl sm:text-3xl font-black text-slate-900 leading-none">{trackingMetrics.totalViewed}</span>
+              <p className="text-[10px] sm:text-xs text-slate-400 font-bold mt-1">
+                {trackingMetrics.totalAvailable > 0 
+                  ? `${Math.round((trackingMetrics.totalViewed / trackingMetrics.totalAvailable) * 100)}% de couverture`
+                  : '0% de couverture'}
+              </p>
+            </div>
+          </div>
+
+          {/* Postulées */}
+          <div className="bg-white border border-slate-150/70 rounded-2xl p-4 sm:p-5 flex flex-col justify-between shadow-sm hover:shadow transition-all">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] sm:text-xs font-black uppercase text-slate-500 tracking-wider">Candidatures</span>
+              <div className="p-1.5 bg-emerald-50 rounded-xl text-emerald-600">
+                <CheckCircle2 className="h-4 w-4" />
+              </div>
+            </div>
+            <div className="mt-4">
+              <span className="text-2xl sm:text-3xl font-black text-slate-900 leading-none">{trackingMetrics.totalApplied}</span>
+              <p className="text-[10px] sm:text-xs text-slate-400 font-bold mt-1">Dossiers transmis</p>
+            </div>
+          </div>
+
+          {/* Enregistrées */}
+          <div className="bg-white border border-slate-150/70 rounded-2xl p-4 sm:p-5 flex flex-col justify-between shadow-sm hover:shadow transition-all">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] sm:text-xs font-black uppercase text-slate-500 tracking-wider">Mes Favoris</span>
+              <div className="p-1.5 bg-rose-50 rounded-xl text-rose-500">
+                <Heart className="h-4 w-4 fill-rose-500" />
+              </div>
+            </div>
+            <div className="mt-4">
+              <span className="text-2xl sm:text-3xl font-black text-slate-900 leading-none">{trackingMetrics.totalSaved}</span>
+              <p className="text-[10px] sm:text-xs text-slate-400 font-bold mt-1">Offres sauvegardées</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 1.8. SECTOR PILLES HORIZONTAL CATEGORY SCROLL (Classification) */}
+      <div className="max-w-7xl mx-auto mb-8 bg-white border border-slate-100 p-4 rounded-3xl shadow-sm">
+        <div className="flex items-center justify-between mb-3 px-1">
+          <h2 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+            <ListFilter className="h-4 w-4 text-orange-600" />
+            Parcourir par secteur d'activité
+          </h2>
+        </div>
+        
+        <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none scroll-smooth">
+          <button
+            onClick={() => setSelectedSector('all')}
+            className={`px-4.5 py-2.5 rounded-full text-xs font-black tracking-tight uppercase border shrink-0 transition-all cursor-pointer flex items-center gap-2 ${
+              selectedSector === 'all'
+                ? 'bg-orange-600 text-white border-orange-600 shadow-md shadow-orange-600/10'
+                : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100/75'
+            }`}
+          >
+            <span>Tous les Secteurs</span>
+            <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
+              selectedSector === 'all' ? 'bg-orange-700 text-orange-50' : 'bg-slate-200/80 text-slate-600'
+            }`}>
+              {jobs.length}
+            </span>
+          </button>
+
+          {availableSectors.map(sect => {
+            const count = sectorCounts[sect] || 0;
+            return (
+              <button
+                key={sect}
+                onClick={() => setSelectedSector(sect)}
+                className={`px-4.5 py-2.5 rounded-full text-xs font-black tracking-tight uppercase border shrink-0 transition-all cursor-pointer flex items-center gap-2 ${
+                  selectedSector === sect
+                    ? 'bg-orange-600 text-white border-orange-600 shadow-md shadow-orange-600/10'
+                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                <span>{sect}</span>
+                <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
+                  selectedSector === sect ? 'bg-orange-700 text-orange-50' : 'bg-slate-100 text-slate-500'
+                }`}>
+                  {count}
+                </span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -498,7 +691,7 @@ export default function Jobs() {
           <Button 
             variant="outline" 
             onClick={() => setShowMobileFilters(!showMobileFilters)}
-            className="h-9 px-4 rounded-xl text-xs font-black uppercase flex items-center gap-1.5 border-slate-200"
+            className="h-9 px-4 rounded-xl text-xs font-black uppercase flex items-center gap-1.5 border-slate-200 cursor-pointer"
           >
             <Filter className="h-3.5 w-3.5 text-orange-600" />
             <span>Filtres</span>
@@ -517,7 +710,7 @@ export default function Jobs() {
               {renderFiltersContent()}
               <Button 
                 onClick={() => setShowMobileFilters(false)}
-                className="w-full mt-6 h-10 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-extrabold uppercase"
+                className="w-full mt-6 h-10 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-extrabold uppercase cursor-pointer"
               >
                 Appliquer les filtres
               </Button>
@@ -526,18 +719,19 @@ export default function Jobs() {
         </AnimatePresence>
 
         {/* 3. JOB LISTING GRID */}
-        <div className="flex-1 w-full">
+        <div className="flex-1 w-full text-left">
           
           {/* Header context count */}
           <div className="hidden lg:flex items-center justify-between mb-6">
-            <span className="text-xs font-black text-slate-400 uppercase tracking-widest">
-              Recherche approfondie ➔ {filteredJobs.length} {filteredJobs.length > 1 ? 'Opportunités' : 'Opportunité'}
+            <span className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+              <SlidersHorizontal className="h-4 w-4" />
+              Recherche approfondie ➔ {filteredJobs.length} {filteredJobs.length > 1 ? 'Opportunités Disponibles' : 'Opportunité Disponible'}
             </span>
           </div>
 
           {filteredJobs.length > 0 ? (
-            /* Halved sizes layout: Dual Columns Grid on wide screen, and vertically stacked scroll feeds on mobile */
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            /* Spacious 1-Column Layout: Single responsive width, optimized for premium readability */
+            <div className="flex flex-col gap-6 w-full max-w-4xl">
               {filteredJobs.map((job, index) => {
                 const partnerProfile = job.recruiterId ? companyDetails[job.recruiterId] : null;
                 const isRegistered = partnerProfile && partnerProfile.role === 'recruiter' && partnerProfile.companyName;
@@ -581,7 +775,7 @@ export default function Jobs() {
                       <motion.div 
                         initial={{ opacity: 0, scale: 0.98 }}
                         animate={{ opacity: 1, scale: 1 }}
-                        className="col-span-1 md:col-span-2 py-2 px-1 sm:px-3 mb-4 select-none"
+                        className="py-2 px-1 sm:px-3 mb-4 select-none"
                       >
                         <BannerRotator
                           images={config.jobsInBetweenBannersImages}
@@ -596,14 +790,14 @@ export default function Jobs() {
             </div>
           ) : (
             <div className="text-center py-20 bg-white border border-slate-100 rounded-[32px] shadow-sm max-w-lg mx-auto">
-              <Briefcase className="h-10 w-10 text-slate-300 mx-auto mb-3" />
+              <Briefcase className="h-10 w-10 text-slate-300 mx-auto mb-3 animate-bounce" />
               <p className="text-slate-700 font-extrabold text-base">Aucun poste trouvé</p>
-              <p className="text-slate-400 font-semibold text-xs mt-1.5 px-6">
-                Essayez de modifier vos filtres ou de réinitialiser la recherche pour découvrir d'autres offres d'emploi.
+              <p className="text-slate-400 font-semibold text-xs mt-1.5 px-6 leading-relaxed">
+                Essayez de modifier vos filtres, de choisir un autre secteur, ou de réinitialiser la recherche pour découvrir d'autres offres d'emploi.
               </p>
               <Button 
                 onClick={clearAllFilters}
-                className="mt-6 h-9 px-4.5 rounded-full bg-orange-600 hover:bg-orange-700 text-white text-[11px] font-black uppercase tracking-wider"
+                className="mt-6 h-10 px-6 rounded-full bg-orange-600 hover:bg-orange-700 text-white text-[11px] font-black uppercase tracking-wider cursor-pointer"
               >
                 Réinitialiser les filtres
               </Button>

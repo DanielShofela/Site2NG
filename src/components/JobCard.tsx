@@ -69,6 +69,7 @@ export default function JobCard({
   const navigate = useNavigate();
   const [isExpanded, setIsExpanded] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
+  const [isViewed, setIsViewed] = useState(false);
   const [copied, setCopied] = useState(false);
   const [matchingCompanyId, setMatchingCompanyId] = useState<string | null>(null);
   
@@ -173,6 +174,8 @@ export default function JobCard({
       setCopiedEmail(true);
       triggerToast("Adresse email copiée avec succès.", "success");
       setTimeout(() => setCopiedEmail(false), 2000);
+      localStorage.setItem(`viewed_job_${localJob.id}`, 'true');
+      setIsViewed(true);
 
       // Increment applications directly on the offer document as copying email signifies applying
       const jobRef = doc(db, 'offers', localJob.id);
@@ -189,6 +192,8 @@ export default function JobCard({
   useEffect(() => {
     const saved = localStorage.getItem(`saved_job_${localJob.id}`);
     setIsSaved(!!saved);
+    const viewed = localStorage.getItem(`viewed_job_${localJob.id}`);
+    setIsViewed(!!viewed);
   }, [localJob.id]);
 
   // Dynamic search for registered recruiter portfolio pages
@@ -384,6 +389,8 @@ export default function JobCard({
     try {
       onApply(); // Execute standard candidate application script (addDoc collections inside Home/Jobs)
       setIsApplied(true);
+      localStorage.setItem(`viewed_job_${localJob.id}`, 'true');
+      setIsViewed(true);
 
       // Increment applications directly on the offer document
       const jobRef = doc(db, 'offers', localJob.id);
@@ -570,6 +577,8 @@ export default function JobCard({
       } catch (err) {
         console.log("View count incremented local copy");
       }
+      localStorage.setItem(`viewed_job_${localJob.id}`, 'true');
+      setIsViewed(true);
     }
     setIsExpanded(!isExpanded);
   };
@@ -578,7 +587,7 @@ export default function JobCard({
   const docsToShow = localJob.requiredDocs || ["Curriculum Vitae (CV)", "Lettre de motivation (LM)"];
 
   return (
-    <div id={`card-${localJob.id}`} className="relative w-full max-w-[310px] xs:max-w-[350px] sm:max-w-md mx-auto mb-6 select-none bg-white border border-slate-150/70 rounded-[24px] sm:rounded-[28px] shadow-sm hover:shadow-lg transition-all duration-300 overflow-hidden flex flex-col justify-between leading-normal">
+    <div id={`card-${localJob.id}`} className="relative w-full max-w-full mx-auto mb-6 select-none bg-white border border-slate-150/70 rounded-[24px] sm:rounded-[28px] shadow-sm hover:shadow-lg transition-all duration-300 overflow-hidden flex flex-col justify-between leading-normal">
       
       {/* Toast Alert Canvas Banner inside Card */}
       <AnimatePresence>
@@ -638,7 +647,7 @@ export default function JobCard({
                         {cleanCompanyName} <ArrowUpRight className="h-3 w-3 sm:h-3.5 sm:w-3.5 mt-0.5" />
                       </Link>
                     ) : (
-                      <span className="text-slate-200 font-extrabold text-xs sm:text-sm tracking-tight leading-none truncate max-w-[110px] sm:max-w-[150px]">
+                      <span className="text-slate-850 font-extrabold text-xs sm:text-sm tracking-tight leading-none truncate max-w-[110px] sm:max-w-[150px]">
                         {cleanCompanyName}
                       </span>
                     )}
@@ -649,14 +658,14 @@ export default function JobCard({
                     </span>
                   </div>
 
-                  <span className="text-[9px] sm:text-[10px] text-slate-400 font-bold block mt-1 uppercase tracking-wider leading-none truncate max-w-[130px] sm:max-w-[180px]">
+                  <span className="text-[10px] sm:text-xs text-slate-400 font-bold block mt-1 uppercase tracking-wider leading-none truncate max-w-[130px] sm:max-w-[180px]">
                     {localJob.field || "Secteur Général"}
                   </span>
                 </div>
               </div>
 
               {/* Sub-Badges and Editor Modifier tools */}
-              <div className="flex items-center gap-1 shrink-0">
+              <div className="flex items-center gap-1 shrink-0 flex-wrap justify-end">
                 {canModify && (
                   <Button
                     size="sm"
@@ -665,55 +674,65 @@ export default function JobCard({
                       e.stopPropagation();
                       handleOpenEdit();
                     }}
-                    className="h-7 sm:h-8 rounded-full border-orange-200 text-orange-600 hover:bg-orange-50/50 hover:text-orange-700 text-[9px] sm:text-[10px] font-black uppercase flex items-center gap-1 shrink-0 px-2 sm:px-2.5 transition-colors"
+                    className="h-7 sm:h-8 rounded-full border-orange-200 text-orange-600 hover:bg-orange-50/50 hover:text-orange-700 text-[10px] sm:text-xs font-black uppercase flex items-center gap-1 shrink-0 px-2 sm:px-2.5 transition-colors"
                   >
                     <Pencil className="h-2.5 w-2.5 sm:h-3 sm:w-3 stroke-[2.5]" />
                     <span>Modifier</span>
                   </Button>
                 )}
 
-                <Badge variant="outline" className="border-slate-200 text-orange-600 bg-orange-50/50 font-black text-[8px] sm:text-[9px] px-1.5 sm:px-2 py-0.5 uppercase rounded-lg shrink-0">
+                <Badge variant="outline" className="border-slate-200 text-orange-600 bg-orange-50/50 font-black text-[10px] sm:text-xs px-2 py-0.5 uppercase rounded-lg shrink-0">
                   Offre {localJob.offer_type === 'external' ? 'relais' : 'interne'}
                 </Badge>
+
+                {isViewed ? (
+                  <Badge variant="outline" className="border-slate-200 text-slate-500 bg-slate-100 font-black text-[10px] sm:text-xs px-2 py-0.5 uppercase rounded-lg shrink-0 flex items-center gap-0.5 leading-none shadow-sm">
+                    Déjà vu ✓
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className="border-amber-200 text-amber-600 bg-amber-50/80 font-black text-[10px] sm:text-xs px-2 py-0.5 uppercase rounded-lg shrink-0 flex items-center gap-0.5 animate-pulse leading-none shadow-sm">
+                    Nouveau ✨
+                  </Badge>
+                )}
               </div>
             </div>
 
             {/* Post Job Name - Bold heading */}
             <div className="mt-3.5">
-              <h3 className="text-base sm:text-lg font-extrabold text-slate-900 tracking-tight leading-snug">
+              <h3 className="text-lg sm:text-xl md:text-2xl font-black text-slate-900 tracking-tight leading-snug">
                 {localJob.title}
               </h3>
             </div>
 
             {/* Geographical details & publish date metadata */}
-            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mt-2 text-[10px] sm:text-[11px] font-bold text-slate-400">
-              <span className="flex items-center gap-1">
-                <MapPin className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-slate-300 shrink-0" />
+            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mt-2 text-xs sm:text-sm font-semibold text-slate-400">
+              <span className="flex items-center gap-1 text-slate-500">
+                <MapPin className="h-3.5 w-3.5 text-slate-400 shrink-0" />
                 <span>{localJob.location || "Abidjan, Côte d'Ivoire"}</span>
               </span>
               <span className="text-slate-200">|</span>
-              <span className="flex items-center gap-1">
-                <Clock className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-slate-300 shrink-0" />
+              <span className="flex items-center gap-1 text-slate-500">
+                <Clock className="h-3.5 w-3.5 text-slate-400 shrink-0" />
                 <span>Publié {formattedDate()}</span>
               </span>
             </div>
 
             {/* Standard pastel tag badges */}
-            <div className="flex flex-wrap gap-1 mt-2.5">
-              <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-100 font-extrabold text-[8px] sm:text-[9px] px-2 py-0.5 uppercase rounded-lg leading-none shrink-0 shadow-none">
+            <div className="flex flex-wrap gap-1.5 mt-3.5">
+              <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-100 font-extrabold text-[10px] sm:text-xs px-2.5 py-1 uppercase rounded-lg leading-none shrink-0 shadow-none">
                 {localJob.contractType || localJob.type || 'CDI'}
               </Badge>
-              <Badge className="bg-sky-50 text-sky-700 border border-sky-100 font-extrabold text-[8px] sm:text-[9px] px-2 py-0.5 uppercase rounded-lg leading-none shrink-0 shadow-none">
+              <Badge className="bg-sky-50 text-sky-700 border border-sky-100 font-extrabold text-[10px] sm:text-xs px-2.5 py-1 uppercase rounded-lg leading-none shrink-0 shadow-none">
                 Temps plein
               </Badge>
-              <Badge className="bg-purple-50 text-purple-700 border border-purple-100 font-extrabold text-[8px] sm:text-[9px] px-2 py-0.5 uppercase rounded-lg leading-none shrink-0 shadow-none">
+              <Badge className="bg-purple-50 text-purple-700 border border-purple-100 font-extrabold text-[10px] sm:text-xs px-2.5 py-1 uppercase rounded-lg leading-none shrink-0 shadow-none">
                 Exp. {localJob.experienceYears ? String(localJob.experienceYears) : "2 à 5 ans"}
               </Badge>
             </div>
 
             {/* Short summary snippet text (Max 2 lines) */}
             {localJob.description && (
-              <p className="text-slate-500 font-medium text-[11px] leading-relaxed line-clamp-2 mt-3.5 text-justify">
+              <p className="text-slate-650 font-medium text-xs sm:text-sm leading-relaxed line-clamp-2 mt-4 text-justify">
                 {parsedDesc.descriptionText}
               </p>
             )}
