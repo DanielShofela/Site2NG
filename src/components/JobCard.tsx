@@ -53,6 +53,7 @@ interface JobCardProps {
   showNextArrow?: boolean;
   userRole?: string;
   loggedIn: boolean;
+  onToggleSave?: (jobId: string, isSaved: boolean) => void;
 }
 
 export default function JobCard({
@@ -64,7 +65,8 @@ export default function JobCard({
   onNext,
   showNextArrow = false,
   userRole,
-  loggedIn
+  loggedIn,
+  onToggleSave
 }: JobCardProps) {
   const navigate = useNavigate();
   const [isExpanded, setIsExpanded] = useState(false);
@@ -416,6 +418,7 @@ export default function JobCard({
       } catch (err) {
         console.log("Local save toggled", err);
       }
+      if (onToggleSave) onToggleSave(localJob.id, false);
     } else {
       localStorage.setItem(`saved_job_${localJob.id}`, 'true');
       setIsSaved(true);
@@ -424,6 +427,7 @@ export default function JobCard({
       } catch (err) {
         console.log("Local save toggled", err);
       }
+      if (onToggleSave) onToggleSave(localJob.id, true);
     }
   };
 
@@ -617,8 +621,8 @@ export default function JobCard({
           
           <div className="flex flex-col text-left min-w-0">
             {/* Cabal / Meta row */}
-            <div className="flex items-center justify-between gap-1.5 min-w-0">
-              <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 min-w-0">
+              <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                 {/* Logo company */}
                 <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl overflow-hidden shrink-0 shadow-sm leading-none flex items-center justify-center bg-white border border-slate-150/70">
                   {showDefaultIcon ? (
@@ -636,18 +640,18 @@ export default function JobCard({
                   )}
                 </div>
 
-                <div className="flex flex-col text-left min-w-0 flex-1">
+                <div className="flex flex-col text-left min-w-0">
                   <div className="flex items-center gap-1 min-w-0">
                     {matchingCompanyId ? (
                       <Link 
                         to={`/company/${matchingCompanyId}`} 
                         onClick={(e) => e.stopPropagation()}
-                        className="text-slate-800 hover:text-orange-600 font-black text-xs sm:text-sm tracking-tight leading-none truncate max-w-[110px] sm:max-w-[150px] inline-flex items-center gap-0.5 transition-all outline-none"
+                        className="text-slate-800 hover:text-orange-600 font-black text-xs sm:text-sm tracking-tight leading-none truncate max-w-[130px] sm:max-w-[150px] inline-flex items-center gap-0.5 transition-all outline-none"
                       >
                         {cleanCompanyName} <ArrowUpRight className="h-3 w-3 sm:h-3.5 sm:w-3.5 mt-0.5" />
                       </Link>
                     ) : (
-                      <span className="text-slate-850 font-extrabold text-xs sm:text-sm tracking-tight leading-none truncate max-w-[110px] sm:max-w-[150px]">
+                      <span className="text-slate-850 font-extrabold text-xs sm:text-sm tracking-tight leading-none truncate max-w-[130px] sm:max-w-[150px]">
                         {cleanCompanyName}
                       </span>
                     )}
@@ -658,14 +662,14 @@ export default function JobCard({
                     </span>
                   </div>
 
-                  <span className="text-[10px] sm:text-xs text-slate-400 font-bold block mt-1 uppercase tracking-wider leading-none truncate max-w-[130px] sm:max-w-[180px]">
+                  <span className="text-[10px] sm:text-xs text-slate-400 font-bold block mt-1 uppercase tracking-wider leading-none truncate max-w-[150px] sm:max-w-[180px]">
                     {localJob.field || "Secteur Général"}
                   </span>
                 </div>
               </div>
 
               {/* Sub-Badges and Editor Modifier tools */}
-              <div className="flex items-center gap-1 shrink-0 flex-wrap justify-end">
+              <div className="flex items-center gap-1.5 flex-wrap sm:justify-end">
                 {canModify && (
                   <Button
                     size="sm"

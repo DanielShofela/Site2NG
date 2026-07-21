@@ -832,7 +832,7 @@ export default function Home() {
                       setCurrentOfferIndex((prevIdx) => (prevIdx - 1 + allHomeOffers.length) % allHomeOffers.length);
                     }
                   }}
-                  className="cursor-grab active:cursor-grabbing w-full flex justify-center items-center"
+                  className="cursor-grab active:cursor-grabbing w-full max-w-[320px] xs:max-w-[350px] sm:max-w-md mx-auto flex justify-center items-center"
                 >
                   {(() => {
                     const job = allHomeOffers[currentOfferIndex];

@@ -51,8 +51,20 @@ export default function Jobs() {
   const [companyNames, setCompanyNames] = useState<Record<string, string>>({});
   const [companyDetails, setCompanyDetails] = useState<Record<string, any>>({});
   const [appliedJobIds, setAppliedJobIds] = useState<Set<string>>(new Set());
+  const [savedJobIds, setSavedJobIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [isApplying, setIsApplying] = useState(false);
+
+  // Track saved/favorites jobs state from localStorage for real-time tracking dashboard updates
+  useEffect(() => {
+    const saved = new Set<string>();
+    jobs.forEach(job => {
+      if (localStorage.getItem(`saved_job_${job.id}`)) {
+        saved.add(job.id);
+      }
+    });
+    setSavedJobIds(saved);
+  }, [jobs]);
 
   // Search & Filter State
   const [searchTerm, setSearchTerm] = useState('');
@@ -234,15 +246,13 @@ export default function Jobs() {
       }
     });
 
-    const savedCount = jobs.filter(job => localStorage.getItem(`saved_job_${job.id}`)).length;
-
     return {
       totalAvailable: jobs.length,
       totalViewed: viewedCount,
       totalApplied: appliedJobIds.size,
-      totalSaved: savedCount
+      totalSaved: savedJobIds.size
     };
-  }, [jobs, appliedJobIds]);
+  }, [jobs, appliedJobIds, savedJobIds]);
 
   // Highly responsive multi-dimension filter mechanism
   const filteredJobs = jobs.filter(job => {
@@ -765,6 +775,17 @@ export default function Jobs() {
                         loggedIn={!!user}
                         userRole={user?.role}
                         showNextArrow={false}
+                        onToggleSave={(jobId, isSaved) => {
+                          setSavedJobIds(prev => {
+                            const next = new Set(prev);
+                            if (isSaved) {
+                              next.add(jobId);
+                            } else {
+                              next.delete(jobId);
+                            }
+                            return next;
+                          });
+                        }}
                       />
                     </motion.div>
 

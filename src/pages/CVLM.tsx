@@ -313,20 +313,10 @@ export default function CVLM() {
       </div>
 
       {/* Responsive Workspace Layout Header */}
-      <div className="bg-white border-b border-slate-200/60 sticky top-[88px] z-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4.5 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="h-11 w-11 bg-gradient-to-tr from-orange-600 to-amber-500 rounded-2xl flex items-center justify-center text-white font-black shadow-lg shadow-orange-600/25">
-              💡
-            </div>
-            <div>
-              <h1 className="text-sm font-black uppercase tracking-wider text-slate-900">CVLM</h1>
-              <p className="text-[10px] font-bold text-slate-400">CV ET LETTRES DE MOTIVATION</p>
-            </div>
-          </div>
-
+      <div className="hidden lg:block bg-white border-b border-slate-200/60 sticky top-[88px] z-20 py-2.5">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-center">
           {/* Desktop Navigation Links tabs */}
-          <div className="hidden lg:flex items-center space-x-1 bg-slate-100 p-1.5 rounded-2xl">
+          <div className="flex items-center space-x-1 bg-slate-100 p-1.5 rounded-2xl">
             {[
               { scr: CVLMScreen.DASHBOARD, label: 'Galerie', icon: <LayoutGrid className="h-4 w-4" /> },
               { scr: CVLMScreen.MY_CVS, label: 'Mes Documents', icon: <FileText className="h-4 w-4" /> },
@@ -349,14 +339,6 @@ export default function CVLM() {
                 </button>
               );
             })}
-          </div>
-
-          <div className="flex items-center gap-3">
-            {/* Simple point status indicators */}
-            <div className="bg-orange-50/70 border border-orange-100 rounded-2xl px-4 py-2 text-center select-none shrink-0">
-              <p className="text-[9px] font-black uppercase text-orange-600 tracking-wider">Vos Points</p>
-              <p className="text-xs font-black text-slate-800">{profile.points} XP</p>
-            </div>
           </div>
         </div>
       </div>
