@@ -144,12 +144,19 @@ export default function CVLM() {
   const { user, logout } = useAuth();
   const [screen, setScreen] = useState<CVLMScreen>(CVLMScreen.ONBOARDING);
   const [templates, setTemplates] = useState<CVLMTemplate[]>([]);
-  const [filter, setFilter] = useState<'all' | 'cv' | 'lm'>('all');
+  const [filter, setFilter] = useState<'all' | 'cv' | 'lm' | 'favorite'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [cvVersions, setCvVersions] = useState<CVVersion[]>([]);
   const [lmVersions, setLmVersions] = useState<LMVersion[]>([]);
   const [profile, setProfile] = useState<CVLMUserProfile>(DEFAULT_PROFILE('', ''));
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  
+  // Custom Confirmation Modal state
+  const [confirmAction, setConfirmAction] = useState<{
+    type: 'delete_cv' | 'delete_lm';
+    id: string;
+    name: string;
+  } | null>(null);
   
   // Template Preview Modal
   const [previewTemplate, setPreviewTemplate] = useState<CVLMTemplate | null>(null);
@@ -268,7 +275,10 @@ export default function CVLM() {
 
   // Filter & Search computation
   const filteredTemplates = templates.filter(t => {
-    const matchesFilter = filter === 'all' || t.type === filter;
+    const matchesFilter = 
+      filter === 'all' ? true :
+      filter === 'favorite' ? t.isFavorite :
+      t.type === filter;
     const matchesSearch = t.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           t.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()));
     return matchesFilter && matchesSearch;
@@ -437,8 +447,13 @@ export default function CVLM() {
                   <p className="text-sm font-black text-slate-800">{lmVersions.length} créées</p>
                 </div>
               </GlassCard>
-              <GlassCard className="p-4 flex items-center gap-3">
-                <div className="h-10 w-10 bg-orange-50 text-orange-600 rounded-xl flex items-center justify-center shrink-0">
+              <GlassCard 
+                onClick={() => setFilter('favorite')}
+                className={`p-4 flex items-center gap-3 cursor-pointer hover:shadow-md transition-all select-none ${
+                  filter === 'favorite' ? 'ring-2 ring-rose-500 bg-rose-50/10' : ''
+                }`}
+              >
+                <div className="h-10 w-10 bg-rose-50 text-rose-600 rounded-xl flex items-center justify-center shrink-0">
                   <Heart className="h-5 w-5 text-rose-500 fill-rose-500" />
                 </div>
                 <div>
@@ -461,7 +476,7 @@ export default function CVLM() {
 
             {/* Filtering, Search & Layout configuration */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 pb-5">
-              <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-2xl shrink-0 w-max">
+              <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-2xl shrink-0 w-max overflow-x-auto max-w-full">
                 <button
                   onClick={() => setFilter('all')}
                   className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
@@ -485,6 +500,14 @@ export default function CVLM() {
                   }`}
                 >
                   Lettres (43)
+                </button>
+                <button
+                  onClick={() => setFilter('favorite')}
+                  className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+                    filter === 'favorite' ? 'bg-white text-orange-600 shadow-sm' : 'text-slate-500'
+                  }`}
+                >
+                  Favoris ({templates.filter(t => t.isFavorite).length})
                 </button>
               </div>
 
@@ -599,13 +622,7 @@ export default function CVLM() {
                             <Edit className="h-4 w-4" />
                           </button>
                           <button
-                            onClick={() => {
-                              if (window.confirm('Supprimer ce brouillon ?')) {
-                                deleteVersion(v.id);
-                                refreshData();
-                                showToast('Brouillon supprimé !', 'success');
-                              }
-                            }}
+                            onClick={() => setConfirmAction({ type: 'delete_cv', id: v.id, name: v.name })}
                             className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
                             title="Supprimer"
                           >
@@ -648,13 +665,7 @@ export default function CVLM() {
                             <Edit className="h-4 w-4" />
                           </button>
                           <button
-                            onClick={() => {
-                              if (window.confirm('Supprimer cette lettre ?')) {
-                                deleteLMVersion(v.id);
-                                refreshData();
-                                showToast('Lettre supprimée !', 'success');
-                              }
-                            }}
+                            onClick={() => setConfirmAction({ type: 'delete_lm', id: v.id, name: v.name })}
                             className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
                             title="Supprimer"
                           >
@@ -836,6 +847,63 @@ export default function CVLM() {
           </motion.div>
         </div>
       )}
+
+      {/* Custom Confirmation Modal */}
+      <AnimatePresence>
+        {confirmAction && (
+          <div className="fixed inset-0 bg-slate-950/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl border border-slate-100 space-y-4"
+            >
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 bg-rose-50 text-rose-600 rounded-full flex items-center justify-center shrink-0">
+                  <Trash2 className="h-5 w-5" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-black text-slate-950">Confirmer la suppression</h4>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase">Cette action est irréversible</p>
+                </div>
+              </div>
+
+              <p className="text-xs text-slate-650 font-medium leading-relaxed">
+                Êtes-vous sûr de vouloir supprimer définitivement le document <strong className="text-slate-900">"{confirmAction.name}"</strong> ?
+              </p>
+
+              <div className="flex items-center gap-2 pt-2">
+                <Button
+                  type="button"
+                  onClick={() => setConfirmAction(null)}
+                  variant="outline"
+                  className="flex-1 h-10 border-slate-200 hover:bg-slate-50 text-slate-700 font-bold rounded-xl text-xs cursor-pointer"
+                >
+                  Annuler
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => {
+                    if (confirmAction.type === 'delete_cv') {
+                      deleteVersion(confirmAction.id);
+                      refreshData();
+                      showToast('Brouillon supprimé !', 'success');
+                    } else if (confirmAction.type === 'delete_lm') {
+                      deleteLMVersion(confirmAction.id);
+                      refreshData();
+                      showToast('Lettre supprimée !', 'success');
+                    }
+                    setConfirmAction(null);
+                  }}
+                  className="flex-1 h-10 bg-rose-600 hover:bg-rose-700 text-white font-black rounded-xl text-xs uppercase tracking-wider cursor-pointer"
+                >
+                  Supprimer
+                </Button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Persistent Bottom navigation for mobile layouts */}
       <BottomNav

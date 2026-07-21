@@ -4,6 +4,7 @@ interface GlassCardProps extends React.HTMLAttributes<HTMLDivElement> {
   children: React.ReactNode;
   className?: string;
   intensity?: 'light' | 'medium' | 'dark';
+  onClick?: React.MouseEventHandler<HTMLDivElement>;
 }
 
 export default function GlassCard({ children, className = '', intensity = 'medium', ...props }: GlassCardProps) {

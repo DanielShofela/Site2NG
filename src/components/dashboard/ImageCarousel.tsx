@@ -75,14 +75,20 @@ export default function ImageCarousel() {
   return (
     <div className="relative w-full h-48 sm:h-52 md:h-56 rounded-3xl overflow-hidden shadow-md group transition-all duration-300">
       {/* Background slide renderer */}
-      <div className={`absolute inset-0 w-full h-full bg-gradient-to-r ${slide.bgGradient} transition-all duration-500`}>
-        {slide.imagePath && !imgError[currentIndex] && (
-          <img
-            src={slide.imagePath}
-            alt={slide.title}
-            className="absolute inset-0 w-full h-full object-cover mix-blend-overlay opacity-30"
-            onError={() => setImgError(prev => ({ ...prev, [currentIndex]: true }))}
-          />
+      <div className="absolute inset-0 w-full h-full bg-slate-900 transition-all duration-500">
+        {slide.imagePath && !imgError[currentIndex] ? (
+          <>
+            <img
+              src={slide.imagePath}
+              alt={slide.title}
+              className="absolute inset-0 w-full h-full object-cover transition-all duration-500"
+              onError={() => setImgError(prev => ({ ...prev, [currentIndex]: true }))}
+            />
+            {/* Elegant dark gradient overlay to ensure white text is perfectly legible */}
+            <div className="absolute inset-0 bg-gradient-to-r from-slate-950/80 via-slate-950/50 to-transparent" />
+          </>
+        ) : (
+          <div className={`absolute inset-0 w-full h-full bg-gradient-to-r ${slide.bgGradient}`} />
         )}
       </div>
 

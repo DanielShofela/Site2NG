@@ -236,6 +236,13 @@ export default function CVLMModule({ addLog }: CVLMModuleProps) {
   // Slide modal states
   const [isSlideModalOpen, setIsSlideModalOpen] = useState(false);
   const [editingSlide, setEditingSlide] = useState<CVLMPromoSlide | null>(null);
+
+  // Custom Confirmation Modal state
+  const [confirmAdminAction, setConfirmAdminAction] = useState<{
+    type: 'delete_template' | 'reset_templates' | 'delete_slide' | 'reset_slides';
+    id?: string;
+    name?: string;
+  } | null>(null);
   
   // Form states for Add/Edit
   const [formName, setFormName] = useState('');
@@ -290,21 +297,19 @@ export default function CVLMModule({ addLog }: CVLMModuleProps) {
   };
 
   // Action: Delete Template
-  const handleDeleteTemplate = async (id: string, name: string) => {
-    if (window.confirm(`Êtes-vous sûr de vouloir supprimer définitivement le modèle "${name}" ?`)) {
-      const updated = deleteTemplate(id);
-      setTemplates(updated);
-      await addLog("Suppression de modèle CVLM", `Modèle "${name}" (ID: ${id}) supprimé`, "warning");
-    }
+  const handleDeleteTemplate = (id: string, name: string) => {
+    setConfirmAdminAction({
+      type: 'delete_template',
+      id,
+      name
+    });
   };
 
   // Action: Reset defaults
-  const handleResetDefaults = async () => {
-    if (window.confirm("Attention: Cette action réinitialisera la base de données de modèles aux 84 templates par défaut. Vos ajouts et personnalisations seront écrasés. Continuer ?")) {
-      const fresh = resetTemplates();
-      setTemplates(fresh);
-      await addLog("Réinitialisation modèles CVLM", "Base de modèles restaurée aux valeurs d'usine", "warning");
-    }
+  const handleResetDefaults = () => {
+    setConfirmAdminAction({
+      type: 'reset_templates'
+    });
   };
 
   // Open Add Modal
@@ -423,20 +428,18 @@ export default function CVLMModule({ addLog }: CVLMModuleProps) {
     setIsSlideModalOpen(false);
   };
 
-  const handleDeleteSlide = async (id: string, title: string) => {
-    if (window.confirm(`Êtes-vous sûr de vouloir supprimer définitivement la bannière "${title}" ?`)) {
-      const updated = deletePromoSlide(id);
-      setSlides(updated);
-      await addLog("Suppression bannière CVLM", `Bannière "${title}" supprimée`, "warning");
-    }
+  const handleDeleteSlide = (id: string, title: string) => {
+    setConfirmAdminAction({
+      type: 'delete_slide',
+      id,
+      name: title
+    });
   };
 
-  const handleResetSlides = async () => {
-    if (window.confirm("Attention: Réinitialisera toutes les bannières publicitaires aux valeurs par défaut. Continuer ?")) {
-      const fresh = resetPromoSlides();
-      setSlides(fresh);
-      await addLog("Réinitialisation bannières CVLM", "Bannières restaurées aux valeurs d'usine", "warning");
-    }
+  const handleResetSlides = () => {
+    setConfirmAdminAction({
+      type: 'reset_slides'
+    });
   };
 
   return (
@@ -762,13 +765,19 @@ export default function CVLMModule({ addLog }: CVLMModuleProps) {
                 >
                   {/* Live Render Area */}
                   <div className="relative w-full h-44 overflow-hidden bg-slate-900">
-                    <div className={`absolute inset-0 w-full h-full bg-gradient-to-r ${slide.bgGradient}`}>
-                      {slide.imagePath && (
-                        <img
-                          src={slide.imagePath}
-                          alt={slide.title}
-                          className="absolute inset-0 w-full h-full object-cover mix-blend-overlay opacity-30"
-                        />
+                    <div className="absolute inset-0 w-full h-full">
+                      {slide.imagePath ? (
+                        <>
+                          <img
+                            src={slide.imagePath}
+                            alt={slide.title}
+                            className="absolute inset-0 w-full h-full object-cover"
+                          />
+                          {/* Elegant dark gradient overlay to ensure white text is perfectly legible */}
+                          <div className="absolute inset-0 bg-gradient-to-r from-slate-950/80 via-slate-950/50 to-transparent" />
+                        </>
+                      ) : (
+                        <div className={`absolute inset-0 w-full h-full bg-gradient-to-r ${slide.bgGradient}`} />
                       )}
                     </div>
 
@@ -794,10 +803,10 @@ export default function CVLMModule({ addLog }: CVLMModuleProps) {
                   {/* Actions & details panel */}
                   <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-4">
                     <div className="space-y-0.5 truncate">
-                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Dégradé & Icône</span>
+                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Image & Icône</span>
                       <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-650">
-                        <span className="h-2.5 w-2.5 rounded-full bg-gradient-to-r from-orange-500 to-amber-500 shadow-sm" />
-                        <span className="truncate max-w-[120px]">{slide.bgGradient.replace('from-', '').split(' ')[0]}</span>
+                        <span className={`h-2 w-2 rounded-full ${slide.imagePath ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+                        <span className="truncate max-w-[120px]">{slide.imagePath ? "Image personnalisée" : "Sans image"}</span>
                         <span className="text-slate-300">•</span>
                         <span className="flex items-center gap-1">
                           {getIcon(slide.iconName)}
@@ -1161,34 +1170,13 @@ export default function CVLMModule({ addLog }: CVLMModuleProps) {
                 </div>
 
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-bold text-slate-700">Couleur / Thème Dégradé</Label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {GRADIENT_PRESETS.map((grad) => (
-                      <button
-                        key={grad.value}
-                        type="button"
-                        onClick={() => setSlideBgGradient(grad.value)}
-                        className={`p-2.5 rounded-xl border text-left text-[10px] font-bold transition-all flex items-center gap-2 cursor-pointer ${
-                          slideBgGradient === grad.value 
-                            ? 'border-orange-500 bg-orange-50/50 text-orange-700 font-black' 
-                            : 'border-slate-150 bg-slate-50 text-slate-650 hover:bg-slate-100'
-                        }`}
-                      >
-                        <span className={`h-3.5 w-3.5 rounded-full bg-gradient-to-r ${grad.value} border border-white shadow-sm shrink-0`} />
-                        <span className="truncate">{grad.name}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="space-y-1.5">
                   <Label className="text-xs font-bold text-slate-700">Image d'illustration (Télécharger)</Label>
                   <ImageUploader 
                     value={slideImagePath} 
                     onChange={setSlideImagePath} 
                   />
                   <p className="text-[9px] font-bold text-slate-400">
-                    L'image se superpose en mix-blend-overlay avec 30% d'opacité sur le dégradé pour un effet visuel ultra-pro (limite de 2 Mo).
+                    L'image d'illustration s'affiche en arrière-plan avec une légère superposition sombre pour assurer la lisibilité du texte (taille limite : 2 Mo).
                   </p>
                 </div>
 
@@ -1209,6 +1197,92 @@ export default function CVLMModule({ addLog }: CVLMModuleProps) {
                   </Button>
                 </div>
               </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Custom Confirmation Modal for Admin Actions */}
+      <AnimatePresence>
+        {confirmAdminAction && (
+          <div className="fixed inset-0 bg-slate-950/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-[32px] w-full max-w-sm p-6 shadow-2xl border border-slate-100 space-y-5"
+            >
+              <div className="flex items-center gap-3">
+                <div className={`h-11 w-11 rounded-full flex items-center justify-center shrink-0 ${
+                  confirmAdminAction.type.startsWith('delete') ? 'bg-rose-50 text-rose-600' : 'bg-amber-50 text-amber-600'
+                }`}>
+                  <Trash2 className="h-5 w-5" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-black text-slate-950">
+                    {confirmAdminAction.type.startsWith('delete') ? 'Confirmer la suppression' : 'Confirmer l\'action'}
+                  </h4>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase">Cette action est définitive</p>
+                </div>
+              </div>
+
+              <p className="text-xs text-slate-600 font-medium leading-relaxed">
+                {confirmAdminAction.type === 'delete_template' && (
+                  <>Êtes-vous sûr de vouloir supprimer définitivement le modèle <strong className="text-slate-900">"{confirmAdminAction.name}"</strong> ?</>
+                )}
+                {confirmAdminAction.type === 'reset_templates' && (
+                  <>Attention: Cette action réinitialisera la base de données de modèles aux 84 templates par défaut. Vos ajouts et personnalisations seront écrasés.</>
+                )}
+                {confirmAdminAction.type === 'delete_slide' && (
+                  <>Êtes-vous sûr de vouloir supprimer définitivement la bannière <strong className="text-slate-900">"{confirmAdminAction.name}"</strong> ?</>
+                )}
+                {confirmAdminAction.type === 'reset_slides' && (
+                  <>Attention: Réinitialisera toutes les bannières publicitaires aux valeurs par défaut.</>
+                )}
+              </p>
+
+              <div className="flex items-center gap-2 pt-2">
+                <Button
+                  type="button"
+                  onClick={() => setConfirmAdminAction(null)}
+                  variant="outline"
+                  className="flex-1 h-10 border-slate-200 hover:bg-slate-50 text-slate-700 font-bold rounded-xl text-xs cursor-pointer"
+                >
+                  Annuler
+                </Button>
+                <Button
+                  type="button"
+                  onClick={async () => {
+                    const actionType = confirmAdminAction.type;
+                    const actionId = confirmAdminAction.id;
+                    const actionName = confirmAdminAction.name;
+                    setConfirmAdminAction(null);
+
+                    if (actionType === 'delete_template' && actionId && actionName) {
+                      const updated = deleteTemplate(actionId);
+                      setTemplates(updated);
+                      await addLog("Suppression de modèle CVLM", `Modèle "${actionName}" (ID: ${actionId}) supprimé`, "warning");
+                    } else if (actionType === 'reset_templates') {
+                      const fresh = resetTemplates();
+                      setTemplates(fresh);
+                      await addLog("Réinitialisation modèles CVLM", "Base de modèles restaurée aux valeurs d'usine", "warning");
+                    } else if (actionType === 'delete_slide' && actionId && actionName) {
+                      const updated = deletePromoSlide(actionId);
+                      setSlides(updated);
+                      await addLog("Suppression bannière CVLM", `Bannière "${actionName}" supprimée`, "warning");
+                    } else if (actionType === 'reset_slides') {
+                      const fresh = resetPromoSlides();
+                      setSlides(fresh);
+                      await addLog("Réinitialisation bannières CVLM", "Bannières restaurées aux valeurs d'usine", "warning");
+                    }
+                  }}
+                  className={`flex-1 h-10 text-white font-black rounded-xl text-xs uppercase tracking-wider cursor-pointer ${
+                    confirmAdminAction.type.startsWith('delete') ? 'bg-rose-600 hover:bg-rose-700' : 'bg-amber-600 hover:bg-amber-700'
+                  }`}
+                >
+                  Confirmer
+                </Button>
+              </div>
             </motion.div>
           </div>
         )}
