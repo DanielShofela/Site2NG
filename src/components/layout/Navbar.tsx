@@ -101,20 +101,32 @@ export default function Navbar() {
           <div className="hidden lg:block">
             <div className="flex items-center space-x-4">
               {user ? (
-                <div className="flex items-center space-x-4">
-                  <Link to={getDashboardLink()}>
-                    <Button variant="outline" className="text-slate-700 hover:text-orange-600 border-slate-200 hover:border-orange-200 font-extrabold rounded-2xl h-11 px-5 shadow-sm transition-all duration-300 hover:scale-[1.02]">
-                      {user.role === 'admin' ? (
-                        <ShieldAlert className="mr-2 h-4.5 w-4.5 text-orange-600" />
-                      ) : (
-                        <User className="mr-2 h-4.5 w-4.5 text-orange-600" />
-                      )}
-                      Mon Espace
-                    </Button>
+                <div className="flex items-center space-x-3">
+                  <Link 
+                    to={getDashboardLink()} 
+                    title="Mon Espace" 
+                    className="relative group rounded-full transition-all duration-300 hover:scale-105 active:scale-95 focus:outline-none"
+                  >
+                    {user.photoUrl ? (
+                      <img 
+                        src={user.photoUrl} 
+                        alt="Photo de profil" 
+                        className="h-10 w-10 rounded-full object-cover shadow-sm ring-2 ring-orange-500/80 hover:ring-orange-600 transition-all" 
+                        referrerPolicy="no-referrer"
+                      />
+                    ) : (
+                      <div className="h-10 w-10 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center font-black text-sm shadow-sm ring-2 ring-orange-500/80 hover:bg-orange-200 transition-all">
+                        {user.role === 'admin' ? (
+                          <ShieldAlert className="h-5 w-5 text-orange-600" />
+                        ) : (
+                          <User className="h-5 w-5 text-orange-600" />
+                        )}
+                      </div>
+                    )}
                   </Link>
                   <Button 
                     variant="ghost" 
-                    className="text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-2xl h-11 w-11 p-0 transition-all duration-300" 
+                    className="text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-2xl h-10 w-10 p-0 transition-all duration-300" 
                     onClick={handleLogout}
                     title="Déconnexion"
                   >
@@ -193,15 +205,25 @@ export default function Navbar() {
             {/* Compact Action Footer */}
             <div className="pt-2.5 border-t border-slate-100">
               {user ? (
-                <div className="flex items-center gap-2">
-                  <Link to={getDashboardLink()} onClick={() => setIsOpen(false)} className="flex-1">
-                    <Button className="w-full h-10 rounded-xl font-extrabold text-xs bg-slate-900 hover:bg-slate-800 text-white flex items-center justify-center gap-1.5 shadow-sm">
-                      <User className="h-4 w-4" /> Mon Espace
-                    </Button>
+                <div className="flex items-center justify-between gap-2 p-1.5 bg-slate-50 rounded-xl border border-slate-100">
+                  <Link to={getDashboardLink()} onClick={() => setIsOpen(false)} className="flex items-center gap-2.5 flex-1 px-1">
+                    {user.photoUrl ? (
+                      <img 
+                        src={user.photoUrl} 
+                        alt="Photo de profil" 
+                        className="h-9 w-9 rounded-full object-cover ring-2 ring-orange-500 shrink-0" 
+                        referrerPolicy="no-referrer"
+                      />
+                    ) : (
+                      <div className="h-9 w-9 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center shrink-0 ring-2 ring-orange-500 font-black text-xs">
+                        <User className="h-4 w-4" />
+                      </div>
+                    )}
+                    <span className="font-black text-xs text-slate-800">Mon Espace</span>
                   </Link>
                   <Button 
-                    variant="outline" 
-                    className="h-10 px-3.5 rounded-xl font-extrabold text-xs text-red-600 bg-red-50 hover:bg-red-100 border-red-200 flex items-center justify-center gap-1" 
+                    variant="ghost" 
+                    className="h-8 w-8 p-0 rounded-lg text-red-600 hover:bg-red-50 flex items-center justify-center shrink-0" 
                     onClick={handleLogout}
                     title="Déconnexion"
                   >
