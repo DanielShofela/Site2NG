@@ -3,12 +3,13 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   LayoutGrid, FileText, Users, Settings, Sparkles, Heart, Eye, 
   Share2, Search, Award, HelpCircle, LogIn, Compass, ArrowRight,
-  LogOut, CheckCircle, Bell, Shield, Info, Copy, UserCheck, Edit, Trash2
+  LogOut, CheckCircle, Bell, Shield, Info, Copy, UserCheck, Edit, Trash2,
+  Camera, Upload
 } from 'lucide-react';
 import { CVLMScreen, CVLMTemplate, CVVersion, LMVersion, CVLMUserProfile } from '@/types/cvlm';
-import { getCVTemplates, getLMTemplates, getTemplates, toggleFavorite } from '@/services/templateService';
-import { getAllVersions, duplicateVersion, deleteVersion } from '@/services/cvVersionService';
-import { getAllLMVersions, duplicateLMVersion, deleteLMVersion } from '@/services/lmVersionService';
+import { getCVTemplates, getLMTemplates, getTemplates, toggleFavorite, subscribeToTemplates } from '@/services/templateService';
+import { getAllVersions, duplicateVersion, deleteVersion, subscribeToVersions } from '@/services/cvVersionService';
+import { getAllLMVersions, duplicateLMVersion, deleteLMVersion, subscribeToLMVersions } from '@/services/lmVersionService';
 import { showToast, ToastMessage } from '@/components/dashboard/toast';
 
 import GlassCard from '@/components/dashboard/GlassCard';
@@ -21,6 +22,10 @@ import VersionManagement from '@/components/dashboard/VersionManagement';
 
 import { useAuth } from '@/contexts/AuthContext';
 import { Link } from 'react-router-dom';
+import { safeSetItem, safeGetItem } from '@/lib/safeStorage';
+import { compressImage } from '@/lib/imageUtils';
+import { db } from '@/lib/firebase';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 const DEFAULT_PROFILE = (email: string = '', name: string = ''): CVLMUserProfile => ({
   name: name,
@@ -82,9 +87,13 @@ function TemplateCard({ template, onPreview, onToggleFav, onShare, onUse }: Temp
             {template.type === 'cv' ? 'CV' : 'Lettre'}
           </span>
           
-          {template.isPremium && (
+          {template.isPremium ? (
             <span className="px-2 py-0.5 bg-gradient-to-r from-amber-500 to-orange-600 text-white text-[8px] font-black uppercase tracking-wider rounded-md pointer-events-auto shadow-sm">
               👑 Premium
+            </span>
+          ) : (
+            <span className="px-2 py-0.5 bg-slate-900/80 backdrop-blur-md text-white text-[8px] font-black uppercase tracking-wider rounded-md pointer-events-auto shadow-sm">
+              Standard
             </span>
           )}
         </div>
@@ -181,28 +190,68 @@ export default function CVLM() {
     return () => window.removeEventListener('cvlm_toast', handleToast);
   }, []);
 
-  // Sync / Load Initial Data
+  // Refresh local data state helper
   const refreshData = () => {
     setTemplates(getTemplates());
     setCvVersions(getAllVersions());
     setLmVersions(getAllLMVersions());
-
-    const storedProfile = localStorage.getItem('cvlm_profile');
-    if (storedProfile) {
-      try {
-        setProfile(JSON.parse(storedProfile));
-      } catch (e) {
-        console.error(e);
-      }
-    } else if (user) {
-      const initial = DEFAULT_PROFILE(user.email, user.displayName || '');
-      localStorage.setItem('cvlm_profile', JSON.stringify(initial));
-      setProfile(initial);
-    }
   };
 
+  // Real-time Firestore Subscriptions & Profile Loading
   useEffect(() => {
-    refreshData();
+    // Initial local load
+    setTemplates(getTemplates());
+    setCvVersions(getAllVersions());
+    setLmVersions(getAllLMVersions());
+
+    // Subscribe to Firestore collections
+    const unsubCV = subscribeToVersions((updated) => setCvVersions(updated), user?.uid);
+    const unsubLM = subscribeToLMVersions((updated) => setLmVersions(updated), user?.uid);
+    const unsubTpl = subscribeToTemplates((updated) => setTemplates(updated));
+
+    // Fetch profile from Firestore if user is authenticated
+    const fetchFirestoreProfile = async () => {
+      const storedProfile = safeGetItem('cvlm_profile');
+      let baseProfile = DEFAULT_PROFILE(user?.email || '', user?.displayName || '');
+      if (storedProfile) {
+        try {
+          baseProfile = { ...baseProfile, ...JSON.parse(storedProfile) };
+        } catch (e) {
+          console.error(e);
+        }
+      }
+
+      if (user?.uid) {
+        try {
+          const profileDoc = await getDoc(doc(db, 'cvlm_profiles', user.uid));
+          if (profileDoc.exists()) {
+            const data = profileDoc.data() as CVLMUserProfile;
+            baseProfile = { ...baseProfile, ...data };
+          } else {
+            const userDoc = await getDoc(doc(db, 'users', user.uid));
+            if (userDoc.exists()) {
+              const uData = userDoc.data();
+              if (uData.photoUrl) baseProfile.avatarUrl = uData.photoUrl;
+              if (uData.displayName) baseProfile.name = uData.displayName;
+              if (uData.phone) baseProfile.phone = uData.phone;
+            }
+          }
+        } catch (err) {
+          console.warn('Profile Firestore load note:', err);
+        }
+      }
+
+      setProfile(baseProfile);
+      safeSetItem('cvlm_profile', JSON.stringify(baseProfile));
+    };
+
+    fetchFirestoreProfile();
+
+    return () => {
+      unsubCV();
+      unsubLM();
+      unsubTpl();
+    };
   }, [user]);
 
   // Actions
@@ -261,16 +310,48 @@ export default function CVLM() {
     setScreen(CVLMScreen.LM_FORM);
   };
 
-  const handleSaveProfile = (e: React.FormEvent) => {
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const compressed = await compressImage(file, 400, 400, 0.85);
+      const updatedProfile = { ...profile, avatarUrl: compressed };
+      setProfile(updatedProfile);
+      safeSetItem('cvlm_profile', JSON.stringify(updatedProfile));
+
+      if (user?.uid) {
+        await setDoc(doc(db, 'cvlm_profiles', user.uid), JSON.parse(JSON.stringify(updatedProfile)), { merge: true });
+        await setDoc(doc(db, 'users', user.uid), { photoUrl: compressed }, { merge: true });
+      }
+
+      showToast('Photo de profil mise à jour et enregistrée dans la base de données !', 'success');
+    } catch (err) {
+      console.error('Avatar upload error:', err);
+      showToast('Erreur lors du traitement de l\'image', 'error');
+    }
+  };
+
+  const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-    localStorage.setItem('cvlm_profile', JSON.stringify(profile));
-    showToast('Profil enregistré avec succès !', 'success');
-    // Increment points for completing profile
-    setProfile(prev => {
-      const updated = { ...prev, points: prev.points + 10 };
-      localStorage.setItem('cvlm_profile', JSON.stringify(updated));
-      return updated;
-    });
+    const updatedProfile = { ...profile, points: profile.points + 10 };
+    setProfile(updatedProfile);
+    safeSetItem('cvlm_profile', JSON.stringify(updatedProfile));
+
+    if (user?.uid) {
+      try {
+        await setDoc(doc(db, 'cvlm_profiles', user.uid), JSON.parse(JSON.stringify(updatedProfile)), { merge: true });
+        await setDoc(doc(db, 'users', user.uid), {
+          displayName: updatedProfile.name,
+          phone: updatedProfile.phone,
+          photoUrl: updatedProfile.avatarUrl
+        }, { merge: true });
+      } catch (err) {
+        console.error('Firestore save profile error:', err);
+      }
+    }
+
+    showToast('Profil enregistré et synchronisé avec la base de données !', 'success');
   };
 
   // Filter & Search computation
@@ -680,16 +761,29 @@ export default function CVLM() {
                       alt="Avatar"
                       className="h-20 w-20 rounded-full object-cover border-2 border-orange-500 shadow-sm"
                     />
-                    <div className="absolute inset-0 bg-black/40 rounded-full opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity cursor-pointer">
-                      <span className="text-[8px] font-black text-white uppercase tracking-wider">Éditer</span>
-                    </div>
+                    <label className="absolute inset-0 bg-black/50 rounded-full opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center transition-opacity cursor-pointer text-white">
+                      <Camera className="h-5 w-5 mb-0.5" />
+                      <span className="text-[7px] font-black uppercase tracking-wider">Éditer</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleAvatarUpload}
+                        className="hidden"
+                      />
+                    </label>
                   </div>
-                  <div className="text-center sm:text-left">
+                  <div className="text-center sm:text-left space-y-1">
                     <h4 className="text-sm font-black text-slate-800">{profile.name || "Candidat Invité"}</h4>
                     <p className="text-xs text-slate-400 font-semibold">{profile.email}</p>
-                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-orange-50 text-orange-600 rounded-full text-[9px] font-black uppercase tracking-wider mt-1.5">
-                      🔥 Niveau 24
-                    </span>
+                    <label className="inline-flex items-center gap-1.5 px-3 py-1 bg-orange-50 hover:bg-orange-100 text-orange-600 rounded-xl text-[9px] font-black uppercase tracking-wider cursor-pointer transition-colors border border-orange-200">
+                      <Upload className="h-3 w-3" /> Changer de photo
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleAvatarUpload}
+                        className="hidden"
+                      />
+                    </label>
                   </div>
                 </div>
 
@@ -865,13 +959,13 @@ export default function CVLM() {
                 </Button>
                 <Button
                   type="button"
-                  onClick={() => {
+                  onClick={async () => {
                     if (confirmAction.type === 'delete_cv') {
-                      deleteVersion(confirmAction.id);
+                      await deleteVersion(confirmAction.id);
                       refreshData();
                       showToast('Brouillon supprimé !', 'success');
                     } else if (confirmAction.type === 'delete_lm') {
-                      deleteLMVersion(confirmAction.id);
+                      await deleteLMVersion(confirmAction.id);
                       refreshData();
                       showToast('Lettre supprimée !', 'success');
                     }

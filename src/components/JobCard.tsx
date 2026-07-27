@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { safeSetItem } from '@/lib/safeStorage';
 import { 
   MapPin, 
   Briefcase, 
@@ -176,7 +177,7 @@ export default function JobCard({
       setCopiedEmail(true);
       triggerToast("Adresse email copiée avec succès.", "success");
       setTimeout(() => setCopiedEmail(false), 2000);
-      localStorage.setItem(`viewed_job_${localJob.id}`, 'true');
+      safeSetItem(`viewed_job_${localJob.id}`, 'true');
       setIsViewed(true);
 
       // Increment applications directly on the offer document as copying email signifies applying
@@ -391,7 +392,7 @@ export default function JobCard({
     try {
       onApply(); // Execute standard candidate application script (addDoc collections inside Home/Jobs)
       setIsApplied(true);
-      localStorage.setItem(`viewed_job_${localJob.id}`, 'true');
+      safeSetItem(`viewed_job_${localJob.id}`, 'true');
       setIsViewed(true);
 
       // Increment applications directly on the offer document
@@ -420,7 +421,7 @@ export default function JobCard({
       }
       if (onToggleSave) onToggleSave(localJob.id, false);
     } else {
-      localStorage.setItem(`saved_job_${localJob.id}`, 'true');
+      safeSetItem(`saved_job_${localJob.id}`, 'true');
       setIsSaved(true);
       try {
         await updateDoc(jobRef, { likes: increment(1) });
@@ -581,7 +582,7 @@ export default function JobCard({
       } catch (err) {
         console.log("View count incremented local copy");
       }
-      localStorage.setItem(`viewed_job_${localJob.id}`, 'true');
+      safeSetItem(`viewed_job_${localJob.id}`, 'true');
       setIsViewed(true);
     }
     setIsExpanded(!isExpanded);

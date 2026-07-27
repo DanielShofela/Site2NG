@@ -175,13 +175,7 @@ function ImageUploader({ value, onChange }: ImageUploaderProps) {
   );
 }
 
-// Preset visual placeholder generators to help admins create gorgeous thumbnails instantly
-const PRESET_THUMBNAILS = [
-  { name: 'Gradiant Orange (Moderne)', url: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=400&auto=format&fit=crop&q=60' },
-  { name: 'Sable Doré (Élégant)', url: 'https://images.unsplash.com/photo-1604871000636-074fa5117945?w=400&auto=format&fit=crop&q=60' },
-  { name: 'Nuit Cosmique (Créatif)', url: 'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?w=400&auto=format&fit=crop&q=60' },
-  { name: 'Ardoise Minimale (Corporate)', url: 'https://images.unsplash.com/photo-1550684848-fac1c5b4e853?w=400&auto=format&fit=crop&q=60' }
-];
+const DEFAULT_THUMBNAIL = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=400&auto=format&fit=crop&q=60';
 
 const GRADIENT_PRESETS = [
   { name: 'Orange Chaud', value: 'from-orange-650 to-amber-550' },
@@ -293,7 +287,7 @@ export default function CVLMModule({ addLog }: CVLMModuleProps) {
   const handleTogglePremium = async (id: string, current: boolean) => {
     const updated = updateTemplate(id, { isPremium: !current });
     setTemplates(updated);
-    await addLog("Modification d'accès modèle", `Modèle ID ${id} passé en ${!current ? 'Premium' : 'Gratuit'}`, "info");
+    await addLog("Modification d'accès modèle", `Modèle ID ${id} passé en ${!current ? 'Premium' : 'Standard'}`, "info");
   };
 
   // Action: Delete Template
@@ -327,7 +321,7 @@ export default function CVLMModule({ addLog }: CVLMModuleProps) {
     e.preventDefault();
     if (!formName.trim()) return;
 
-    const thumbnailToUse = formThumbnail.trim() || PRESET_THUMBNAILS[0].url;
+    const thumbnailToUse = formThumbnail.trim() || DEFAULT_THUMBNAIL;
     const tagArray = formTags.split(',').map(t => t.trim()).filter(Boolean);
 
     const updated = addTemplate({
@@ -561,7 +555,7 @@ export default function CVLMModule({ addLog }: CVLMModuleProps) {
               <p className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Taux Premium</p>
               <div className="flex items-baseline gap-2 mt-2">
                 <span className="text-2xl font-black text-slate-800">{premiumPercent}%</span>
-                <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">{freeCount} Gratuits</span>
+                <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">{freeCount} Standards</span>
               </div>
             </Card>
           </div>
@@ -621,7 +615,7 @@ export default function CVLMModule({ addLog }: CVLMModuleProps) {
                     filterPremium === 'free' ? 'bg-white text-slate-900 shadow-sm font-black' : 'text-slate-500 hover:text-slate-800'
                   }`}
                 >
-                  Gratuit ({freeCount})
+                  Standard ({freeCount})
                 </button>
                 <button 
                   onClick={() => setFilterPremium('premium')}
@@ -690,7 +684,7 @@ export default function CVLMModule({ addLog }: CVLMModuleProps) {
                             <Crown className="h-2.5 w-2.5" /> Premium
                           </>
                         ) : (
-                          'Gratuit'
+                          'Standard'
                         )}
                       </button>
                     </div>
@@ -911,26 +905,6 @@ export default function CVLMModule({ addLog }: CVLMModuleProps) {
                     value={formThumbnail} 
                     onChange={setFormThumbnail} 
                   />
-                  {/* Preset Quick Selection */}
-                  <div className="space-y-1 pt-1.5">
-                    <span className="text-[10px] font-bold text-slate-400">Ou choisir parmi nos thèmes visuels :</span>
-                    <div className="grid grid-cols-2 gap-2">
-                      {PRESET_THUMBNAILS.map((preset) => (
-                        <button
-                          key={preset.name}
-                          type="button"
-                          onClick={() => setFormThumbnail(preset.url)}
-                          className={`p-2 rounded-lg border text-left text-[9px] font-bold truncate transition-all ${
-                            formThumbnail === preset.url 
-                              ? 'border-orange-500 bg-orange-50 text-orange-700 font-black' 
-                              : 'border-slate-150 bg-slate-50 text-slate-650 hover:bg-slate-100'
-                          }`}
-                        >
-                          {preset.name}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
                 </div>
 
                 <div className="space-y-1.5">
@@ -1038,26 +1012,6 @@ export default function CVLMModule({ addLog }: CVLMModuleProps) {
                     value={formThumbnail} 
                     onChange={setFormThumbnail} 
                   />
-                  {/* Preset Quick Selection */}
-                  <div className="space-y-1 pt-1.5">
-                    <span className="text-[10px] font-bold text-slate-400">Ou choisir parmi nos thèmes visuels :</span>
-                    <div className="grid grid-cols-2 gap-2">
-                      {PRESET_THUMBNAILS.map((preset) => (
-                        <button
-                          key={preset.name}
-                          type="button"
-                          onClick={() => setFormThumbnail(preset.url)}
-                          className={`p-2 rounded-lg border text-left text-[9px] font-bold truncate transition-all ${
-                            formThumbnail === preset.url 
-                              ? 'border-orange-500 bg-orange-50 text-orange-700 font-black' 
-                              : 'border-slate-150 bg-slate-50 text-slate-650 hover:bg-slate-100'
-                          }`}
-                        >
-                          {preset.name}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
                 </div>
 
                 <div className="space-y-1.5">

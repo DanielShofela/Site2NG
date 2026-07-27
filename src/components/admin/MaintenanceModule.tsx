@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { safeSetItem } from '@/lib/safeStorage';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -72,7 +73,7 @@ export default function MaintenanceModule({ addLog }: MaintenanceProps) {
 
   const handleToggleBypass = () => {
     const nextBypass = !isBypassed;
-    localStorage.setItem('bypass_maintenance', nextBypass ? 'true' : 'false');
+    safeSetItem('bypass_maintenance', nextBypass ? 'true' : 'false');
     setIsBypassed(nextBypass);
     alert(nextBypass 
       ? "Clé de contournement temporaire activée dans votre navigateur ! Vous pourrez naviguer sur la plateforme même si le mode maintenance est actif."

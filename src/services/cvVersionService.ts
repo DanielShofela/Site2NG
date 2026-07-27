@@ -1,9 +1,12 @@
-import { CVVersion, CVFormData } from '@/types/cvlm';
+import { CVVersion } from '@/types/cvlm';
+import { safeSetItem, safeGetItem } from '@/lib/safeStorage';
+import { db, auth } from '@/lib/firebase';
+import { collection, doc, setDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
 
 const PREF = 'cvlm_';
 
 export const getAllVersions = (): CVVersion[] => {
-  const stored = localStorage.getItem(`${PREF}versions`);
+  const stored = safeGetItem(`${PREF}versions`);
   if (stored) {
     try {
       return JSON.parse(stored);
@@ -14,14 +17,17 @@ export const getAllVersions = (): CVVersion[] => {
   return [];
 };
 
-export const saveVersion = (version: CVVersion): CVVersion[] => {
-  const versions = getAllVersions();
-  const existingIndex = versions.findIndex(v => v.id === version.id);
-  
-  const updatedVersion = {
+export const saveVersion = async (version: CVVersion): Promise<CVVersion[]> => {
+  const currentUser = auth.currentUser;
+  const updatedVersion: CVVersion = {
     ...version,
+    userId: version.userId || currentUser?.uid || 'guest',
+    userEmail: version.userEmail || currentUser?.email || '',
     updatedAt: new Date().toISOString()
   };
+
+  const versions = getAllVersions();
+  const existingIndex = versions.findIndex(v => v.id === updatedVersion.id);
 
   if (existingIndex > -1) {
     versions[existingIndex] = updatedVersion;
@@ -29,7 +35,16 @@ export const saveVersion = (version: CVVersion): CVVersion[] => {
     versions.push(updatedVersion);
   }
 
-  localStorage.setItem(`${PREF}versions`, JSON.stringify(versions));
+  safeSetItem(`${PREF}versions`, JSON.stringify(versions));
+
+  // Async sync with Firestore
+  try {
+    const docRef = doc(db, 'cv_versions', updatedVersion.id);
+    await setDoc(docRef, JSON.parse(JSON.stringify(updatedVersion)), { merge: true });
+  } catch (err) {
+    console.error('Firestore saveVersion error:', err);
+  }
+
   return versions;
 };
 
@@ -41,14 +56,22 @@ export const hasAnyVersions = (): boolean => {
   return getAllVersions().length > 0;
 };
 
-export const deleteVersion = (id: string): CVVersion[] => {
+export const deleteVersion = async (id: string): Promise<CVVersion[]> => {
   const versions = getAllVersions();
   const filtered = versions.filter(v => v.id !== id);
-  localStorage.setItem(`${PREF}versions`, JSON.stringify(filtered));
+  safeSetItem(`${PREF}versions`, JSON.stringify(filtered));
+
+  try {
+    const docRef = doc(db, 'cv_versions', id);
+    await deleteDoc(docRef);
+  } catch (err) {
+    console.error('Firestore deleteVersion error:', err);
+  }
+
   return filtered;
 };
 
-export const duplicateVersion = (id: string): CVVersion | null => {
+export const duplicateVersion = async (id: string): Promise<CVVersion | null> => {
   const versions = getAllVersions();
   const original = versions.find(v => v.id === id);
   if (!original) return null;
@@ -61,7 +84,45 @@ export const duplicateVersion = (id: string): CVVersion | null => {
     updatedAt: new Date().toISOString()
   };
 
-  versions.push(duplicated);
-  localStorage.setItem(`${PREF}versions`, JSON.stringify(versions));
+  await saveVersion(duplicated);
   return duplicated;
+};
+
+/**
+ * Real-time synchronization listener for CV versions in Firestore
+ */
+export const subscribeToVersions = (onUpdate: (versions: CVVersion[]) => void, userId?: string) => {
+  try {
+    const versionsRef = collection(db, 'cv_versions');
+    return onSnapshot(versionsRef, (snapshot) => {
+      const remoteVersions: CVVersion[] = [];
+      snapshot.forEach(docSnap => {
+        const data = docSnap.data() as CVVersion;
+        if (!userId || !data.userId || data.userId === userId || data.userId === 'guest') {
+          remoteVersions.push(data);
+        }
+      });
+
+      if (remoteVersions.length > 0) {
+        // Merge local & remote
+        const local = getAllVersions();
+        const map = new Map<string, CVVersion>();
+        local.forEach(v => map.set(v.id, v));
+        remoteVersions.forEach(v => map.set(v.id, v));
+
+        const merged = Array.from(map.values());
+        safeSetItem(`${PREF}versions`, JSON.stringify(merged));
+        onUpdate(merged);
+      } else {
+        onUpdate(getAllVersions());
+      }
+    }, (err) => {
+      console.warn('Firestore versions listener notice:', err);
+      onUpdate(getAllVersions());
+    });
+  } catch (e) {
+    console.error('Failed to subscribe to versions:', e);
+    onUpdate(getAllVersions());
+    return () => {};
+  }
 };

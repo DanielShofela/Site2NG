@@ -175,5 +175,37 @@ service cloud.firestore {
       );
       allow delete: if isAdmin();
     }
+
+    // 9. CV Versions Rules
+    match /cv_versions/{versionId} {
+      allow read: if true; // Allows viewing or loading CV versions
+      allow create, update: if isSignedIn() || isAdmin();
+      allow delete: if isSignedIn() || isAdmin();
+    }
+
+    // 10. LM Versions Rules
+    match /lm_versions/{versionId} {
+      allow read: if true;
+      allow create, update: if isSignedIn() || isAdmin();
+      allow delete: if isSignedIn() || isAdmin();
+    }
+
+    // 11. CV Templates Catalog Rules
+    match /cv_templates/{templateId} {
+      allow read: if true;
+      allow write: if isSignedIn() || isAdmin();
+    }
+
+    // 12. CVLM Profiles Rules
+    match /cvlm_profiles/{userId} {
+      allow read: if true;
+      allow write: if isSignedIn() || isAdmin();
+    }
+
+    // 13. Promo Slides Rules
+    match /promo_slides/{slideId} {
+      allow read: if true;
+      allow write: if isSignedIn() || isAdmin();
+    }
   }
 }

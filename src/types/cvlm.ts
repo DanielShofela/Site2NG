@@ -47,6 +47,7 @@ export interface CVFormData {
   nationality: string;
   jobTitle: string;
   portfolioUrl: string;
+  photoUrl?: string;
   educations: CVEducation[];
   experiences: CVExperience[];
   skillsTechnical: string;
@@ -62,6 +63,8 @@ export interface CVFormData {
 
 export interface CVVersion {
   id: string;
+  userId?: string;
+  userEmail?: string;
   profileType: string;
   name: string;
   data: CVFormData;
@@ -121,6 +124,8 @@ export interface LMFormData {
 
 export interface LMVersion {
   id: string;
+  userId?: string;
+  userEmail?: string;
   name: string;
   data: LMFormData;
   createdAt: string;

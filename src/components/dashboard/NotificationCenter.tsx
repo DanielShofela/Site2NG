@@ -17,6 +17,7 @@ import {
   MessageSquare
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { safeSetItem } from '@/lib/safeStorage';
 import { useAuth } from '@/contexts/AuthContext';
 
 export interface MockNotification {
@@ -165,12 +166,12 @@ export default function NotificationCenter() {
         console.error('Error parsing notifications', e);
         const defaults = isCandidate ? DEFAULT_CANDIDATE_NOTIFS : DEFAULT_RECRUITER_NOTIFS;
         setNotifications(defaults);
-        localStorage.setItem(key, JSON.stringify(defaults));
+        safeSetItem(key, JSON.stringify(defaults));
       }
     } else {
       const defaults = isCandidate ? DEFAULT_CANDIDATE_NOTIFS : DEFAULT_RECRUITER_NOTIFS;
       setNotifications(defaults);
-      localStorage.setItem(key, JSON.stringify(defaults));
+      safeSetItem(key, JSON.stringify(defaults));
     }
   }, [user?.uid, isCandidate]);
 
@@ -178,7 +179,7 @@ export default function NotificationCenter() {
   const saveNotifications = (newNotifs: MockNotification[]) => {
     if (!user) return;
     setNotifications(newNotifs);
-    localStorage.setItem(`2ng_notifications_${user.uid}`, JSON.stringify(newNotifs));
+    safeSetItem(`2ng_notifications_${user.uid}`, JSON.stringify(newNotifs));
   };
 
   // Close dropdown on outside click

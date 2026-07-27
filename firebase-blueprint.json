@@ -139,6 +139,26 @@
     "/settings/{docId}": {
       "schema": "object",
       "description": "System configuration and tracking goals"
+    },
+    "/cv_versions/{versionId}": {
+      "schema": "object",
+      "description": "User saved CV versions"
+    },
+    "/lm_versions/{versionId}": {
+      "schema": "object",
+      "description": "User saved LM versions"
+    },
+    "/cv_templates/{templateId}": {
+      "schema": "object",
+      "description": "CV and LM templates catalog"
+    },
+    "/cvlm_profiles/{userId}": {
+      "schema": "object",
+      "description": "CVLM specific candidate user profiles"
+    },
+    "/promo_slides/{slideId}": {
+      "schema": "object",
+      "description": "Promotional banner slides"
     }
   }
 }

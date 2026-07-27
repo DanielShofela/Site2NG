@@ -25,6 +25,7 @@ import {
   onSnapshot 
 } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
+import { safeSetItem, safeGetItem, safeRemoveItem } from '@/lib/safeStorage';
 
 export function cleanUndefined<T>(obj: T): T {
   if (obj === undefined) {
@@ -156,7 +157,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const provider = new GoogleAuthProvider();
       
       // Store preferred role in localStorage in case we need it after redirect
-      localStorage.setItem('google_preferred_role', preferredRole);
+      safeSetItem('google_preferred_role', preferredRole);
 
       try {
         console.log("Attempting Google login via Popup flow...");

@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   User, Mail, Phone, Calendar, Globe, MapPin, Briefcase, 
   GraduationCap, Sparkles, Plus, Trash2, ArrowLeft, ArrowRight,
-  FileCheck, Download, Award, HeartHandshake, Eye, BookOpen
+  FileCheck, Download, Award, HeartHandshake, Eye, BookOpen,
+  Camera, Upload, Image as ImageIcon
 } from 'lucide-react';
 import Button from './Button';
 import GlassCard from './GlassCard';
@@ -12,6 +13,7 @@ import { saveVersion, getVersionById } from '@/services/cvVersionService';
 import { generateCVAdvice } from '@/services/geminiService';
 import { saveCVRequest } from '@/services/supabaseClient';
 import { showToast } from './toast';
+import { compressImage } from '@/lib/imageUtils';
 import { jsPDF } from 'jspdf';
 
 interface CVFormProps {
@@ -78,6 +80,19 @@ export default function CVForm({ templateId, templateName, initialVersionId, onB
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const compressed = await compressImage(file, 500, 500, 0.85);
+      setFormData(prev => ({ ...prev, photoUrl: compressed }));
+      showToast('Photo de profil ajoutée avec succès au CV !', 'success');
+    } catch (err) {
+      console.error('Error compressing CV photo:', err);
+      showToast('Erreur lors du traitement de la photo', 'error');
+    }
   };
 
   // Dynamic Array Handlers - Educations
@@ -514,6 +529,46 @@ export default function CVForm({ templateId, templateName, initialVersionId, onB
             {/* Step 1: Personal Info */}
             {step === 1 && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Photo Upload Area */}
+                <div className="col-span-1 sm:col-span-2 bg-slate-50 border border-dashed border-slate-300 p-4 rounded-2xl flex flex-col sm:flex-row items-center gap-4">
+                  <div className="relative shrink-0">
+                    {formData.photoUrl ? (
+                      <img
+                        src={formData.photoUrl}
+                        alt="Photo CV"
+                        className="h-20 w-20 rounded-2xl object-cover border-2 border-orange-500 shadow-sm"
+                      />
+                    ) : (
+                      <div className="h-20 w-20 rounded-2xl bg-slate-200 border-2 border-dashed border-slate-300 flex flex-col items-center justify-center text-slate-400">
+                        <Camera className="h-8 w-8" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1 text-center sm:text-left space-y-1">
+                    <p className="text-xs font-black uppercase text-slate-800">Photo du CV (Optionnel)</p>
+                    <p className="text-[10px] text-slate-500">Insérez une photo professionnelle. Elle sera enregistrée dans la base de données.</p>
+                    <label className="inline-flex items-center gap-2 px-3 py-1.5 bg-orange-600 hover:bg-orange-700 text-white rounded-xl text-[10px] font-black uppercase tracking-wider cursor-pointer transition-colors shadow-sm mt-1">
+                      <Upload className="h-3.5 w-3.5" />
+                      {formData.photoUrl ? 'Changer la photo' : 'Téléverser une photo'}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handlePhotoUpload}
+                        className="hidden"
+                      />
+                    </label>
+                    {formData.photoUrl && (
+                      <button
+                        type="button"
+                        onClick={() => setFormData(prev => ({ ...prev, photoUrl: undefined }))}
+                        className="ml-2 inline-flex items-center gap-1 text-[10px] font-bold text-rose-600 hover:underline"
+                      >
+                        <Trash2 className="h-3 w-3" /> Supprimer
+                      </button>
+                    )}
+                  </div>
+                </div>
+
                 <div className="space-y-1.5 col-span-1 sm:col-span-2">
                   <label className="text-[10px] font-black uppercase text-slate-500 flex items-center gap-1.5"><User className="h-3.5 w-3.5 text-orange-600" /> Nom complet *</label>
                   <input

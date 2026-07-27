@@ -1,9 +1,12 @@
-import { LMVersion, LMFormData } from '@/types/cvlm';
+import { LMVersion } from '@/types/cvlm';
+import { safeSetItem, safeGetItem } from '@/lib/safeStorage';
+import { db, auth } from '@/lib/firebase';
+import { collection, doc, setDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
 
 const PREF = 'cvlm_';
 
 export const getAllLMVersions = (): LMVersion[] => {
-  const stored = localStorage.getItem(`${PREF}lm_versions`);
+  const stored = safeGetItem(`${PREF}lm_versions`);
   if (stored) {
     try {
       return JSON.parse(stored);
@@ -14,14 +17,17 @@ export const getAllLMVersions = (): LMVersion[] => {
   return [];
 };
 
-export const saveLMVersion = (version: LMVersion): LMVersion[] => {
-  const versions = getAllLMVersions();
-  const existingIndex = versions.findIndex(v => v.id === version.id);
-  
-  const updatedVersion = {
+export const saveLMVersion = async (version: LMVersion): Promise<LMVersion[]> => {
+  const currentUser = auth.currentUser;
+  const updatedVersion: LMVersion = {
     ...version,
+    userId: version.userId || currentUser?.uid || 'guest',
+    userEmail: version.userEmail || currentUser?.email || '',
     updatedAt: new Date().toISOString()
   };
+
+  const versions = getAllLMVersions();
+  const existingIndex = versions.findIndex(v => v.id === updatedVersion.id);
 
   if (existingIndex > -1) {
     versions[existingIndex] = updatedVersion;
@@ -29,7 +35,16 @@ export const saveLMVersion = (version: LMVersion): LMVersion[] => {
     versions.push(updatedVersion);
   }
 
-  localStorage.setItem(`${PREF}lm_versions`, JSON.stringify(versions));
+  safeSetItem(`${PREF}lm_versions`, JSON.stringify(versions));
+
+  // Async sync with Firestore
+  try {
+    const docRef = doc(db, 'lm_versions', updatedVersion.id);
+    await setDoc(docRef, JSON.parse(JSON.stringify(updatedVersion)), { merge: true });
+  } catch (err) {
+    console.error('Firestore saveLMVersion error:', err);
+  }
+
   return versions;
 };
 
@@ -41,14 +56,22 @@ export const hasAnyLMVersions = (): boolean => {
   return getAllLMVersions().length > 0;
 };
 
-export const deleteLMVersion = (id: string): LMVersion[] => {
+export const deleteLMVersion = async (id: string): Promise<LMVersion[]> => {
   const versions = getAllLMVersions();
   const filtered = versions.filter(v => v.id !== id);
-  localStorage.setItem(`${PREF}lm_versions`, JSON.stringify(filtered));
+  safeSetItem(`${PREF}lm_versions`, JSON.stringify(filtered));
+
+  try {
+    const docRef = doc(db, 'lm_versions', id);
+    await deleteDoc(docRef);
+  } catch (err) {
+    console.error('Firestore deleteLMVersion error:', err);
+  }
+
   return filtered;
 };
 
-export const duplicateLMVersion = (id: string): LMVersion | null => {
+export const duplicateLMVersion = async (id: string): Promise<LMVersion | null> => {
   const versions = getAllLMVersions();
   const original = versions.find(v => v.id === id);
   if (!original) return null;
@@ -61,7 +84,44 @@ export const duplicateLMVersion = (id: string): LMVersion | null => {
     updatedAt: new Date().toISOString()
   };
 
-  versions.push(duplicated);
-  localStorage.setItem(`${PREF}lm_versions`, JSON.stringify(versions));
+  await saveLMVersion(duplicated);
   return duplicated;
+};
+
+/**
+ * Real-time synchronization listener for LM versions in Firestore
+ */
+export const subscribeToLMVersions = (onUpdate: (versions: LMVersion[]) => void, userId?: string) => {
+  try {
+    const versionsRef = collection(db, 'lm_versions');
+    return onSnapshot(versionsRef, (snapshot) => {
+      const remoteVersions: LMVersion[] = [];
+      snapshot.forEach(docSnap => {
+        const data = docSnap.data() as LMVersion;
+        if (!userId || !data.userId || data.userId === userId || data.userId === 'guest') {
+          remoteVersions.push(data);
+        }
+      });
+
+      if (remoteVersions.length > 0) {
+        const local = getAllLMVersions();
+        const map = new Map<string, LMVersion>();
+        local.forEach(v => map.set(v.id, v));
+        remoteVersions.forEach(v => map.set(v.id, v));
+
+        const merged = Array.from(map.values());
+        safeSetItem(`${PREF}lm_versions`, JSON.stringify(merged));
+        onUpdate(merged);
+      } else {
+        onUpdate(getAllLMVersions());
+      }
+    }, (err) => {
+      console.warn('Firestore LM versions listener notice:', err);
+      onUpdate(getAllLMVersions());
+    });
+  } catch (e) {
+    console.error('Failed to subscribe to LM versions:', e);
+    onUpdate(getAllLMVersions());
+    return () => {};
+  }
 };

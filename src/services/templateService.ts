@@ -1,4 +1,7 @@
 import { CVLMTemplate, CVLMPromoSlide } from '@/types/cvlm';
+import { safeSetItem, safeGetItem } from '@/lib/safeStorage';
+import { db } from '@/lib/firebase';
+import { collection, doc, setDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
 
 const PREF = 'cvlm_';
 
@@ -17,7 +20,6 @@ export const generateTemplates = (): CVLMTemplate[] => {
   // Generate 41 CV templates
   for (let i = 1; i <= 41; i++) {
     const padded = i.toString().padStart(3, '0');
-    // Alternating H and F suffix as indicated in prompt
     const suffix = i % 2 === 0 ? 'F' : 'H';
     const numStr = `${padded}${suffix}`;
     const name = `CV Modèle ${numStr}`;
@@ -28,7 +30,7 @@ export const generateTemplates = (): CVLMTemplate[] => {
       name,
       thumbnail: `/cvlm/cv-samples/CV ${numStr}.png`,
       tags,
-      isPremium: i % 4 === 0, // Every 4th template is Premium
+      isPremium: i % 4 === 0,
       isFavorite: false,
       type: 'cv'
     });
@@ -45,7 +47,7 @@ export const generateTemplates = (): CVLMTemplate[] => {
       name,
       thumbnail: `/cvlm/lm-samples/LM ${padded}.png`,
       tags,
-      isPremium: i % 5 === 0, // Every 5th letter template is Premium
+      isPremium: i % 5 === 0,
       isFavorite: false,
       type: 'lm'
     });
@@ -55,7 +57,7 @@ export const generateTemplates = (): CVLMTemplate[] => {
 };
 
 export const getTemplates = (): CVLMTemplate[] => {
-  const stored = localStorage.getItem(`${PREF}templates`);
+  const stored = safeGetItem(`${PREF}templates`);
   if (stored) {
     try {
       return JSON.parse(stored);
@@ -65,7 +67,7 @@ export const getTemplates = (): CVLMTemplate[] => {
   }
   
   const fresh = generateTemplates();
-  localStorage.setItem(`${PREF}templates`, JSON.stringify(fresh));
+  safeSetItem(`${PREF}templates`, JSON.stringify(fresh));
   return fresh;
 };
 
@@ -85,15 +87,15 @@ export const toggleFavorite = (id: string): CVLMTemplate[] => {
     }
     return t;
   });
-  localStorage.setItem(`${PREF}templates`, JSON.stringify(updated));
+  saveTemplates(updated);
   return updated;
 };
 
 export const saveTemplates = (templates: CVLMTemplate[]): void => {
-  localStorage.setItem(`${PREF}templates`, JSON.stringify(templates));
+  safeSetItem(`${PREF}templates`, JSON.stringify(templates));
 };
 
-export const addTemplate = (template: Omit<CVLMTemplate, 'id' | 'isFavorite'>): CVLMTemplate[] => {
+export const addTemplate = async (template: Omit<CVLMTemplate, 'id' | 'isFavorite'>): Promise<CVLMTemplate[]> => {
   const templates = getTemplates();
   const id = `${template.type}-${Date.now()}`;
   const newTemplate: CVLMTemplate = {
@@ -103,25 +105,51 @@ export const addTemplate = (template: Omit<CVLMTemplate, 'id' | 'isFavorite'>): 
   };
   const updated = [newTemplate, ...templates];
   saveTemplates(updated);
+
+  try {
+    await setDoc(doc(db, 'cv_templates', id), JSON.parse(JSON.stringify(newTemplate)), { merge: true });
+  } catch (err) {
+    console.error('Firestore addTemplate error:', err);
+  }
+
   return updated;
 };
 
-export const updateTemplate = (id: string, updatedFields: Partial<CVLMTemplate>): CVLMTemplate[] => {
+export const updateTemplate = async (id: string, updatedFields: Partial<CVLMTemplate>): Promise<CVLMTemplate[]> => {
   const templates = getTemplates();
+  let updatedItem: CVLMTemplate | undefined;
+
   const updated = templates.map(t => {
     if (t.id === id) {
-      return { ...t, ...updatedFields };
+      updatedItem = { ...t, ...updatedFields };
+      return updatedItem;
     }
     return t;
   });
   saveTemplates(updated);
+
+  if (updatedItem) {
+    try {
+      await setDoc(doc(db, 'cv_templates', id), JSON.parse(JSON.stringify(updatedItem)), { merge: true });
+    } catch (err) {
+      console.error('Firestore updateTemplate error:', err);
+    }
+  }
+
   return updated;
 };
 
-export const deleteTemplate = (id: string): CVLMTemplate[] => {
+export const deleteTemplate = async (id: string): Promise<CVLMTemplate[]> => {
   const templates = getTemplates();
   const updated = templates.filter(t => t.id !== id);
   saveTemplates(updated);
+
+  try {
+    await deleteDoc(doc(db, 'cv_templates', id));
+  } catch (err) {
+    console.error('Firestore deleteTemplate error:', err);
+  }
+
   return updated;
 };
 
@@ -129,6 +157,38 @@ export const resetTemplates = (): CVLMTemplate[] => {
   const fresh = generateTemplates();
   saveTemplates(fresh);
   return fresh;
+};
+
+export const subscribeToTemplates = (onUpdate: (templates: CVLMTemplate[]) => void) => {
+  try {
+    const templatesRef = collection(db, 'cv_templates');
+    return onSnapshot(templatesRef, (snapshot) => {
+      const remoteTemplates: CVLMTemplate[] = [];
+      snapshot.forEach(docSnap => {
+        remoteTemplates.push(docSnap.data() as CVLMTemplate);
+      });
+
+      if (remoteTemplates.length > 0) {
+        const local = getTemplates();
+        const map = new Map<string, CVLMTemplate>();
+        local.forEach(t => map.set(t.id, t));
+        remoteTemplates.forEach(t => map.set(t.id, t));
+
+        const merged = Array.from(map.values());
+        saveTemplates(merged);
+        onUpdate(merged);
+      } else {
+        onUpdate(getTemplates());
+      }
+    }, (err) => {
+      console.warn('Firestore templates listener notice:', err);
+      onUpdate(getTemplates());
+    });
+  } catch (e) {
+    console.error('Failed to subscribe to templates:', e);
+    onUpdate(getTemplates());
+    return () => {};
+  }
 };
 
 const DEFAULT_SLIDES: CVLMPromoSlide[] = [
@@ -162,11 +222,10 @@ const DEFAULT_SLIDES: CVLMPromoSlide[] = [
 ];
 
 export const getPromoSlides = (): CVLMPromoSlide[] => {
-  const stored = localStorage.getItem(`${PREF}promo_slides`);
+  const stored = safeGetItem(`${PREF}promo_slides`);
   if (stored) {
     try {
       const parsed: CVLMPromoSlide[] = JSON.parse(stored);
-      // Automatically migrate old broken local paths to new high-quality Unsplash ones
       let migrated = false;
       const updated = parsed.map(slide => {
         if (slide.imagePath === '/cvlm/pub/promo1.jpg') {
@@ -184,7 +243,7 @@ export const getPromoSlides = (): CVLMPromoSlide[] => {
         return slide;
       });
       if (migrated) {
-        localStorage.setItem(`${PREF}promo_slides`, JSON.stringify(updated));
+        safeSetItem(`${PREF}promo_slides`, JSON.stringify(updated));
       }
       return updated;
     } catch (e) {
@@ -192,12 +251,12 @@ export const getPromoSlides = (): CVLMPromoSlide[] => {
     }
   }
   
-  localStorage.setItem(`${PREF}promo_slides`, JSON.stringify(DEFAULT_SLIDES));
+  safeSetItem(`${PREF}promo_slides`, JSON.stringify(DEFAULT_SLIDES));
   return DEFAULT_SLIDES;
 };
 
 export const savePromoSlides = (slides: CVLMPromoSlide[]): void => {
-  localStorage.setItem(`${PREF}promo_slides`, JSON.stringify(slides));
+  safeSetItem(`${PREF}promo_slides`, JSON.stringify(slides));
 };
 
 export const addPromoSlide = (slide: Omit<CVLMPromoSlide, 'id'>): CVLMPromoSlide[] => {
@@ -235,4 +294,3 @@ export const resetPromoSlides = (): CVLMPromoSlide[] => {
   savePromoSlides(DEFAULT_SLIDES);
   return DEFAULT_SLIDES;
 };
-

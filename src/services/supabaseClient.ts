@@ -1,9 +1,10 @@
 import { CVRequest } from '@/types/cvlm';
+import { safeSetItem, safeGetItem } from '@/lib/safeStorage';
 
 const PREF = 'cvlm_';
 
 export const saveCVRequest = async (request: Omit<CVRequest, 'id' | 'date'>): Promise<CVRequest> => {
-  const stored = localStorage.getItem(`${PREF}requests`);
+  const stored = safeGetItem(`${PREF}requests`);
   let requests: CVRequest[] = [];
   if (stored) {
     try {
@@ -20,12 +21,12 @@ export const saveCVRequest = async (request: Omit<CVRequest, 'id' | 'date'>): Pr
   };
 
   requests.push(newRequest);
-  localStorage.setItem(`${PREF}requests`, JSON.stringify(requests));
+  safeSetItem(`${PREF}requests`, JSON.stringify(requests));
   return newRequest;
 };
 
 export const getLMRequests = async (): Promise<CVRequest[]> => {
-  const stored = localStorage.getItem(`${PREF}requests`);
+  const stored = safeGetItem(`${PREF}requests`);
   if (stored) {
     try {
       const requests: CVRequest[] = JSON.parse(stored);
@@ -38,7 +39,7 @@ export const getLMRequests = async (): Promise<CVRequest[]> => {
 };
 
 export const getAllRequests = async (): Promise<CVRequest[]> => {
-  const stored = localStorage.getItem(`${PREF}requests`);
+  const stored = safeGetItem(`${PREF}requests`);
   if (stored) {
     try {
       return JSON.parse(stored);

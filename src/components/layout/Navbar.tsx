@@ -159,17 +159,18 @@ export default function Navbar() {
         </div>
       </div>
 
-      {/* Fullscreen Mobile Menu */}
+      {/* Floating Compact Mobile Menu */}
       <AnimatePresence>
         {isOpen && (
           <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            transition={{ duration: 0.25, ease: 'easeInOut' }}
-            className="fixed inset-x-0 top-[68px] z-40 bg-white block lg:hidden overflow-y-auto shadow-xl border-b border-slate-200/80 max-h-[85vh] pb-10"
+            initial={{ opacity: 0, y: -8, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -8, scale: 0.98 }}
+            transition={{ duration: 0.2, ease: 'easeOut' }}
+            className="absolute top-full left-3 right-3 sm:left-auto sm:right-6 sm:w-88 mt-2 z-50 bg-white/98 backdrop-blur-2xl border border-slate-200/90 rounded-2xl shadow-2xl p-3 sm:p-4 text-slate-800 lg:hidden overflow-hidden"
           >
-            <div className="space-y-1 px-5 py-4">
+            {/* Compact 2-column Nav Grid */}
+            <div className="grid grid-cols-2 gap-1.5 mb-3">
               {navLinks.map((link) => {
                 const isActive = location.pathname === link.href;
                 return (
@@ -177,61 +178,61 @@ export default function Navbar() {
                     key={link.name}
                     to={link.href}
                     onClick={() => setIsOpen(false)}
-                    className={`block rounded-xl px-4 py-2.5 text-xs font-black transition-all uppercase tracking-wider border-b border-dashed border-slate-100 last:border-0 ${
-                      isActive ? 'bg-orange-50 text-orange-600' : 'text-slate-700 hover:bg-slate-50'
+                    className={`px-3 py-2 rounded-xl text-[11px] sm:text-xs font-black transition-all flex items-center justify-between cursor-pointer ${
+                      isActive 
+                        ? 'bg-orange-600 text-white shadow-md shadow-orange-600/20' 
+                        : 'bg-slate-50 text-slate-700 hover:bg-slate-100 hover:text-orange-600 border border-slate-100/80'
                     }`}
                   >
-                    {link.name}
+                    <span className="truncate">{link.name}</span>
                   </Link>
                 );
               })}
-              
-              <div className="mt-4 border-t border-slate-100 pt-5 px-1">
-                {user ? (
-                  <div className="space-y-4">
-                    <Link to={getDashboardLink()} onClick={() => setIsOpen(false)} className="block w-full">
-                       <Button className="w-full justify-center font-extrabold h-14 rounded-2xl bg-slate-900 text-white flex items-center gap-2">
-                         <User className="h-5 w-5" /> Accéder à mon Espace
-                       </Button>
-                    </Link>
-                    <Button variant="outline" className="w-full h-14 rounded-2xl justify-center font-extrabold text-red-600 border-red-200 bg-red-50 hover:bg-red-100 flex items-center gap-2" onClick={handleLogout}>
-                      <LogOut className="h-5 w-5" /> Déconnexion
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="space-y-6">
-                    {/* Collapsible/Group Login */}
-                    <div className="space-y-3">
-                      <p className="text-xs font-black text-slate-400 uppercase tracking-widest pl-2">Se Connecter :</p>
-                      <div className="grid grid-cols-2 gap-3">
-                        <Link to="/auth/login/member" onClick={() => setIsOpen(false)} className="block w-full">
-                          <Button variant="outline" className="w-full h-14 rounded-2xl font-black text-xs uppercase bg-slate-50 border-slate-200 text-slate-800">Candidat</Button>
-                        </Link>
-                        <Link to="/auth/login/company" onClick={() => setIsOpen(false)} className="block w-full">
-                          <Button variant="outline" className="w-full h-14 rounded-2xl font-black text-xs uppercase bg-slate-50 border-slate-200 text-slate-800">Recruteur</Button>
-                        </Link>
-                      </div>
-                    </div>
+            </div>
 
-                    {/* S'inscrire options */}
-                    <div className="space-y-3 pt-4 border-t border-slate-100">
-                      <p className="text-xs font-black text-slate-400 uppercase tracking-widest pl-2">S'enregistrer :</p>
-                      <div className="flex flex-col gap-3">
-                        <Link to="/auth/register/member" onClick={() => setIsOpen(false)} className="block w-full">
-                          <Button className="w-full h-14 rounded-2xl font-extrabold bg-orange-600 text-white shadow-lg shadow-orange-600/10 flex items-center justify-center gap-1.5">
-                            Créer mon profil Adhérent
-                          </Button>
-                        </Link>
-                        <Link to="/auth/register/company" onClick={() => setIsOpen(false)} className="block w-full">
-                          <Button variant="secondary" className="w-full h-14 rounded-2xl font-extrabold bg-slate-100 text-slate-800 border-none flex items-center justify-center gap-1.5">
-                            Créer un espace Entreprise
-                          </Button>
-                        </Link>
-                      </div>
-                    </div>
+            {/* Compact Action Footer */}
+            <div className="pt-2.5 border-t border-slate-100">
+              {user ? (
+                <div className="flex items-center gap-2">
+                  <Link to={getDashboardLink()} onClick={() => setIsOpen(false)} className="flex-1">
+                    <Button className="w-full h-10 rounded-xl font-extrabold text-xs bg-slate-900 hover:bg-slate-800 text-white flex items-center justify-center gap-1.5 shadow-sm">
+                      <User className="h-4 w-4" /> Mon Espace
+                    </Button>
+                  </Link>
+                  <Button 
+                    variant="outline" 
+                    className="h-10 px-3.5 rounded-xl font-extrabold text-xs text-red-600 bg-red-50 hover:bg-red-100 border-red-200 flex items-center justify-center gap-1" 
+                    onClick={handleLogout}
+                    title="Déconnexion"
+                  >
+                    <LogOut className="h-4 w-4" />
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    <Link to="/login" onClick={() => setIsOpen(false)} className="w-full">
+                      <Button variant="outline" className="w-full h-10 rounded-xl font-black text-xs text-slate-800 bg-slate-100 hover:bg-slate-200 border-none">
+                        Connexion
+                      </Button>
+                    </Link>
+                    <Link to="/signup" onClick={() => setIsOpen(false)} className="w-full">
+                      <Button className="w-full h-10 rounded-xl font-black text-xs text-white bg-orange-600 hover:bg-orange-700 shadow-md shadow-orange-600/20 border-none">
+                        Inscription
+                      </Button>
+                    </Link>
                   </div>
-                )}
-              </div>
+                  {/* Subtle Role Direct Shortcuts */}
+                  <div className="flex items-center justify-between px-1 text-[10px] font-bold text-slate-400">
+                    <Link to="/auth/login/member" onClick={() => setIsOpen(false)} className="hover:text-orange-600 transition-colors">
+                      Espace Candidat ➔
+                    </Link>
+                    <Link to="/auth/login/company" onClick={() => setIsOpen(false)} className="hover:text-orange-600 transition-colors">
+                      Espace Entreprise ➔
+                    </Link>
+                  </div>
+                </div>
+              )}
             </div>
           </motion.div>
         )}
