@@ -37,11 +37,11 @@ const DEFAULT_PROFILE = (email: string = '', name: string = ''): CVLMUserProfile
   linkedinUrl: '',
   portfolioUrl: '',
   websiteUrl: '',
-  bio: 'Candidat déterminé à la recherche de nouvelles opportunités professionnelles.',
+  bio: '',
   openToWork: true,
-  languages: ['Français', 'Anglais'],
-  points: 120,
-  avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&h=150&fit=crop&crop=faces'
+  languages: ['Français'],
+  points: 0,
+  avatarUrl: ''
 });
 
 interface TemplateCardProps {
@@ -280,8 +280,10 @@ export default function CVLM() {
     }
   };
 
+  const safeTemplates = Array.isArray(templates) ? templates : [];
+
   const handleEditCVVersion = (version: CVVersion) => {
-    const matchedTemplate = templates.find(t => t.id === version.templateId) || {
+    const matchedTemplate = safeTemplates.find(t => t?.id === version.templateId) || {
       id: version.templateId || 'cv-1',
       name: version.templateName || 'Modèle Personnalisé',
       thumbnail: '',
@@ -296,7 +298,7 @@ export default function CVLM() {
   };
 
   const handleEditLMVersion = (version: LMVersion) => {
-    const matchedTemplate = templates.find(t => t.id === version.templateId) || {
+    const matchedTemplate = safeTemplates.find(t => t?.id === version.templateId) || {
       id: version.templateId || 'lm-1',
       name: version.templateName || 'Lettre Personnalisée',
       thumbnail: '',
@@ -355,13 +357,14 @@ export default function CVLM() {
   };
 
   // Filter & Search computation
-  const filteredTemplates = templates.filter(t => {
+  const filteredTemplates = safeTemplates.filter(t => {
+    if (!t) return false;
     const matchesFilter = 
       filter === 'all' ? true :
       filter === 'favorite' ? t.isFavorite :
       t.type === filter;
-    const matchesSearch = t.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          t.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()));
+    const matchesSearch = (t.name || '').toLowerCase().includes(searchQuery.toLowerCase()) || 
+                          (t.tags || []).some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()));
     return matchesFilter && matchesSearch;
   });
 
@@ -522,7 +525,7 @@ export default function CVLM() {
                 <div>
                   <p className="text-[9px] font-black uppercase text-slate-400">Favoris</p>
                   <p className="text-sm font-black text-slate-800">
-                    {templates.filter(t => t.isFavorite).length} modèles
+                    {safeTemplates.filter(t => t?.isFavorite).length} modèles
                   </p>
                 </div>
               </GlassCard>
@@ -546,7 +549,7 @@ export default function CVLM() {
                     filter === 'all' ? 'bg-white text-orange-600 shadow-sm' : 'text-slate-500'
                   }`}
                 >
-                  Tous ({templates.length})
+                  Tous ({safeTemplates.length})
                 </button>
                 <button
                   onClick={() => setFilter('cv')}
@@ -554,7 +557,7 @@ export default function CVLM() {
                     filter === 'cv' ? 'bg-white text-orange-600 shadow-sm' : 'text-slate-500'
                   }`}
                 >
-                  CV (41)
+                  CV ({safeTemplates.filter(t => t?.type === 'cv').length})
                 </button>
                 <button
                   onClick={() => setFilter('lm')}
@@ -562,7 +565,7 @@ export default function CVLM() {
                     filter === 'lm' ? 'bg-white text-orange-600 shadow-sm' : 'text-slate-500'
                   }`}
                 >
-                  Lettres (43)
+                  Lettres ({safeTemplates.filter(t => t?.type === 'lm').length})
                 </button>
                 <button
                   onClick={() => setFilter('favorite')}
@@ -570,7 +573,7 @@ export default function CVLM() {
                     filter === 'favorite' ? 'bg-white text-orange-600 shadow-sm' : 'text-slate-500'
                   }`}
                 >
-                  Favoris ({templates.filter(t => t.isFavorite).length})
+                  Favoris ({safeTemplates.filter(t => t?.isFavorite).length})
                 </button>
               </div>
 
@@ -756,11 +759,17 @@ export default function CVLM() {
               <GlassCard className="space-y-6">
                 <div className="flex flex-col sm:flex-row items-center gap-4 border-b border-slate-100 pb-5">
                   <div className="relative group shrink-0">
-                    <img
-                      src={profile.avatarUrl}
-                      alt="Avatar"
-                      className="h-20 w-20 rounded-full object-cover border-2 border-orange-500 shadow-sm"
-                    />
+                    {profile.avatarUrl ? (
+                      <img
+                        src={profile.avatarUrl}
+                        alt="Avatar"
+                        className="h-20 w-20 rounded-full object-cover border-2 border-orange-500 shadow-sm"
+                      />
+                    ) : (
+                      <div className="h-20 w-20 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center font-black text-xl border-2 border-orange-500 shadow-sm">
+                        {profile.name ? profile.name.charAt(0).toUpperCase() : 'C'}
+                      </div>
+                    )}
                     <label className="absolute inset-0 bg-black/50 rounded-full opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center transition-opacity cursor-pointer text-white">
                       <Camera className="h-5 w-5 mb-0.5" />
                       <span className="text-[7px] font-black uppercase tracking-wider">Éditer</span>

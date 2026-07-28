@@ -103,18 +103,8 @@ export const subscribeToLMVersions = (onUpdate: (versions: LMVersion[]) => void,
         }
       });
 
-      if (remoteVersions.length > 0) {
-        const local = getAllLMVersions();
-        const map = new Map<string, LMVersion>();
-        local.forEach(v => map.set(v.id, v));
-        remoteVersions.forEach(v => map.set(v.id, v));
-
-        const merged = Array.from(map.values());
-        safeSetItem(`${PREF}lm_versions`, JSON.stringify(merged));
-        onUpdate(merged);
-      } else {
-        onUpdate(getAllLMVersions());
-      }
+      safeSetItem(`${PREF}lm_versions`, JSON.stringify(remoteVersions));
+      onUpdate(remoteVersions);
     }, (err) => {
       console.warn('Firestore LM versions listener notice:', err);
       onUpdate(getAllLMVersions());

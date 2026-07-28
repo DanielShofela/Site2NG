@@ -103,19 +103,8 @@ export const subscribeToVersions = (onUpdate: (versions: CVVersion[]) => void, u
         }
       });
 
-      if (remoteVersions.length > 0) {
-        // Merge local & remote
-        const local = getAllVersions();
-        const map = new Map<string, CVVersion>();
-        local.forEach(v => map.set(v.id, v));
-        remoteVersions.forEach(v => map.set(v.id, v));
-
-        const merged = Array.from(map.values());
-        safeSetItem(`${PREF}versions`, JSON.stringify(merged));
-        onUpdate(merged);
-      } else {
-        onUpdate(getAllVersions());
-      }
+      safeSetItem(`${PREF}versions`, JSON.stringify(remoteVersions));
+      onUpdate(remoteVersions);
     }, (err) => {
       console.warn('Firestore versions listener notice:', err);
       onUpdate(getAllVersions());

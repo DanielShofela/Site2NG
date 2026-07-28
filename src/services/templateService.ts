@@ -2,6 +2,7 @@ import { CVLMTemplate, CVLMPromoSlide } from '@/types/cvlm';
 import { safeSetItem, safeGetItem } from '@/lib/safeStorage';
 import { db } from '@/lib/firebase';
 import { collection, doc, setDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
+import { compressDataUrl } from '@/lib/imageUtils';
 
 const PREF = 'cvlm_';
 
@@ -60,7 +61,10 @@ export const getTemplates = (): CVLMTemplate[] => {
   const stored = safeGetItem(`${PREF}templates`);
   if (stored) {
     try {
-      return JSON.parse(stored);
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed)) {
+        return parsed;
+      }
     } catch (e) {
       console.error('Error loading cvlm_templates', e);
     }
@@ -72,17 +76,20 @@ export const getTemplates = (): CVLMTemplate[] => {
 };
 
 export const getCVTemplates = (): CVLMTemplate[] => {
-  return getTemplates().filter(t => t.type === 'cv');
+  const list = getTemplates();
+  return (Array.isArray(list) ? list : []).filter(t => t?.type === 'cv');
 };
 
 export const getLMTemplates = (): CVLMTemplate[] => {
-  return getTemplates().filter(t => t.type === 'lm');
+  const list = getTemplates();
+  return (Array.isArray(list) ? list : []).filter(t => t?.type === 'lm');
 };
 
 export const toggleFavorite = (id: string): CVLMTemplate[] => {
   const templates = getTemplates();
-  const updated = templates.map(t => {
-    if (t.id === id) {
+  const list = Array.isArray(templates) ? templates : [];
+  const updated = list.map(t => {
+    if (t && t.id === id) {
       return { ...t, isFavorite: !t.isFavorite };
     }
     return t;
@@ -92,14 +99,26 @@ export const toggleFavorite = (id: string): CVLMTemplate[] => {
 };
 
 export const saveTemplates = (templates: CVLMTemplate[]): void => {
-  safeSetItem(`${PREF}templates`, JSON.stringify(templates));
+  const validList = Array.isArray(templates) ? templates : [];
+  safeSetItem(`${PREF}templates`, JSON.stringify(validList));
 };
 
 export const addTemplate = async (template: Omit<CVLMTemplate, 'id' | 'isFavorite'>): Promise<CVLMTemplate[]> => {
   const templates = getTemplates();
   const id = `${template.type}-${Date.now()}`;
+
+  let compressedThumb = template.thumbnail;
+  if (compressedThumb && compressedThumb.startsWith('data:image/')) {
+    try {
+      compressedThumb = await compressDataUrl(compressedThumb, 600, 800, 0.75);
+    } catch (e) {
+      console.warn('Failed compressing thumbnail in addTemplate:', e);
+    }
+  }
+
   const newTemplate: CVLMTemplate = {
     ...template,
+    thumbnail: compressedThumb,
     id,
     isFavorite: false
   };
@@ -119,9 +138,18 @@ export const updateTemplate = async (id: string, updatedFields: Partial<CVLMTemp
   const templates = getTemplates();
   let updatedItem: CVLMTemplate | undefined;
 
+  const fieldsToApply = { ...updatedFields };
+  if (fieldsToApply.thumbnail && fieldsToApply.thumbnail.startsWith('data:image/')) {
+    try {
+      fieldsToApply.thumbnail = await compressDataUrl(fieldsToApply.thumbnail, 600, 800, 0.75);
+    } catch (e) {
+      console.warn('Failed compressing thumbnail in updateTemplate:', e);
+    }
+  }
+
   const updated = templates.map(t => {
     if (t.id === id) {
-      updatedItem = { ...t, ...updatedFields };
+      updatedItem = { ...t, ...fieldsToApply };
       return updatedItem;
     }
     return t;
@@ -153,32 +181,47 @@ export const deleteTemplate = async (id: string): Promise<CVLMTemplate[]> => {
   return updated;
 };
 
-export const resetTemplates = (): CVLMTemplate[] => {
+export const resetTemplates = async (): Promise<CVLMTemplate[]> => {
   const fresh = generateTemplates();
   saveTemplates(fresh);
+  for (const tpl of fresh) {
+    try {
+      await setDoc(doc(db, 'cv_templates', tpl.id), JSON.parse(JSON.stringify(tpl)), { merge: true });
+    } catch (e) {
+      console.error('Error resetting template in Firestore:', e);
+    }
+  }
   return fresh;
 };
 
 export const subscribeToTemplates = (onUpdate: (templates: CVLMTemplate[]) => void) => {
   try {
     const templatesRef = collection(db, 'cv_templates');
-    return onSnapshot(templatesRef, (snapshot) => {
+    return onSnapshot(templatesRef, async (snapshot) => {
       const remoteTemplates: CVLMTemplate[] = [];
       snapshot.forEach(docSnap => {
         remoteTemplates.push(docSnap.data() as CVLMTemplate);
       });
 
-      if (remoteTemplates.length > 0) {
-        const local = getTemplates();
-        const map = new Map<string, CVLMTemplate>();
-        local.forEach(t => map.set(t.id, t));
-        remoteTemplates.forEach(t => map.set(t.id, t));
+      const defaultTemplates = generateTemplates();
+      const existingIds = new Set(remoteTemplates.map(t => t.id));
+      const missingTemplates = defaultTemplates.filter(t => !existingIds.has(t.id));
 
-        const merged = Array.from(map.values());
-        saveTemplates(merged);
-        onUpdate(merged);
+      if (missingTemplates.length > 0) {
+        // Seed any missing default CV / LM templates into Firestore so the database contains all 41 CVs and 43 LMs
+        for (const tpl of missingTemplates) {
+          try {
+            await setDoc(doc(db, 'cv_templates', tpl.id), JSON.parse(JSON.stringify(tpl)), { merge: true });
+          } catch (e) {
+            console.error('Error seeding template to Firestore:', e);
+          }
+        }
+        const fullList = [...remoteTemplates, ...missingTemplates];
+        saveTemplates(fullList);
+        onUpdate(fullList);
       } else {
-        onUpdate(getTemplates());
+        saveTemplates(remoteTemplates);
+        onUpdate(remoteTemplates);
       }
     }, (err) => {
       console.warn('Firestore templates listener notice:', err);

@@ -10,6 +10,7 @@ import {
   deleteTemplate, 
   resetTemplates, 
   saveTemplates,
+  subscribeToTemplates,
   getPromoSlides,
   addPromoSlide,
   updatePromoSlide,
@@ -17,6 +18,8 @@ import {
   resetPromoSlides
 } from '@/services/templateService';
 import { CVLMTemplate, CVLMPromoSlide } from '@/types/cvlm';
+import { compressImage } from '@/lib/imageUtils';
+
 import { 
   Search, 
   Plus, 
@@ -63,24 +66,25 @@ function ImageUploader({ value, onChange }: ImageUploaderProps) {
     }
   };
 
-  const processFile = (file: File) => {
+  const processFile = async (file: File) => {
     if (!file.type.startsWith('image/')) {
       alert("Veuillez sélectionner un fichier image valide (PNG, JPG, WEBP, GIF).");
       return;
     }
-    // Limit to 2MB to prevent large base64 strings exceeding localStorage limits
-    if (file.size > 2 * 1024 * 1024) {
-      alert("L'image est trop volumineuse. Veuillez utiliser une image de moins de 2 Mo.");
-      return;
+    try {
+      const compressed = await compressImage(file, 600, 800, 0.75);
+      onChange(compressed);
+    } catch (err) {
+      console.error("Error compressing image:", err);
+      // Fallback to reading file if compression fails
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        if (event.target?.result) {
+          onChange(event.target.result as string);
+        }
+      };
+      reader.readAsDataURL(file);
     }
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      if (event.target?.result) {
-        onChange(event.target.result as string);
-      }
-    };
-    reader.readAsDataURL(file);
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -253,10 +257,13 @@ export default function CVLMModule({ addLog }: CVLMModuleProps) {
   const [slideImagePath, setSlideImagePath] = useState('');
   const [slideIconName, setSlideIconName] = useState<'Sparkles' | 'Award' | 'Zap' | 'Briefcase' | 'FileText'>('Sparkles');
 
-  // Load templates and slides on mount
+  // Load templates and slides on mount & listen to real-time Firestore updates
   useEffect(() => {
     setTemplates(getTemplates());
     setSlides(getPromoSlides());
+
+    const unsub = subscribeToTemplates((updated) => setTemplates(updated));
+    return () => unsub();
   }, []);
 
   // Sync templates list
@@ -265,17 +272,19 @@ export default function CVLMModule({ addLog }: CVLMModuleProps) {
   };
 
   // Stats calculations
-  const totalCount = templates.length;
-  const cvCount = templates.filter(t => t.type === 'cv').length;
-  const lmCount = templates.filter(t => t.type === 'lm').length;
-  const premiumCount = templates.filter(t => t.isPremium).length;
+  const safeTemplates = Array.isArray(templates) ? templates : [];
+  const totalCount = safeTemplates.length;
+  const cvCount = safeTemplates.filter(t => t?.type === 'cv').length;
+  const lmCount = safeTemplates.filter(t => t?.type === 'lm').length;
+  const premiumCount = safeTemplates.filter(t => t?.isPremium).length;
   const freeCount = totalCount - premiumCount;
   const premiumPercent = totalCount > 0 ? Math.round((premiumCount / totalCount) * 100) : 0;
 
   // Filter logic
-  const filteredTemplates = templates.filter(t => {
-    const matchesSearch = t.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          t.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()));
+  const filteredTemplates = safeTemplates.filter(t => {
+    if (!t) return false;
+    const matchesSearch = (t.name || '').toLowerCase().includes(searchQuery.toLowerCase()) || 
+                          (t.tags || []).some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()));
     const matchesType = filterType === 'all' || t.type === filterType;
     const matchesPremium = filterPremium === 'all' || 
                            (filterPremium === 'premium' && t.isPremium) || 
