@@ -129,7 +129,8 @@ export default function AdminDashboard() {
     candidates: 0,
     jobs: 0,
     applications: 0,
-    pendingApprovals: 0
+    pendingApprovals: 0,
+    pendingCvRequests: 0
   });
 
   const [cmsData, setCmsData] = useState({
@@ -268,6 +269,17 @@ export default function AdminDashboard() {
       console.warn("Notice reading Goals in Admin:", error?.message || error);
     });
 
+    // CV & LM Requests sync for pending badge
+    const cvRequestsUnsub = onSnapshot(collection(db, 'cv_requests'), (snapshot) => {
+      const pendingCount = snapshot.docs.filter(d => {
+        const data = d.data();
+        return !data.status || data.status === 'submitted';
+      }).length;
+      setStats(prev => ({ ...prev, pendingCvRequests: pendingCount }));
+    }, (error) => {
+      console.warn("Notice reading cv_requests in Admin:", error?.message || error);
+    });
+
     setLoading(false);
 
     return () => {
@@ -278,6 +290,7 @@ export default function AdminDashboard() {
       cmsUnsub();
       maintUnsub();
       goalsUnsub();
+      cvRequestsUnsub();
     };
   }, [user]);
 
@@ -403,7 +416,7 @@ export default function AdminDashboard() {
   const sidebarItems = [
     { id: 'overview', label: "Vue d'ensemble", icon: LayoutDashboard },
     { id: 'editorial', label: "Espace Éditorial", icon: Sparkles },
-    { id: 'cvlm', label: "Modèles CV & Lettres", icon: FileText },
+    { id: 'cvlm', label: "Demandes CV & Modèles", icon: FileText, badge: stats.pendingCvRequests },
     { id: 'users', label: "Utilisateurs", icon: Users },
     { id: 'approvals', label: "File d'attente", icon: ShieldCheck, badge: stats.pendingApprovals },
     { id: 'jobs', label: "Offres d'emploi", icon: Briefcase },
