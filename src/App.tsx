@@ -67,7 +67,7 @@ export default function App() {
 
 function AppLayout() {
   const { user, loading } = useAuth();
-  const { config, maintenanceEnabled } = useSiteConfig();
+  const { config, maintenanceEnabled, quotaExceeded } = useSiteConfig();
   const location = useLocation();
   const isDashboardPage = location.pathname.startsWith('/admin') || 
                           location.pathname.startsWith('/recruiter') || 
@@ -95,6 +95,11 @@ function AppLayout() {
 
   return (
     <div className="min-h-screen bg-background font-sans antialiased overflow-x-hidden">
+      {quotaExceeded && (
+        <div className="bg-amber-600 text-white text-[11px] font-bold px-4 py-1.5 text-center flex items-center justify-center gap-2 shadow-sm z-[100] relative">
+          <span>⚡ Mode Hors-Ligne / Cache local actif — Les données en cache et le système restent fonctionnels.</span>
+        </div>
+      )}
       {!isDashboardPage && <Navbar />}
       <main className={!isDashboardPage ? (config.bannerEnabled && config.bannerContent ? "pt-[136px] sm:pt-[128px]" : "pt-[88px]") : ""}>
         <Routes>

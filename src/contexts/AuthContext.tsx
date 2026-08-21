@@ -128,12 +128,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (snapshot.exists()) {
             const profile = snapshot.data() as UserProfile;
             setUser(profile);
+            safeSetItem(`user_profile_${firebaseUser.uid}`, JSON.stringify(profile));
           } else {
             setUser(null);
           }
           setLoading(false);
         }, (error) => {
-          console.error("Profile sync error:", error);
+          const msg = error?.message || String(error);
+          console.warn("Profile sync notice (using cached profile if available):", msg);
+          
+          // Fallback to local cached profile if available
+          const cachedProfile = safeGetItem(`user_profile_${firebaseUser.uid}`);
+          if (cachedProfile) {
+            try {
+              setUser(JSON.parse(cachedProfile));
+            } catch (e) {
+              // Construct basic user profile fallback from Firebase auth user
+              setUser({
+                uid: firebaseUser.uid,
+                email: firebaseUser.email || '',
+                displayName: firebaseUser.displayName || firebaseUser.email || 'Utilisateur',
+                role: 'candidate',
+                createdAt: new Date().toISOString()
+              } as UserProfile);
+            }
+          } else {
+            setUser({
+              uid: firebaseUser.uid,
+              email: firebaseUser.email || '',
+              displayName: firebaseUser.displayName || firebaseUser.email || 'Utilisateur',
+              role: 'candidate',
+              createdAt: new Date().toISOString()
+            } as UserProfile);
+          }
           setLoading(false);
         });
       } else {

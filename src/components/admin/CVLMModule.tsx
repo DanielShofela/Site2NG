@@ -11,6 +11,7 @@ import {
   resetTemplates, 
   saveTemplates,
   subscribeToTemplates,
+  getTemplateThumbnail,
   getPromoSlides,
   addPromoSlide,
   updatePromoSlide,
@@ -18,7 +19,11 @@ import {
   resetPromoSlides
 } from '@/services/templateService';
 import { CVLMTemplate, CVLMPromoSlide } from '@/types/cvlm';
-import { compressImage } from '@/lib/imageUtils';
+import { compressImage, uploadImageToStorage } from '@/lib/imageUtils';
+import { db } from '@/lib/firebase';
+import { collection, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { safeGetItem, safeSetItem } from '@/lib/safeStorage';
+import { showToast } from '@/components/dashboard/toast';
 
 import { 
   Search, 
@@ -39,9 +44,46 @@ import {
   Image as ImageIcon,
   Award,
   Zap,
-  Briefcase
+  Briefcase,
+  Mail,
+  Phone,
+  MapPin,
+  Calendar,
+  User,
+  Copy,
+  ExternalLink,
+  CheckCircle2,
+  Clock,
+  AlertCircle,
+  XCircle,
+  Printer,
+  Send,
+  MessageCircle,
+  FileCheck,
+  Filter,
+  Building2,
+  GraduationCap,
+  BookOpen,
+  Download,
+  Globe,
+  Inbox
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+
+export interface CVLMRequest {
+  id: string;
+  userId?: string;
+  userEmail: string;
+  userName: string;
+  userPhone: string;
+  templateId?: string;
+  templateName?: string;
+  type: 'cv' | 'lm';
+  formData: any;
+  status: 'submitted' | 'processing' | 'completed' | 'cancelled';
+  createdAt: string;
+  updatedAt?: string;
+}
 
 interface CVLMModuleProps {
   addLog: (action: string, target: string, type: string) => Promise<void>;
@@ -54,6 +96,7 @@ interface ImageUploaderProps {
 
 function ImageUploader({ value, onChange }: ImageUploaderProps) {
   const [dragActive, setDragActive] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleDrag = (e: React.DragEvent) => {
@@ -71,19 +114,25 @@ function ImageUploader({ value, onChange }: ImageUploaderProps) {
       alert("Veuillez sélectionner un fichier image valide (PNG, JPG, WEBP, GIF).");
       return;
     }
+    setIsUploading(true);
     try {
-      const compressed = await compressImage(file, 600, 800, 0.75);
-      onChange(compressed);
+      const storageUrl = await uploadImageToStorage(file, 'cvlm/thumbnails');
+      if (storageUrl) {
+        onChange(storageUrl);
+      } else {
+        const compressed = await compressImage(file, 600, 800, 0.75);
+        onChange(compressed);
+      }
     } catch (err) {
-      console.error("Error compressing image:", err);
-      // Fallback to reading file if compression fails
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        if (event.target?.result) {
-          onChange(event.target.result as string);
-        }
-      };
-      reader.readAsDataURL(file);
+      console.error("Error uploading image to Firebase Storage:", err);
+      try {
+        const compressed = await compressImage(file, 600, 800, 0.75);
+        onChange(compressed);
+      } catch (e2) {
+        console.error("Error compressing image:", e2);
+      }
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -191,7 +240,7 @@ const GRADIENT_PRESETS = [
 ];
 
 const ICON_PRESETS = [
-  { name: 'Étoiles / IA', value: 'Sparkles' },
+  { name: 'Étoiles / Élégance', value: 'Sparkles' },
   { name: 'Médaille / Premium', value: 'Award' },
   { name: 'Éclair / Rapidité', value: 'Zap' },
   { name: 'Mallette / Emploi', value: 'Briefcase' },
@@ -221,8 +270,18 @@ export default function CVLMModule({ addLog }: CVLMModuleProps) {
   const [filterType, setFilterType] = useState<'all' | 'cv' | 'lm'>('all');
   const [filterPremium, setFilterPremium] = useState<'all' | 'free' | 'premium'>('all');
   
+  // Requests State
+  const [requests, setRequests] = useState<CVLMRequest[]>([]);
+  const [loadingRequests, setLoadingRequests] = useState(true);
+  const [selectedRequest, setSelectedRequest] = useState<CVLMRequest | null>(null);
+
+  // Request filters
+  const [reqSearchQuery, setReqSearchQuery] = useState('');
+  const [reqFilterType, setReqFilterType] = useState<'all' | 'cv' | 'lm'>('all');
+  const [reqFilterStatus, setReqFilterStatus] = useState<'all' | 'submitted' | 'processing' | 'completed' | 'cancelled'>('all');
+
   // Navigation activeTab
-  const [activeTab, setActiveTab] = useState<'templates' | 'promo_slides'>('templates');
+  const [activeTab, setActiveTab] = useState<'requests' | 'templates' | 'promo_slides'>('requests');
 
   // Slides State
   const [slides, setSlides] = useState<CVLMPromoSlide[]>([]);
@@ -237,7 +296,7 @@ export default function CVLMModule({ addLog }: CVLMModuleProps) {
 
   // Custom Confirmation Modal state
   const [confirmAdminAction, setConfirmAdminAction] = useState<{
-    type: 'delete_template' | 'reset_templates' | 'delete_slide' | 'reset_slides';
+    type: 'delete_template' | 'reset_templates' | 'delete_slide' | 'reset_slides' | 'delete_request';
     id?: string;
     name?: string;
   } | null>(null);
@@ -257,21 +316,105 @@ export default function CVLMModule({ addLog }: CVLMModuleProps) {
   const [slideImagePath, setSlideImagePath] = useState('');
   const [slideIconName, setSlideIconName] = useState<'Sparkles' | 'Award' | 'Zap' | 'Briefcase' | 'FileText'>('Sparkles');
 
-  // Load templates and slides on mount & listen to real-time Firestore updates
+  // Load templates, slides, and requests on mount & listen to real-time Firestore updates
   useEffect(() => {
     setTemplates(getTemplates());
     setSlides(getPromoSlides());
 
-    const unsub = subscribeToTemplates((updated) => setTemplates(updated));
-    return () => unsub();
+    const unsubTemplates = subscribeToTemplates((updated) => setTemplates(updated));
+
+    let unsubRequests: (() => void) | undefined;
+    try {
+      const q = query(collection(db, 'cv_requests'));
+      unsubRequests = onSnapshot(q, (snapshot) => {
+        const list: CVLMRequest[] = [];
+        snapshot.forEach((docSnap) => {
+          list.push({ id: docSnap.id, ...docSnap.data() } as CVLMRequest);
+        });
+
+        // Merge with local storage cached requests
+        const cachedStr = safeGetItem('cvlm_all_requests');
+        let cachedList: CVLMRequest[] = [];
+        if (cachedStr) {
+          try { cachedList = JSON.parse(cachedStr); } catch (e) {}
+        }
+
+        const map = new Map<string, CVLMRequest>();
+        cachedList.forEach(r => map.set(r.id, r));
+        list.forEach(r => map.set(r.id, r));
+
+        const combined = Array.from(map.values()).sort((a, b) => 
+          (b.createdAt || '').localeCompare(a.createdAt || '')
+        );
+
+        setRequests(combined);
+        setLoadingRequests(false);
+      }, (err) => {
+        console.warn('Error subscribing to cv_requests:', err);
+        const cachedStr = safeGetItem('cvlm_all_requests');
+        if (cachedStr) {
+          try { setRequests(JSON.parse(cachedStr)); } catch (e) {}
+        }
+        setLoadingRequests(false);
+      });
+    } catch (e) {
+      console.warn('Firestore subscription exception:', e);
+      const cachedStr = safeGetItem('cvlm_all_requests');
+      if (cachedStr) {
+        try { setRequests(JSON.parse(cachedStr)); } catch (e) {}
+      }
+      setLoadingRequests(false);
+    }
+
+    return () => {
+      unsubTemplates();
+      if (unsubRequests) unsubRequests();
+    };
   }, []);
+
+  // Request actions
+  const handleUpdateRequestStatus = async (reqId: string, newStatus: CVLMRequest['status']) => {
+    try {
+      await updateDoc(doc(db, 'cv_requests', reqId), {
+        status: newStatus,
+        updatedAt: new Date().toISOString()
+      });
+    } catch (e) {
+      console.warn("Firestore status update notice:", e);
+    }
+
+    setRequests(prev => prev.map(r => r.id === reqId ? { ...r, status: newStatus } : r));
+    if (selectedRequest && selectedRequest.id === reqId) {
+      setSelectedRequest(prev => prev ? { ...prev, status: newStatus } : null);
+    }
+
+    const cachedStr = safeGetItem('cvlm_all_requests');
+    if (cachedStr) {
+      try {
+        const list: CVLMRequest[] = JSON.parse(cachedStr);
+        const updated = list.map(r => r.id === reqId ? { ...r, status: newStatus } : r);
+        safeSetItem('cvlm_all_requests', JSON.stringify(updated));
+      } catch (e) {}
+    }
+
+    showToast(`Statut de la demande mis à jour (${newStatus})`, 'success');
+    await addLog("Mise à jour statut demande", `Demande ID ${reqId} passée à ${newStatus}`, "info");
+  };
+
+  const handleDeleteRequest = (reqId: string, userName: string) => {
+    setConfirmAdminAction({
+      type: 'delete_request',
+      id: reqId,
+      name: userName
+    });
+  };
 
   // Sync templates list
   const refreshList = () => {
     setTemplates(getTemplates());
   };
 
-  // Stats calculations
+  // Stats calculations for Templates
   const safeTemplates = Array.isArray(templates) ? templates : [];
   const totalCount = safeTemplates.length;
   const cvCount = safeTemplates.filter(t => t?.type === 'cv').length;
@@ -280,7 +423,33 @@ export default function CVLMModule({ addLog }: CVLMModuleProps) {
   const freeCount = totalCount - premiumCount;
   const premiumPercent = totalCount > 0 ? Math.round((premiumCount / totalCount) * 100) : 0;
 
-  // Filter logic
+  // Stats calculations for Requests
+  const safeRequests = Array.isArray(requests) ? requests : [];
+  const reqTotalCount = safeRequests.length;
+  const reqCvCount = safeRequests.filter(r => r?.type === 'cv').length;
+  const reqLmCount = safeRequests.filter(r => r?.type === 'lm').length;
+  const reqSubmittedCount = safeRequests.filter(r => r?.status === 'submitted').length;
+  const reqProcessingCount = safeRequests.filter(r => r?.status === 'processing').length;
+  const reqCompletedCount = safeRequests.filter(r => r?.status === 'completed').length;
+
+  // Requests Filter logic
+  const filteredRequests = safeRequests.filter(r => {
+    if (!r) return false;
+    const q = reqSearchQuery.toLowerCase().trim();
+    const nameMatch = (r.userName || '').toLowerCase().includes(q);
+    const emailMatch = (r.userEmail || '').toLowerCase().includes(q);
+    const phoneMatch = (r.userPhone || '').toLowerCase().includes(q);
+    const jobMatch = (r.formData?.jobTitle || r.formData?.subject || r.formData?.recipientCompany || '').toLowerCase().includes(q);
+    const templateMatch = (r.templateName || '').toLowerCase().includes(q);
+    const matchesSearch = !q || nameMatch || emailMatch || phoneMatch || jobMatch || templateMatch;
+
+    const matchesType = reqFilterType === 'all' || r.type === reqFilterType;
+    const matchesStatus = reqFilterStatus === 'all' || r.status === reqFilterStatus;
+
+    return matchesSearch && matchesType && matchesStatus;
+  });
+
+  // Templates Filter logic
   const filteredTemplates = safeTemplates.filter(t => {
     if (!t) return false;
     const matchesSearch = (t.name || '').toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -333,7 +502,7 @@ export default function CVLMModule({ addLog }: CVLMModuleProps) {
     const thumbnailToUse = formThumbnail.trim() || DEFAULT_THUMBNAIL;
     const tagArray = formTags.split(',').map(t => t.trim()).filter(Boolean);
 
-    const updated = addTemplate({
+    const updated = await addTemplate({
       name: formName.trim(),
       type: formType,
       thumbnail: thumbnailToUse,
@@ -363,7 +532,7 @@ export default function CVLMModule({ addLog }: CVLMModuleProps) {
 
     const tagArray = formTags.split(',').map(t => t.trim()).filter(Boolean);
 
-    const updated = updateTemplate(editingTemplate.id, {
+    const updated = await updateTemplate(editingTemplate.id, {
       name: formName.trim(),
       type: formType,
       thumbnail: formThumbnail.trim(),
@@ -405,7 +574,7 @@ export default function CVLMModule({ addLog }: CVLMModuleProps) {
 
     if (editingSlide) {
       // update
-      const updated = updatePromoSlide(editingSlide.id, {
+      const updated = await updatePromoSlide(editingSlide.id, {
         title: slideTitle.trim(),
         description: slideDescription.trim(),
         badge: slideBadge.trim(),
@@ -417,7 +586,7 @@ export default function CVLMModule({ addLog }: CVLMModuleProps) {
       await addLog("Mise à jour bannière CVLM", `Bannière "${slideTitle}" mise à jour`, "info");
     } else {
       // create
-      const updated = addPromoSlide({
+      const updated = await addPromoSlide({
         title: slideTitle.trim(),
         description: slideDescription.trim(),
         badge: slideBadge.trim(),
@@ -452,14 +621,22 @@ export default function CVLMModule({ addLog }: CVLMModuleProps) {
         <div>
           <h2 className="text-xl font-black text-slate-900 flex items-center gap-2">
             <Sparkles className="h-6 w-6 text-orange-500 animate-pulse" />
-            Gestionnaire de Modèles d'Intelligence Artificielle (CVLM)
+            Gestionnaire CVLM & Demandes de Rédaction
           </h2>
           <p className="text-slate-450 text-xs font-semibold leading-relaxed mt-1">
-            Gérez, ajoutez, éditez et configurez tous les modèles de CV/Lettres ainsi que les bannières publicitaires d'accueil de la plateforme.
+            Consultez toutes les demandes de CV et Lettres transmises par les candidats, gérez les modèles et administrez les bannières publicitaires.
           </p>
         </div>
         <div className="flex items-center gap-3 shrink-0">
-          {activeTab === 'templates' ? (
+          {activeTab === 'requests' && (
+            <div className="flex items-center gap-2 bg-orange-50 border border-orange-200/60 px-3.5 py-2 rounded-xl">
+              <Inbox className="h-4 w-4 text-orange-600" />
+              <span className="text-xs font-black text-orange-950">
+                {reqSubmittedCount} demande{reqSubmittedCount > 1 ? 's' : ''} en attente
+              </span>
+            </div>
+          )}
+          {activeTab === 'templates' && (
             <>
               <Button 
                 onClick={handleResetDefaults}
@@ -475,7 +652,8 @@ export default function CVLMModule({ addLog }: CVLMModuleProps) {
                 <Plus className="mr-1.5 h-4 w-4" /> Nouveau Modèle
               </Button>
             </>
-          ) : (
+          )}
+          {activeTab === 'promo_slides' && (
             <>
               <Button 
                 onClick={handleResetSlides}
@@ -496,7 +674,24 @@ export default function CVLMModule({ addLog }: CVLMModuleProps) {
       </div>
 
       {/* Navigation Tabs */}
-      <div className="flex border border-slate-200 bg-slate-50 p-1 rounded-2xl gap-1 max-w-xs">
+      <div className="flex border border-slate-200 bg-slate-50 p-1 rounded-2xl gap-1 max-w-md">
+        <button
+          onClick={() => setActiveTab('requests')}
+          className={`flex-1 py-2.5 px-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+            activeTab === 'requests'
+              ? 'bg-orange-600 text-white shadow-sm'
+              : 'text-slate-500 hover:text-slate-800'
+          }`}
+        >
+          <Inbox className="h-3.5 w-3.5" />
+          Demandes ({reqTotalCount})
+          {reqSubmittedCount > 0 && (
+            <span className="h-4 min-w-[16px] px-1 bg-white text-orange-600 rounded-full text-[9px] font-black flex items-center justify-center shadow-xs">
+              {reqSubmittedCount}
+            </span>
+          )}
+        </button>
+
         <button
           onClick={() => setActiveTab('templates')}
           className={`flex-1 py-2.5 px-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
@@ -506,8 +701,9 @@ export default function CVLMModule({ addLog }: CVLMModuleProps) {
           }`}
         >
           <FileText className="h-3.5 w-3.5 text-orange-500" />
-          Modèles
+          Modèles ({totalCount})
         </button>
+
         <button
           onClick={() => setActiveTab('promo_slides')}
           className={`flex-1 py-2.5 px-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
@@ -517,9 +713,250 @@ export default function CVLMModule({ addLog }: CVLMModuleProps) {
           }`}
         >
           <ImageIcon className="h-3.5 w-3.5 text-orange-500" />
-          Bannières
+          Bannières ({slides.length})
         </button>
       </div>
+
+      {/* TAB 1: REQUESTS LIST */}
+      {activeTab === 'requests' && (
+        <div className="space-y-6">
+          {/* Stats Board */}
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+            <Card className="border-none shadow-sm rounded-2xl bg-white p-5">
+              <p className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Total Demandes</p>
+              <div className="flex items-baseline gap-2 mt-2">
+                <span className="text-2xl font-black text-slate-900">{reqTotalCount}</span>
+                <span className="text-[10px] font-semibold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">Reçues</span>
+              </div>
+            </Card>
+
+            <Card className="border-none shadow-sm rounded-2xl bg-white p-5">
+              <p className="text-[10px] font-black uppercase text-slate-400 tracking-wider">En Attente</p>
+              <div className="flex items-baseline gap-2 mt-2">
+                <span className="text-2xl font-black text-amber-600">{reqSubmittedCount}</span>
+                <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded animate-pulse">Action requise</span>
+              </div>
+            </Card>
+
+            <Card className="border-none shadow-sm rounded-2xl bg-white p-5">
+              <p className="text-[10px] font-black uppercase text-slate-400 tracking-wider">En Cours de Rédaction</p>
+              <div className="flex items-baseline gap-2 mt-2">
+                <span className="text-2xl font-black text-blue-600">{reqProcessingCount}</span>
+                <span className="text-[10px] font-bold text-slate-400">experts RH</span>
+              </div>
+            </Card>
+
+            <Card className="border-none shadow-sm rounded-2xl bg-white p-5">
+              <p className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Terminées / Transmises</p>
+              <div className="flex items-baseline gap-2 mt-2">
+                <span className="text-2xl font-black text-emerald-600">{reqCompletedCount}</span>
+                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">Livrées</span>
+              </div>
+            </Card>
+
+            <Card className="border-none shadow-sm rounded-2xl bg-white p-5 col-span-2 lg:col-span-1">
+              <p className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Répartition</p>
+              <div className="flex items-center gap-3 mt-2">
+                <div className="text-xs font-bold text-orange-600 bg-orange-50 px-2 py-1 rounded-lg">
+                  {reqCvCount} CV
+                </div>
+                <div className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-lg">
+                  {reqLmCount} Lettres
+                </div>
+              </div>
+            </Card>
+          </div>
+
+          {/* Filter & Search Bar */}
+          <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex flex-col md:flex-row gap-4 items-center justify-between">
+            <div className="relative w-full md:max-w-md">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <Input 
+                value={reqSearchQuery}
+                onChange={(e) => setReqSearchQuery(e.target.value)}
+                placeholder="Rechercher par candidat, email, téléphone, poste..."
+                className="pl-10 h-11 bg-slate-50 border-slate-200/80 rounded-xl text-xs font-semibold focus-visible:ring-orange-500"
+              />
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3 w-full md:w-auto justify-end">
+              <div className="flex items-center gap-1 bg-slate-50 p-1 rounded-xl border border-slate-150/80">
+                <button 
+                  onClick={() => setReqFilterType('all')}
+                  className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase transition-all cursor-pointer ${
+                    reqFilterType === 'all' ? 'bg-white text-slate-900 shadow-sm font-black' : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  Tous
+                </button>
+                <button 
+                  onClick={() => setReqFilterType('cv')}
+                  className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase transition-all cursor-pointer ${
+                    reqFilterType === 'cv' ? 'bg-orange-600 text-white shadow-sm font-black' : 'text-slate-500 hover:text-orange-600'
+                  }`}
+                >
+                  CV
+                </button>
+                <button 
+                  onClick={() => setReqFilterType('lm')}
+                  className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase transition-all cursor-pointer ${
+                    reqFilterType === 'lm' ? 'bg-blue-600 text-white shadow-sm font-black' : 'text-slate-500 hover:text-blue-600'
+                  }`}
+                >
+                  Lettres
+                </button>
+              </div>
+
+              <div className="flex items-center gap-1 bg-slate-50 p-1 rounded-xl border border-slate-150/80">
+                <button 
+                  onClick={() => setReqFilterStatus('all')}
+                  className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase transition-all cursor-pointer ${
+                    reqFilterStatus === 'all' ? 'bg-white text-slate-900 shadow-sm font-black' : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  Tous Statuts
+                </button>
+                <button 
+                  onClick={() => setReqFilterStatus('submitted')}
+                  className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase transition-all cursor-pointer ${
+                    reqFilterStatus === 'submitted' ? 'bg-amber-500 text-white shadow-sm font-black' : 'text-slate-500 hover:text-amber-600'
+                  }`}
+                >
+                  En attente
+                </button>
+                <button 
+                  onClick={() => setReqFilterStatus('processing')}
+                  className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase transition-all cursor-pointer ${
+                    reqFilterStatus === 'processing' ? 'bg-blue-600 text-white shadow-sm font-black' : 'text-slate-500 hover:text-blue-600'
+                  }`}
+                >
+                  En cours
+                </button>
+                <button 
+                  onClick={() => setReqFilterStatus('completed')}
+                  className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase transition-all cursor-pointer ${
+                    reqFilterStatus === 'completed' ? 'bg-emerald-600 text-white shadow-sm font-black' : 'text-slate-500 hover:text-emerald-600'
+                  }`}
+                >
+                  Terminé
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Requests Grid */}
+          {loadingRequests ? (
+            <div className="py-20 text-center bg-white rounded-3xl border border-slate-100 shadow-sm">
+              <RefreshCw className="h-8 w-8 text-orange-500 animate-spin mx-auto mb-2" />
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Chargement des demandes en temps réel...</p>
+            </div>
+          ) : filteredRequests.length === 0 ? (
+            <div className="text-center py-20 bg-white rounded-3xl border border-slate-100 shadow-sm">
+              <Inbox className="h-12 w-12 text-slate-300 mx-auto mb-3" />
+              <h3 className="text-sm font-bold text-slate-800">Aucune demande trouvée</h3>
+              <p className="text-xs text-slate-400 mt-1">Ajustez vos filtres ou attendez de nouvelles soumissions de candidats.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {filteredRequests.map((req) => {
+                const dateFormatted = req.createdAt ? new Date(req.createdAt).toLocaleDateString('fr-FR', {
+                  day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+                }) : 'Récemment';
+
+                const targetJob = req.formData?.jobTitle || req.formData?.subject || 'Candidat';
+                const phoneClean = (req.userPhone || '').replace(/\s+/g, '');
+
+                return (
+                  <div 
+                    key={req.id} 
+                    className="bg-white rounded-3xl border border-slate-150 p-5 shadow-sm hover:shadow-md transition-all flex flex-col justify-between space-y-4 group relative"
+                  >
+                    <div className="space-y-3">
+                      {/* Top badges bar */}
+                      <div className="flex items-center justify-between gap-2">
+                        <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${
+                          req.type === 'cv' ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'
+                        }`}>
+                          {req.type === 'cv' ? '📄 CV Professionnel' : '✉️ Lettre de Motivation'}
+                        </span>
+
+                        <select
+                          value={req.status || 'submitted'}
+                          onChange={(e) => handleUpdateRequestStatus(req.id, e.target.value as any)}
+                          className={`text-[9px] font-black uppercase px-2.5 py-1 rounded-full border outline-none cursor-pointer transition-all ${
+                            req.status === 'completed' 
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                              : req.status === 'processing'
+                              ? 'bg-blue-50 text-blue-700 border-blue-200'
+                              : req.status === 'cancelled'
+                              ? 'bg-rose-50 text-rose-700 border-rose-200'
+                              : 'bg-amber-50 text-amber-700 border-amber-200 animate-pulse'
+                          }`}
+                        >
+                          <option value="submitted">⏳ En attente</option>
+                          <option value="processing">⚙️ En cours</option>
+                          <option value="completed">✅ Terminé</option>
+                          <option value="cancelled">❌ Annulé</option>
+                        </select>
+                      </div>
+
+                      {/* Candidate info block */}
+                      <div className="flex items-start gap-3">
+                        <div className="h-11 w-11 rounded-2xl bg-slate-900 text-orange-500 font-black text-base flex items-center justify-center shrink-0 shadow-sm">
+                          {req.userName?.[0] || 'C'}
+                        </div>
+                        <div className="space-y-0.5 min-w-0 flex-1">
+                          <h4 className="text-sm font-black text-slate-900 truncate">{req.userName || 'Candidat Anonyme'}</h4>
+                          <p className="text-xs font-bold text-orange-600 truncate">{targetJob}</p>
+                          <p className="text-[10px] text-slate-400 font-semibold truncate flex items-center gap-1">
+                            <Clock className="h-3 w-3 text-slate-400" /> {dateFormatted}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Contact metadata */}
+                      <div className="bg-slate-50 p-3 rounded-2xl space-y-1.5 border border-slate-100 text-xs text-slate-600 font-medium">
+                        <div className="flex items-center gap-2 truncate">
+                          <Mail className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                          <span className="truncate">{req.userEmail || 'Non spécifié'}</span>
+                        </div>
+                        <div className="flex items-center gap-2 truncate">
+                          <Phone className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                          <span className="truncate font-semibold">{req.userPhone || 'Non spécifié'}</span>
+                        </div>
+                        {req.templateName && (
+                          <div className="flex items-center gap-2 truncate">
+                            <FileText className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                            <span className="truncate font-bold text-slate-700">Modèle : {req.templateName}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Action buttons footer */}
+                    <div className="pt-2 border-t border-slate-100 flex items-center gap-2">
+                      <Button
+                        onClick={() => setSelectedRequest(req)}
+                        className="flex-1 bg-slate-900 hover:bg-slate-800 text-white rounded-xl h-10 text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        <Eye className="h-3.5 w-3.5 text-orange-400" /> Inspecter détails
+                      </Button>
+
+                      <button
+                        onClick={() => handleDeleteRequest(req.id, req.userName)}
+                        className="h-10 w-10 rounded-xl bg-slate-100 hover:bg-rose-100 text-slate-400 hover:text-rose-600 flex items-center justify-center shrink-0 transition-all cursor-pointer"
+                        title="Supprimer la demande"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       {activeTab === 'templates' ? (
         <>
@@ -654,22 +1091,14 @@ export default function CVLMModule({ addLog }: CVLMModuleProps) {
                 >
                   {/* Image Frame */}
                   <div className="aspect-[3/4] bg-slate-50 relative overflow-hidden flex items-center justify-center border-b border-slate-100">
-                    {template.thumbnail ? (
-                      <img 
-                        src={template.thumbnail} 
-                        alt={template.name}
-                        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-102"
-                        onError={(e) => {
-                          // Fallback on error
-                          (e.target as any).src = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=400&auto=format&fit=crop&q=60';
-                        }}
-                      />
-                    ) : (
-                      <div className="text-center p-4">
-                        <FileText className="h-10 w-10 text-slate-300 mx-auto mb-2" />
-                        <span className="text-[10px] font-bold text-slate-400">Sans aperçu</span>
-                      </div>
-                    )}
+                    <img 
+                      src={getTemplateThumbnail(template.thumbnail, template.type, template.id)} 
+                      alt={template.name}
+                      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-102"
+                      onError={(e) => {
+                        (e.target as any).src = getTemplateThumbnail('', template.type, template.id);
+                      }}
+                    />
 
                     {/* Tags over image */}
                     <div className="absolute top-3 left-3 right-3 flex items-center justify-between pointer-events-none">
@@ -1165,6 +1594,303 @@ export default function CVLMModule({ addLog }: CVLMModuleProps) {
         )}
       </AnimatePresence>
 
+      {/* REQUEST DETAIL INSPECTION MODAL */}
+      <AnimatePresence>
+        {selectedRequest && (
+          <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-md z-[100] flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              className="bg-white rounded-[32px] w-full max-w-4xl max-h-[92vh] shadow-2xl border border-slate-100 flex flex-col overflow-hidden relative"
+            >
+              {/* Modal Header */}
+              <div className="p-6 bg-slate-900 text-white flex items-start justify-between gap-4 shrink-0">
+                <div className="flex items-center gap-4">
+                  <div className="h-14 w-14 rounded-2xl bg-orange-600 text-white font-black text-2xl flex items-center justify-center shrink-0 shadow-lg shadow-orange-600/20">
+                    {selectedRequest.userName?.[0] || 'C'}
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-xl font-black text-white">{selectedRequest.userName || 'Candidat Anonyme'}</h3>
+                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                        selectedRequest.type === 'cv' ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30' : 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                      }`}>
+                        {selectedRequest.type === 'cv' ? 'CV Professionnel' : 'Lettre de Motivation'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-300 font-medium mt-0.5 flex items-center gap-3">
+                      <span>Poste / Sujet : <strong className="text-orange-400">{selectedRequest.formData?.jobTitle || selectedRequest.formData?.subject || 'Non spécifié'}</strong></span>
+                      {selectedRequest.templateName && <span>• Modèle : {selectedRequest.templateName}</span>}
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => setSelectedRequest(null)}
+                  className="p-2 text-slate-400 hover:text-white rounded-full bg-slate-800 hover:bg-slate-700 transition-all cursor-pointer shrink-0"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              {/* Modal Body */}
+              <div className="p-6 overflow-y-auto space-y-8 flex-1 bg-slate-50/50">
+                {/* Section 1: Candidate Contact & Identity */}
+                <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs space-y-4">
+                  <h4 className="text-xs font-black uppercase tracking-wider text-slate-400 flex items-center gap-2">
+                    <User className="h-4 w-4 text-orange-600" />
+                    Coordonnées du Candidat
+                  </h4>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase">Nom complet</span>
+                      <p className="font-bold text-slate-900">{selectedRequest.userName || 'Non renseigné'}</p>
+                    </div>
+
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase">Adresse Email</span>
+                      <p className="font-semibold text-slate-800 flex items-center gap-1.5">
+                        <Mail className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                        <a href={`mailto:${selectedRequest.userEmail}`} className="hover:underline text-blue-600">
+                          {selectedRequest.userEmail}
+                        </a>
+                      </p>
+                    </div>
+
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase">Téléphone</span>
+                      <p className="font-bold text-slate-900 flex items-center gap-1.5">
+                        <Phone className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                        {selectedRequest.userPhone || 'Non renseigné'}
+                      </p>
+                    </div>
+
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase">Ville / Adresse</span>
+                      <p className="font-semibold text-slate-800 flex items-center gap-1.5">
+                        <MapPin className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                        {selectedRequest.formData?.address || selectedRequest.formData?.personalInfo?.address || selectedRequest.formData?.personalInfo?.city || 'Non renseigné'}
+                      </p>
+                    </div>
+
+                    {(selectedRequest.formData?.birthYear || selectedRequest.formData?.personalInfo?.birthYear) && (
+                      <div className="space-y-1">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase">Année de naissance</span>
+                        <p className="font-semibold text-slate-800">{selectedRequest.formData?.birthYear || selectedRequest.formData?.personalInfo?.birthYear}</p>
+                      </div>
+                    )}
+
+                    {(selectedRequest.formData?.nationality || selectedRequest.formData?.personalInfo?.nationality) && (
+                      <div className="space-y-1">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase">Nationalité</span>
+                        <p className="font-semibold text-slate-800">{selectedRequest.formData?.nationality || selectedRequest.formData?.personalInfo?.nationality}</p>
+                      </div>
+                    )}
+
+                    {selectedRequest.formData?.portfolioUrl && (
+                      <div className="space-y-1">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase">Portfolio / LinkedIn</span>
+                        <p className="font-semibold text-slate-800 truncate">
+                          <a href={selectedRequest.formData.portfolioUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline flex items-center gap-1">
+                            <Globe className="h-3.5 w-3.5 shrink-0" /> {selectedRequest.formData.portfolioUrl}
+                          </a>
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Section 2: Full Content Details */}
+                {selectedRequest.type === 'cv' ? (
+                  <div className="space-y-6">
+                    {/* Experiences */}
+                    <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs space-y-4">
+                      <h4 className="text-xs font-black uppercase tracking-wider text-slate-400 flex items-center gap-2">
+                        <Briefcase className="h-4 w-4 text-orange-600" />
+                        Expériences Professionnelles
+                      </h4>
+                      {selectedRequest.formData?.experiences?.length > 0 ? (
+                        <div className="space-y-4 divide-y divide-slate-100">
+                          {selectedRequest.formData.experiences.map((exp: any, idx: number) => (
+                            <div key={idx} className={`${idx > 0 ? 'pt-4' : ''} space-y-1`}>
+                              <div className="flex items-center justify-between">
+                                <h5 className="text-sm font-bold text-slate-900">{exp.position || 'Poste occupé'}</h5>
+                                <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
+                                  {exp.startDate} - {exp.endDate || 'Présent'}
+                                </span>
+                              </div>
+                              <p className="text-xs font-bold text-orange-600">{exp.company || 'Entreprise'}</p>
+                              {exp.description && (
+                                <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-wrap pt-1">{exp.description}</p>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-slate-400 italic">Aucune expérience renseignée.</p>
+                      )}
+                    </div>
+
+                    {/* Educations */}
+                    <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs space-y-4">
+                      <h4 className="text-xs font-black uppercase tracking-wider text-slate-400 flex items-center gap-2">
+                        <GraduationCap className="h-4 w-4 text-orange-600" />
+                        Formations & Diplômes
+                      </h4>
+                      {selectedRequest.formData?.educations?.length > 0 ? (
+                        <div className="space-y-4 divide-y divide-slate-100">
+                          {selectedRequest.formData.educations.map((edu: any, idx: number) => (
+                            <div key={idx} className={`${idx > 0 ? 'pt-4' : ''} space-y-1`}>
+                              <div className="flex items-center justify-between">
+                                <h5 className="text-sm font-bold text-slate-900">{edu.degree || 'Diplôme / Formation'}</h5>
+                                <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
+                                  {edu.startDate} - {edu.endDate || 'Présent'}
+                                </span>
+                              </div>
+                              <p className="text-xs font-bold text-blue-600">{edu.school || 'Établissement'}</p>
+                              {edu.description && (
+                                <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-wrap pt-1">{edu.description}</p>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-slate-400 italic">Aucune formation renseignée.</p>
+                      )}
+                    </div>
+
+                    {/* Skills & Languages */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs space-y-3">
+                        <h4 className="text-xs font-black uppercase tracking-wider text-slate-400 flex items-center gap-2">
+                          <Zap className="h-4 w-4 text-orange-600" />
+                          Compétences & Outils
+                        </h4>
+                        <div className="space-y-2 text-xs">
+                          <div>
+                            <span className="text-[10px] font-bold text-slate-400 uppercase">Compétences clés :</span>
+                            <p className="font-medium text-slate-800">{selectedRequest.formData?.skillsTechnical || 'Non spécifié'}</p>
+                          </div>
+                          <div>
+                            <span className="text-[10px] font-bold text-slate-400 uppercase">Outils & Logiciels :</span>
+                            <p className="font-medium text-slate-800">{selectedRequest.formData?.skillsTools || 'Non spécifié'}</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs space-y-3">
+                        <h4 className="text-xs font-black uppercase tracking-wider text-slate-400 flex items-center gap-2">
+                          <Globe className="h-4 w-4 text-orange-600" />
+                          Langues & Intérêts
+                        </h4>
+                        <div className="space-y-2 text-xs">
+                          <div>
+                            <span className="text-[10px] font-bold text-slate-400 uppercase">Langues :</span>
+                            <p className="font-medium text-slate-800">{selectedRequest.formData?.skillsLanguages || 'Non spécifié'}</p>
+                          </div>
+                          <div>
+                            <span className="text-[10px] font-bold text-slate-400 uppercase">Centres d'intérêt :</span>
+                            <p className="font-medium text-slate-800">{selectedRequest.formData?.interestsHobbies || 'Non spécifié'}</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  /* Lettre de Motivation Details */
+                  <div className="space-y-6">
+                    <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs space-y-6">
+                      <h4 className="text-xs font-black uppercase tracking-wider text-slate-400 flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-blue-600" />
+                        Détails de la Lettre de Motivation
+                      </h4>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-slate-50 rounded-xl border border-slate-100 text-xs">
+                        <div>
+                          <span className="text-[10px] font-bold text-slate-400 uppercase">Entreprise Destinataire</span>
+                          <p className="font-bold text-slate-900">{selectedRequest.formData?.recipientCompany || 'Non spécifiée'}</p>
+                          <p className="text-slate-600">{selectedRequest.formData?.recipientName}</p>
+                          <p className="text-slate-500">{selectedRequest.formData?.recipientAddress}</p>
+                        </div>
+                        <div>
+                          <span className="text-[10px] font-bold text-slate-400 uppercase">Objet de la demande</span>
+                          <p className="font-bold text-orange-600">{selectedRequest.formData?.subject || 'Candidature'}</p>
+                          <p className="text-slate-500 mt-1">Date d'envoi : {selectedRequest.formData?.date || 'Date du jour'}</p>
+                        </div>
+                      </div>
+
+                      {/* Content Letter Text */}
+                      <div className="space-y-3">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase">Contenu complet de la lettre :</span>
+                        <div className="p-6 bg-slate-50/80 border border-slate-200/60 rounded-2xl font-serif text-slate-800 text-sm leading-relaxed whitespace-pre-wrap">
+                          {selectedRequest.formData?.openingSalutation && (
+                            <p className="font-bold mb-4 font-sans">{selectedRequest.formData.openingSalutation}</p>
+                          )}
+                          <p>{selectedRequest.formData?.content || 'Aucun contenu texte'}</p>
+                          {selectedRequest.formData?.closingSalutation && (
+                            <p className="mt-6 font-sans font-medium">{selectedRequest.formData.closingSalutation}</p>
+                          )}
+                          {selectedRequest.formData?.signature && (
+                            <p className="mt-4 font-bold font-sans text-slate-950">{selectedRequest.formData.signature}</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Modal Footer Controls */}
+              <div className="p-6 bg-white border-t border-slate-100 flex flex-wrap items-center justify-between gap-4 shrink-0">
+                <div className="flex items-center gap-3">
+                  <span className="text-xs font-bold text-slate-500">Statut :</span>
+                  <select
+                    value={selectedRequest.status || 'submitted'}
+                    onChange={(e) => handleUpdateRequestStatus(selectedRequest.id, e.target.value as any)}
+                    className="h-10 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-black uppercase text-slate-800 outline-none focus:ring-2 focus:ring-orange-500"
+                  >
+                    <option value="submitted">⏳ En attente</option>
+                    <option value="processing">⚙️ En cours de traitement</option>
+                    <option value="completed">✅ Terminé / Livré</option>
+                    <option value="cancelled">❌ Annulé</option>
+                  </select>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <Button
+                    onClick={() => {
+                      navigator.clipboard.writeText(JSON.stringify(selectedRequest.formData, null, 2));
+                      showToast("Données brutes copiées dans le presse-papier", "info");
+                    }}
+                    variant="outline"
+                    className="h-10 px-3 rounded-xl border-slate-200 text-slate-700 text-xs font-bold"
+                  >
+                    <Copy className="h-3.5 w-3.5 mr-1" /> Copier
+                  </Button>
+
+                  <Button
+                    onClick={() => window.print()}
+                    variant="outline"
+                    className="h-10 px-3 rounded-xl border-slate-200 text-slate-700 text-xs font-bold"
+                  >
+                    <Printer className="h-3.5 w-3.5 mr-1" /> Imprimer
+                  </Button>
+
+                  <Button
+                    onClick={() => setSelectedRequest(null)}
+                    className="h-10 px-5 bg-slate-900 text-white hover:bg-slate-800 rounded-xl text-xs font-bold"
+                  >
+                    Fermer
+                  </Button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       {/* Custom Confirmation Modal for Admin Actions */}
       <AnimatePresence>
         {confirmAdminAction && (
@@ -1190,6 +1916,9 @@ export default function CVLMModule({ addLog }: CVLMModuleProps) {
               </div>
 
               <p className="text-xs text-slate-600 font-medium leading-relaxed">
+                {confirmAdminAction.type === 'delete_request' && (
+                  <>Êtes-vous sûr de vouloir supprimer la demande de <strong className="text-slate-900">"{confirmAdminAction.name}"</strong> ?</>
+                )}
                 {confirmAdminAction.type === 'delete_template' && (
                   <>Êtes-vous sûr de vouloir supprimer définitivement le modèle <strong className="text-slate-900">"{confirmAdminAction.name}"</strong> ?</>
                 )}
@@ -1221,7 +1950,18 @@ export default function CVLMModule({ addLog }: CVLMModuleProps) {
                     const actionName = confirmAdminAction.name;
                     setConfirmAdminAction(null);
 
-                    if (actionType === 'delete_template' && actionId && actionName) {
+                    if (actionType === 'delete_request' && actionId) {
+                      try {
+                        await deleteDoc(doc(db, 'cv_requests', actionId));
+                        setRequests(prev => prev.filter(r => r.id !== actionId));
+                        if (selectedRequest?.id === actionId) setSelectedRequest(null);
+                        showToast("Demande supprimée", "info");
+                        await addLog("Suppression de demande", `Demande de "${actionName}" (ID: ${actionId}) supprimée`, "warning");
+                      } catch (e) {
+                        console.error("Error deleting request:", e);
+                        showToast("Erreur lors de la suppression de la demande", "error");
+                      }
+                    } else if (actionType === 'delete_template' && actionId && actionName) {
                       const updated = deleteTemplate(actionId);
                       setTemplates(updated);
                       await addLog("Suppression de modèle CVLM", `Modèle "${actionName}" (ID: ${actionId}) supprimé`, "warning");

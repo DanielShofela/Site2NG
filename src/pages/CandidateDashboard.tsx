@@ -342,7 +342,7 @@ export default function CandidateDashboard() {
               to="/cvlm" 
               className="w-full md:w-auto h-11 md:h-12 bg-gradient-to-r from-orange-600 to-amber-500 text-white hover:opacity-95 flex items-center justify-center font-black rounded-xl md:rounded-2xl shadow-xl shadow-orange-600/20 px-5 transition-all text-xs uppercase tracking-wide"
             >
-              <Sparkles className="mr-2 h-4 w-4 animate-pulse" /> Rédiger un CV/Lettre (IA)
+              <FileText className="mr-2 h-4 w-4" /> Rédiger un CV & Lettre
             </Link>
             <Link 
               to="/onboarding" 

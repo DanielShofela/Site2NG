@@ -11,7 +11,7 @@ import {
   serverTimestamp,
   query
 } from 'firebase/firestore';
-import { db, auth } from '@/lib/firebase';
+import { db, auth, testFirebaseConnection } from '@/lib/firebase';
 import { UserProfile, Job } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { motion, AnimatePresence } from 'motion/react';
@@ -79,8 +79,9 @@ interface FirestoreErrorInfo {
 }
 
 function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const errStr = error instanceof Error ? error.message : String(error);
   const errInfo: FirestoreErrorInfo = {
-    error: error instanceof Error ? error.message : String(error),
+    error: errStr,
     authInfo: {
       userId: auth.currentUser?.uid,
       email: auth.currentUser?.email,
@@ -88,8 +89,11 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
     operationType,
     path
   };
-  console.error('Firestore Error: ', JSON.stringify(errInfo));
-  throw new Error(JSON.stringify(errInfo));
+  if (errStr.includes('Quota') || errStr.includes('quota') || errStr.includes('resource-exhausted')) {
+    console.warn(`Firestore Quota Notice (${operationType} ${path}):`, errStr);
+    return;
+  }
+  console.warn('Firestore Warning: ', JSON.stringify(errInfo));
 }
 
 export default function AdminDashboard() {
@@ -107,8 +111,17 @@ export default function AdminDashboard() {
   const [logs, setLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
-  // Real maintenance state
+  // Real maintenance & DB connection state
   const [maintenanceModeActive, setMaintenanceModeActive] = useState(false);
+  const [dbConnected, setDbConnected] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    testFirebaseConnection().then(res => {
+      setDbConnected(res.success);
+    }).catch(() => {
+      setDbConnected(false);
+    });
+  }, []);
 
   const [stats, setStats] = useState({
     totalUsers: 0,
@@ -227,6 +240,8 @@ export default function AdminDashboard() {
       if (snapshot.exists()) {
         setCmsData(snapshot.data() as any);
       }
+    }, (error) => {
+      console.warn("Notice reading CMS config in Admin:", error?.message || error);
     });
 
     // Maintenance sync
@@ -235,6 +250,8 @@ export default function AdminDashboard() {
         const data = snapshot.data();
         setMaintenanceModeActive(!!data.enabled);
       }
+    }, (error) => {
+      console.warn("Notice reading Maintenance in Admin:", error?.message || error);
     });
 
     // Goals sync
@@ -247,6 +264,8 @@ export default function AdminDashboard() {
           targetApplications: data.targetApplications || 200
         });
       }
+    }, (error) => {
+      console.warn("Notice reading Goals in Admin:", error?.message || error);
     });
 
     setLoading(false);
@@ -568,8 +587,20 @@ export default function AdminDashboard() {
           <div className="flex items-center gap-4">
             {/* Live Status indicator */}
             <span className="hidden md:flex items-center gap-1.5 bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-full text-[10px] font-black uppercase text-slate-650 tracking-wider">
-              <span className={`h-2 w-2 rounded-full ${maintenanceModeActive ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'}`} />
-              {maintenanceModeActive ? 'Restriction active (Maint)' : 'Portail en ligne'}
+              <span className={`h-2 w-2 rounded-full ${
+                maintenanceModeActive 
+                  ? 'bg-amber-500 animate-pulse' 
+                  : dbConnected === false 
+                    ? 'bg-rose-500 animate-pulse' 
+                    : 'bg-emerald-500'
+              }`} />
+              {maintenanceModeActive 
+                ? 'Restriction active (Maint)' 
+                : dbConnected === false 
+                  ? 'BDD Firestore Déconnectée' 
+                  : dbConnected === true 
+                    ? 'BDD Firestore En Ligne' 
+                    : 'Vérification BDD...'}
             </span>
 
             {/* Profile widget */}

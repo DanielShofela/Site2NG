@@ -19,6 +19,8 @@ import {
 } from 'lucide-react';
 import { collection, onSnapshot, addDoc, doc, deleteDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { uploadImageToStorage } from '@/lib/imageUtils';
+
 
 interface MediaProps {
   addLog?: (action: string, target: string, type: string) => Promise<void>;
@@ -49,7 +51,7 @@ export default function MediaModule({ addLog }: MediaProps) {
     return () => unsub();
   }, []);
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -57,32 +59,28 @@ export default function MediaModule({ addLog }: MediaProps) {
     const titleToUse = customTitle.trim() || file.name.split('.')[0];
     
     try {
-      const reader = new FileReader();
-      reader.onloadend = async () => {
-        const base64Data = reader.result as string;
-        
-        const payload = {
-          name: titleToUse,
-          fileName: file.name,
-          type: file.type,
-          size: `${Math.round(file.size / 1024)} KB`,
-          url: base64Data,
-          uploadedAt: new Date()
-        };
-
-        await addDoc(collection(db, 'media'), payload);
-        if (addLog) {
-          await addLog("Fichier téléversé", `Fichier ${file.name} ajouté à la médiathèque`, "info");
-        }
-        
-        alert("Fichier importé avec succès dans votre Médiathèque 2NG !");
-        setCustomTitle("");
-        setUploading(false);
+      const storageUrl = await uploadImageToStorage(file, 'media');
+      
+      const payload = {
+        name: titleToUse,
+        fileName: file.name,
+        type: file.type,
+        size: `${Math.round(file.size / 1024)} KB`,
+        url: storageUrl,
+        uploadedAt: new Date()
       };
-      reader.readAsDataURL(file);
+
+      await addDoc(collection(db, 'media'), payload);
+      if (addLog) {
+        await addLog("Fichier téléversé", `Fichier ${file.name} ajouté à la médiathèque`, "info");
+      }
+      
+      alert("Fichier importé avec succès dans votre Médiathèque 2NG !");
+      setCustomTitle("");
     } catch (err) {
       console.error(err);
       alert("Erreur lors de l'upload du fichier.");
+    } finally {
       setUploading(false);
     }
   };

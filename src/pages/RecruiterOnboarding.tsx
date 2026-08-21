@@ -46,6 +46,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { UserProfile } from '@/types';
 import { calculateCompletionScore } from '@/lib/profileUtils';
 import { cn, compressImage } from '@/lib/utils';
+import { uploadImageToStorage } from '@/lib/imageUtils';
+
 
 const STEPS = [
   { id: 'general', title: 'Infos Générales', icon: Building2 },
@@ -850,12 +852,12 @@ function BrandingStep({ data, onChange }: { data: Partial<UserProfile>, onChange
               <input type="file" className="hidden" accept="image/*" onChange={async (e) => {
                 const file = e.target.files?.[0];
                 if (file) {
-                  const reader = new FileReader();
-                  reader.onloadend = async () => {
-                    const compressed = await compressImage(reader.result as string, 1200, 600, 0.6);
-                    updateBranding({ bannerUrl: compressed });
-                  };
-                  reader.readAsDataURL(file);
+                  try {
+                    const storageUrl = await uploadImageToStorage(file, 'recruiter_banners');
+                    updateBranding({ bannerUrl: storageUrl });
+                  } catch (err) {
+                    console.error("Failed uploading recruiter banner:", err);
+                  }
                 }
               }} />
             </label>
@@ -922,22 +924,17 @@ function DocumentsStep({ data, onChange }: { data: Partial<UserProfile>, onChang
   const docs = data.legalDocuments || { brochureUrl: '', presentationUrl: '' };
   const updateDocs = (fields: any) => onChange({ legalDocuments: { ...docs, ...fields } });
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, field: 'brochureUrl' | 'presentationUrl') => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, field: 'brochureUrl' | 'presentationUrl') => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Check size - very strict here because recruiter profile already has lots of data
-    const MAX_SIZE = 500 * 1024; // 500KB
-    if (file.size > MAX_SIZE) {
-      alert("Ce fichier est trop volumineux (Max 500 Ko). Pour des documents plus lourds, veuillez utiliser un lien URL vers Google Drive ou votre site web.");
-      return;
+    try {
+      const storageUrl = await uploadImageToStorage(file, 'recruiter_docs');
+      updateDocs({ [field]: storageUrl, [`${field}Name`]: file.name });
+    } catch (err) {
+      console.error("Failed uploading document:", err);
+      alert("Erreur lors de l'envoi du document.");
     }
-
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      updateDocs({ [field]: reader.result as string, [`${field}Name`]: file.name });
-    };
-    reader.readAsDataURL(file);
   };
 
   return (

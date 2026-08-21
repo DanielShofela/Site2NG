@@ -19,7 +19,7 @@ export const generateCVAdvice = async (jobTitle: string): Promise<string> => {
     return data.advice || 'Aucun conseil généré.';
   } catch (error) {
     console.error('Error fetching CV advice', error);
-    return `### 💡 Conseils pour le poste de **${jobTitle || 'Candidat'}** (Mode hors-ligne)\n\n1. **Valorisez vos réalisations concrètes** : Utilisez des chiffres précis (ex: augmentation de 15% de productivité).\n2. **Mots-clés du secteur** : Intégrez les compétences requises de l'offre pour passer les algorithmes ATS.\n3. **Mise en page épurée** : Limitez le contenu à 1 page, claire, organisée et percutante.`;
+    return `### 💡 Conseils pour le poste de **${jobTitle || 'Candidat'}** (Mode hors-ligne)\n\n1. **Valorisez vos réalisations concrètes** : Utilisez des chiffres précis (ex: augmentation de 15% de productivité).\n2. **Mots-clés du secteur** : Intégrez les compétences clés et le vocabulaire technique recherchés par les recruteurs.\n3. **Mise en page épurée** : Limitez le contenu à 1 page, claire, organisée et percutante.`;
   }
 };
 

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { 
   User, Mail, Phone, MapPin, Calendar, Sparkles, ArrowLeft, ArrowRight,
-  FileCheck, Download, Award, Edit, Trash2, HelpCircle
+  FileCheck, Award, Edit, Trash2, HelpCircle, Send, Save, RotateCcw, CheckCircle2
 } from 'lucide-react';
 import Button from './Button';
 import GlassCard from './GlassCard';
@@ -11,7 +11,10 @@ import { saveLMVersion, getLMVersionById } from '@/services/lmVersionService';
 import { generateLMAdvice } from '@/services/geminiService';
 import { saveCVRequest } from '@/services/supabaseClient';
 import { showToast } from './toast';
-import { jsPDF } from 'jspdf';
+import { safeSetItem, safeGetItem, safeRemoveItem } from '@/lib/safeStorage';
+import { db, auth } from '@/lib/firebase';
+import { doc, setDoc } from 'firebase/firestore';
+import { cleanUndefined } from '@/contexts/AuthContext';
 
 interface LMFormProps {
   templateId: string;
@@ -34,10 +37,10 @@ Disponible rapidement, je me tiens à votre entière disposition pour convenir d
 
 Je vous prie d'agréer, Madame, Monsieur, l'expression de mes salutations distinguées.`;
 
-const DEFAULT_LM_DATA = (email: string = '', name: string = '', phone: string = ''): LMFormData => ({
-  fullName: name,
-  email: email,
-  phone: phone,
+const DEFAULT_LM_DATA = (): LMFormData => ({
+  fullName: '',
+  email: '',
+  phone: '',
   address: '',
   recipientName: 'Directeur des Ressources Humaines',
   recipientCompany: 'Entreprise Cible',
@@ -47,17 +50,47 @@ const DEFAULT_LM_DATA = (email: string = '', name: string = '', phone: string = 
   openingSalutation: 'Madame, Monsieur,',
   content: '',
   closingSalutation: 'Je vous prie d\'agréer, Madame, Monsieur, l\'expression de mes salutations distinguées.',
-  signature: name || 'Candidat'
+  signature: 'Candidat'
 });
+
+const buildPrefilledLMData = (profile: any): LMFormData => {
+  const base = DEFAULT_LM_DATA();
+  if (!profile) return base;
+
+  const pName = profile?.displayName || profile?.name || (profile?.firstName ? `${profile.firstName} ${profile.lastName || ''}`.trim() : '') || base.fullName;
+  const pEmail = profile?.email || base.email;
+  const pPhone = profile?.phone || base.phone;
+  const pAddress = profile?.address || (profile?.locationCity ? `${profile.locationCity}, Côte d'Ivoire` : '') || base.address;
+  const pTitle = profile?.jobTitle || '';
+
+  return {
+    fullName: pName,
+    email: pEmail,
+    phone: pPhone,
+    address: pAddress,
+    recipientName: base.recipientName,
+    recipientCompany: base.recipientCompany,
+    recipientAddress: base.recipientAddress,
+    date: base.date,
+    subject: pTitle ? `Candidature au poste de ${pTitle}` : base.subject,
+    openingSalutation: base.openingSalutation,
+    content: SAMPLE_LETTER_TEMPLATE(pName, 'Votre Entreprise', pTitle),
+    closingSalutation: base.closingSalutation,
+    signature: pName || 'Candidat'
+  };
+};
 
 export default function LMForm({ templateId, templateName, initialVersionId, onBack, onSaveComplete, userProfile }: LMFormProps) {
   const [step, setStep] = useState(1);
-  const [formData, setFormData] = useState<LMFormData>(DEFAULT_LM_DATA(userProfile?.email, userProfile?.displayName, userProfile?.phone));
+  const [formData, setFormData] = useState<LMFormData>(() => buildPrefilledLMData(userProfile));
   const [aiAdvice, setAiAdvice] = useState<string | null>(null);
   const [loadingAdvice, setLoadingAdvice] = useState(false);
+  const [submittingRequest, setSubmittingRequest] = useState(false);
   const [versionName, setVersionName] = useState('Ma Lettre de Motivation');
 
-  // Load version or pre-populate
+  const draftCacheKey = `cvlm_draft_cache_lm_${templateId}`;
+
+  // Load version or pre-populate or load from cache
   useEffect(() => {
     if (initialVersionId) {
       const existing = getLMVersionById(initialVersionId);
@@ -65,21 +98,34 @@ export default function LMForm({ templateId, templateName, initialVersionId, onB
         setFormData(existing.data);
         setVersionName(existing.name);
       }
-    } else if (userProfile) {
-      const pName = userProfile.displayName || '';
-      const pTitle = userProfile.jobTitle || '';
-      setFormData(prev => ({
-        ...prev,
-        fullName: pName,
-        email: userProfile.email || prev.email,
-        phone: userProfile.phone || prev.phone,
-        address: userProfile.locationCity ? `${userProfile.locationCity}, ${userProfile.locationCountry || 'CI'}` : prev.address,
-        subject: pTitle ? `Candidature au poste de ${pTitle}` : prev.subject,
-        content: SAMPLE_LETTER_TEMPLATE(pName, 'Votre Entreprise', pTitle),
-        signature: pName
-      }));
+    } else {
+      const cachedStr = safeGetItem(draftCacheKey);
+      if (cachedStr) {
+        try {
+          const cachedData = JSON.parse(cachedStr);
+          setFormData(cachedData);
+          showToast('Brouillon de lettre sauvegardé en cache restauré !', 'info');
+        } catch (e) {
+          setFormData(buildPrefilledLMData(userProfile));
+        }
+      } else if (userProfile) {
+        setFormData(buildPrefilledLMData(userProfile));
+      }
     }
-  }, [initialVersionId, userProfile]);
+  }, [initialVersionId, userProfile, templateId]);
+
+  // Auto-save form cache to localStorage
+  useEffect(() => {
+    if (!initialVersionId && formData.fullName) {
+      safeSetItem(draftCacheKey, JSON.stringify(formData));
+    }
+  }, [formData, templateId, initialVersionId]);
+
+  const handleClearDraftCache = () => {
+    safeRemoveItem(draftCacheKey);
+    setFormData(buildPrefilledLMData(userProfile));
+    showToast('Formulaire de lettre réinitialisé.', 'info');
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -119,9 +165,9 @@ export default function LMForm({ templateId, templateName, initialVersionId, onB
     try {
       const feedback = await generateLMAdvice(formData.content);
       setAiAdvice(feedback);
-      showToast('Analyses de style Gemini générées !', 'success');
+      showToast('Conseils de nos experts générés !', 'success');
     } catch (e) {
-      showToast('Erreur d\'amélioration IA', 'error');
+      showToast('Erreur lors de l\'analyse', 'error');
     } finally {
       setLoadingAdvice(false);
     }
@@ -182,106 +228,102 @@ export default function LMForm({ templateId, templateName, initialVersionId, onB
     showToast('Redirection vers WhatsApp...', 'success');
   };
 
-  // PDF generation for Letter of Motivation
-  const handleDownloadPDF = () => {
+  // Submit Cover Letter Request to database & experts
+  const handleSubmitRequest = async () => {
+    setSubmittingRequest(true);
     try {
-      const doc = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: 'a4'
+      const versionId = initialVersionId || `lm-version-${Date.now()}`;
+      const newVersion: LMVersion = {
+        id: versionId,
+        name: versionName,
+        data: formData,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        templateId,
+        templateName
+      };
+      await saveLMVersion(newVersion);
+
+      // Save request record
+      await saveCVRequest({
+        templateName,
+        status: 'completed'
       });
 
-      const primaryColor = [226, 92, 29]; // #e25c1d
-      const darkColor = [15, 23, 42]; // #0f172a
-      const lightColor = [71, 85, 105]; // Slate 600
+      // Save to Firestore database collection 'cv_requests' and local cache
+      const currentUser = auth.currentUser;
+      const requestDoc = {
+        id: `req-lm-${Date.now()}`,
+        userId: currentUser?.uid || 'guest',
+        userEmail: formData.email,
+        userName: formData.fullName,
+        userPhone: formData.phone,
+        templateId,
+        templateName,
+        type: 'lm',
+        formData: cleanUndefined(formData),
+        status: 'submitted',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
 
-      const margin = 20;
-      let y = 25;
+      // Save to local storage cache for instant offline / admin access
+      try {
+        const cachedStr = safeGetItem('cvlm_all_requests');
+        let cachedList = [];
+        if (cachedStr) {
+          try { cachedList = JSON.parse(cachedStr); } catch (e) {}
+        }
+        cachedList = [requestDoc, ...cachedList.filter((r: any) => r.id !== requestDoc.id)];
+        safeSetItem('cvlm_all_requests', JSON.stringify(cachedList));
+      } catch (e) {
+        console.warn('Local request cache notice:', e);
+      }
 
-      // Header strip decoration
-      doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-      doc.rect(0, 0, 210, 8, 'F');
+      try {
+        await setDoc(doc(db, 'cv_requests', requestDoc.id), requestDoc);
+        if (currentUser?.uid) {
+          await setDoc(doc(db, 'users', currentUser.uid), {
+            displayName: formData.fullName,
+            phone: formData.phone,
+            address: formData.address,
+            lmUpdatedAt: new Date().toISOString()
+          }, { merge: true });
+        }
+      } catch (e) {
+        console.warn('Firestore request save notice:', e);
+      }
 
-      // 1. SENDER DETAILS (Top Left)
-      doc.setFont('Helvetica', 'bold');
-      doc.setFontSize(11);
-      doc.setTextColor(darkColor[0], darkColor[1], darkColor[2]);
-      doc.text(formData.fullName.toUpperCase(), margin, y);
-      y += 5;
+      // Background email notification
+      try {
+        fetch('https://formspree.io/f/xvovgwza', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            recipient: '2ng.groupeentreprise@gmail.com',
+            subject: `Nouvelle demande de Lettre (${templateName}) - ${formData.fullName}`,
+            candidateName: formData.fullName,
+            candidateEmail: formData.email,
+            candidatePhone: formData.phone,
+            recipientCompany: formData.recipientCompany,
+            templateName,
+            formData
+          })
+        }).catch(() => {});
+      } catch (err) {
+        // ignore background dispatch
+      }
 
-      doc.setFont('Helvetica', 'normal');
-      doc.setFontSize(9);
-      doc.setTextColor(lightColor[0], lightColor[1], lightColor[2]);
-      doc.text(formData.address || 'Abidjan, Côte d\'Ivoire', margin, y);
-      y += 4;
-      doc.text(`Tél: ${formData.phone || ''}`, margin, y);
-      y += 4;
-      doc.text(`Email: ${formData.email}`, margin, y);
+      // Clear cached draft
+      safeRemoveItem(draftCacheKey);
 
-      // Reset Y for recipient block
-      let rY = 25;
-
-      // 2. RECIPIENT DETAILS (Top Right aligned)
-      doc.setFont('Helvetica', 'bold');
-      doc.setFontSize(10);
-      doc.setTextColor(darkColor[0], darkColor[1], darkColor[2]);
-      doc.text(`À l'attention de :`, 130, rY);
-      rY += 5;
-      doc.text(formData.recipientName, 130, rY);
-      rY += 4;
-      doc.setFont('Helvetica', 'italic');
-      doc.text(formData.recipientCompany, 130, rY);
-      rY += 4;
-      doc.setFont('Helvetica', 'normal');
-      doc.text(formData.recipientAddress, 130, rY);
-
-      y = Math.max(y, rY) + 15;
-
-      // Date Block
-      doc.setFont('Helvetica', 'normal');
-      doc.setFontSize(9);
-      doc.text(`Fait à Abidjan, le ${formData.date}`, 210 - margin, y, { align: 'right' });
-      y += 12;
-
-      // Subject Block
-      doc.setFont('Helvetica', 'bold');
-      doc.setFontSize(10);
-      doc.setTextColor(darkColor[0], darkColor[1], darkColor[2]);
-      doc.text(`OBJET : ${formData.subject.toUpperCase()}`, margin, y);
-      y += 10;
-
-      // Salutation
-      doc.setFont('Helvetica', 'normal');
-      doc.setFontSize(10);
-      doc.text(formData.openingSalutation, margin, y);
-      y += 10;
-
-      // Body Content (splitted)
-      const splitContent = doc.splitTextToSize(formData.content, 170);
-      doc.text(splitContent, margin, y);
-      y += splitContent.length * 6 + 10;
-
-      // Closing
-      const splitClose = doc.splitTextToSize(formData.closingSalutation, 170);
-      doc.text(splitClose, margin, y);
-      y += splitClose.length * 6 + 15;
-
-      // Signature Block (Right aligned)
-      doc.setFont('Helvetica', 'bold');
-      doc.text(formData.signature, 210 - margin - 40, y);
-
-      // Footer
-      doc.setFontSize(8);
-      doc.setTextColor(180, 180, 180);
-      doc.text(`Généré avec CVLM - 2NG Groupe Entreprises`, 105, 287, { align: 'center' });
-
-      doc.save(`Lettre_${formData.fullName.replace(/\s+/g, '_')}_${templateName.replace(/\s+/g, '_')}.pdf`);
-      showToast('Lettre exportée en PDF !', 'success');
-      
-      handleSaveDraft(true);
-    } catch (e: any) {
-      console.error(e);
-      showToast(`Erreur PDF: ${e.message}`, 'error');
+      showToast('Votre demande de lettre de motivation a été transmise avec succès à nos experts !', 'success');
+      onSaveComplete();
+    } catch (err) {
+      console.error('Error submitting LM request:', err);
+      showToast('Erreur lors de la transmission de la demande', 'error');
+    } finally {
+      setSubmittingRequest(false);
     }
   };
 
@@ -347,9 +389,8 @@ export default function LMForm({ templateId, templateName, initialVersionId, onB
         })}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
-          <GlassCard className="space-y-6">
+      <div className="max-w-4xl mx-auto">
+        <GlassCard className="space-y-6">
             <h3 className="text-sm font-black uppercase tracking-wider text-slate-900 border-b border-slate-100 pb-3 flex items-center gap-2">
               Étape {step} / 5 : {stepsList[step - 1]}
             </h3>
@@ -519,16 +560,16 @@ export default function LMForm({ templateId, templateName, initialVersionId, onB
               </div>
             )}
 
-            {/* Step 5: Finalize and export */}
+            {/* Step 5: Finalize and submit request */}
             {step === 5 && (
               <div className="py-6 text-center space-y-6">
                 <div className="h-16 w-16 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center mx-auto shadow-sm">
-                  <FileCheck className="h-8 w-8" />
+                  <CheckCircle2 className="h-8 w-8" />
                 </div>
                 <div className="space-y-2">
-                  <h4 className="text-base font-black text-slate-800 uppercase">Lettre Prête pour l'Action !</h4>
+                  <h4 className="text-base font-black text-slate-800 uppercase">DEMANDE PRÊTE À ÊTRE TRANSMISE !</h4>
                   <p className="text-xs font-semibold text-slate-500 max-w-md mx-auto leading-relaxed">
-                    Votre Lettre de Motivation est prête à être envoyée. Exportez-la maintenant en format PDF professionnel pour compléter votre candidature.
+                    Votre formulaire est complet. Transmettez votre demande pour que nos experts RH rédigent et subliment votre lettre de motivation sur-mesure.
                   </p>
                 </div>
 
@@ -545,33 +586,31 @@ export default function LMForm({ templateId, templateName, initialVersionId, onB
                   </div>
 
                   <div className="flex flex-col gap-3 w-full">
+                    <Button 
+                      variant="primary" 
+                      className="w-full py-3.5 text-xs font-black uppercase tracking-wider bg-orange-600 hover:bg-orange-700 text-white flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-orange-650/20"
+                      onClick={handleSubmitRequest}
+                      isLoading={submittingRequest}
+                    >
+                      <Send className="h-4 w-4" /> Soumettre ma demande de Lettre
+                    </Button>
+
                     <div className="flex flex-col sm:flex-row items-center justify-center gap-3 w-full">
-                      <Button 
-                        variant="primary" 
-                        className="w-full py-3 text-xs tracking-wider"
-                        onClick={handleDownloadPDF}
-                      >
-                        <Download className="mr-1.5 h-4.5 w-4.5 animate-bounce" /> Exporter Lettre
-                      </Button>
                       <Button 
                         variant="secondary" 
                         className="w-full py-3 text-xs tracking-wider"
                         onClick={() => handleSaveDraft(false)}
                       >
-                        Terminer & Sauver
+                        <Save className="mr-1.5 h-4 w-4" /> Sauvegarder brouillon
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="w-full py-3 text-xs tracking-wider border-slate-200"
+                        onClick={handleClearDraftCache}
+                      >
+                        <RotateCcw className="mr-1.5 h-4 w-4 text-slate-500" /> Réinitialiser
                       </Button>
                     </div>
-                    
-                    <Button
-                      type="button"
-                      onClick={handleSendWhatsApp}
-                      className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl text-xs uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer shadow-md border-0"
-                    >
-                      <svg className="h-4 w-4 fill-current shrink-0" viewBox="0 0 24 24">
-                        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L0 24l6.335-1.662c1.746.953 3.71 1.458 5.705 1.459h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
-                      </svg>
-                      Partager sur WhatsApp
-                    </Button>
                   </div>
                 </div>
               </div>
@@ -604,47 +643,6 @@ export default function LMForm({ templateId, templateName, initialVersionId, onB
               )}
             </div>
           </GlassCard>
-        </div>
-
-        {/* AI Style Editor Panel */}
-        <div className="lg:col-span-1 space-y-6">
-          <GlassCard className="border-orange-100/60 bg-gradient-to-br from-white to-orange-50/10 space-y-4">
-            <div className="flex items-center gap-2">
-              <div className="h-8 w-8 bg-orange-100 text-orange-600 rounded-xl flex items-center justify-center">
-                <Sparkles className="h-4.5 w-4.5 animate-pulse" />
-              </div>
-              <div>
-                <h4 className="text-xs font-black uppercase tracking-wider text-slate-800">Correcteur de Style IA</h4>
-                <p className="text-[9px] font-bold text-slate-400">AMÉLIORER AVEC GEMINI</p>
-              </div>
-            </div>
-
-            <p className="text-[10px] font-semibold text-slate-500 leading-normal">
-              Utilisez la puissance de Gemini 2.5 pour analyser votre rédaction, corriger les tournures maladroites, et maximiser l'intérêt des recruteurs professionnels.
-            </p>
-
-            <Button
-              variant="outline"
-              className="w-full text-[10px] uppercase tracking-wider bg-white py-2"
-              onClick={handleGetAiAdvice}
-              isLoading={loadingAdvice}
-              disabled={!formData.content}
-            >
-              <Sparkles className="mr-1.5 h-4 w-4 text-orange-500" /> Améliorer ma Lettre
-            </Button>
-
-            {aiAdvice && (
-              <div className="bg-slate-950 text-slate-100 rounded-2xl p-4.5 border border-slate-800/80 shadow-md text-left text-xs leading-relaxed max-h-72 overflow-y-auto space-y-2 prose prose-invert font-semibold">
-                <p className="text-[10px] font-black uppercase text-orange-400 tracking-wider flex items-center gap-1.5 pb-1 border-b border-slate-850">
-                  ⚡ Revue de style de l'IA
-                </p>
-                <div className="text-[11px] font-medium leading-relaxed space-y-1.5 break-words whitespace-pre-wrap">
-                  {aiAdvice}
-                </div>
-              </div>
-            )}
-          </GlassCard>
-        </div>
       </div>
     </div>
   );

@@ -3,8 +3,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   User, Mail, Phone, Calendar, Globe, MapPin, Briefcase, 
   GraduationCap, Sparkles, Plus, Trash2, ArrowLeft, ArrowRight,
-  FileCheck, Download, Award, HeartHandshake, Eye, BookOpen,
-  Camera, Upload, Image as ImageIcon
+  FileCheck, Award, HeartHandshake, Eye, BookOpen,
+  Camera, Upload, Image as ImageIcon, Send, Save, RotateCcw, CheckCircle2
 } from 'lucide-react';
 import Button from './Button';
 import GlassCard from './GlassCard';
@@ -14,7 +14,10 @@ import { generateCVAdvice } from '@/services/geminiService';
 import { saveCVRequest } from '@/services/supabaseClient';
 import { showToast } from './toast';
 import { compressImage } from '@/lib/imageUtils';
-import { jsPDF } from 'jspdf';
+import { safeSetItem, safeGetItem, safeRemoveItem } from '@/lib/safeStorage';
+import { db, auth } from '@/lib/firebase';
+import { doc, setDoc } from 'firebase/firestore';
+import { cleanUndefined } from '@/contexts/AuthContext';
 
 interface CVFormProps {
   templateId: string;
@@ -25,10 +28,10 @@ interface CVFormProps {
   userProfile?: any;
 }
 
-const DEFAULT_FORM_DATA = (email: string = '', name: string = '', phone: string = ''): CVFormData => ({
-  fullName: name,
-  email: email,
-  phonePrimary: phone,
+const DEFAULT_FORM_DATA = (): CVFormData => ({
+  fullName: '',
+  email: '',
+  phonePrimary: '',
   phoneSecondary: '',
   address: '',
   birthYear: '',
@@ -48,14 +51,96 @@ const DEFAULT_FORM_DATA = (email: string = '', name: string = '', phone: string 
   message: ''
 });
 
+const buildPrefilledCVData = (profile: any): CVFormData => {
+  const base = DEFAULT_FORM_DATA();
+  if (!profile) return base;
+
+  const email = profile?.email || base.email;
+  const name = profile?.displayName || profile?.name || 
+    (profile?.firstName ? `${profile.firstName} ${profile.lastName || ''}`.trim() : '') || 
+    base.fullName;
+
+  const phone = profile?.phone || profile?.phonePrimary || base.phonePrimary;
+
+  const address = profile?.address ||
+    (profile?.locationCity ? `${profile.locationCity}, Côte d'Ivoire` : '') ||
+    (profile?.city ? `${profile.city}, Côte d'Ivoire` : '') ||
+    (profile?.location || base.address);
+
+  const jobTitle = profile?.jobTitle || base.jobTitle;
+  const portfolioUrl = profile?.portfolioUrl || profile?.linkedinUrl || profile?.social?.linkedin || profile?.social?.portfolio || base.portfolioUrl;
+  const photoUrl = profile?.avatarUrl || profile?.photoUrl || undefined;
+
+  let experiences: CVExperience[] = base.experiences;
+  if (Array.isArray(profile?.experiences) && profile.experiences.length > 0) {
+    experiences = profile.experiences.map((exp: any, idx: number) => ({
+      id: `exp-${idx}-${Date.now()}`,
+      company: exp.company || '',
+      position: exp.role || exp.position || '',
+      startDate: exp.startDate || '',
+      endDate: exp.current ? 'Présent' : (exp.endDate || ''),
+      description: exp.description || ''
+    }));
+  }
+
+  let educations: CVEducation[] = base.educations;
+  if (Array.isArray(profile?.education) && profile.education.length > 0) {
+    educations = profile.education.map((ed: any, idx: number) => ({
+      id: `ed-${idx}-${Date.now()}`,
+      school: ed.school || '',
+      degree: ed.degree ? `${ed.degree}${ed.field ? ' en ' + ed.field : ''}` : (ed.field || ''),
+      startDate: ed.startDate || '',
+      endDate: ed.current ? 'En cours' : (ed.endDate || ''),
+      description: ed.description || ''
+    }));
+  }
+
+  let skillsTechnical = base.skillsTechnical;
+  if (Array.isArray(profile?.skills) && profile.skills.length > 0) {
+    skillsTechnical = profile.skills.map((s: any) => typeof s === 'string' ? s : s.name).filter(Boolean).join(', ');
+  }
+
+  let skillsLanguages = base.skillsLanguages;
+  if (Array.isArray(profile?.languages) && profile.languages.length > 0) {
+    skillsLanguages = profile.languages.map((l: any) => typeof l === 'string' ? l : `${l.language || l} (${l.level || ''})`).filter(Boolean).join(', ');
+  }
+
+  return {
+    fullName: name,
+    email: email,
+    phonePrimary: phone,
+    phoneSecondary: profile?.phoneSecondary || base.phoneSecondary,
+    address: address,
+    birthYear: profile?.birthDate ? profile.birthDate.substring(0, 4) : base.birthYear,
+    nationality: profile?.nationality || base.nationality,
+    jobTitle: jobTitle,
+    portfolioUrl: portfolioUrl,
+    photoUrl: photoUrl,
+    educations: educations,
+    experiences: experiences,
+    skillsTechnical: skillsTechnical,
+    skillsTools: base.skillsTools,
+    skillsLanguages: skillsLanguages,
+    certifications: base.certifications,
+    interestsHobbies: profile?.bio || base.interestsHobbies,
+    interestsVolunteering: base.interestsVolunteering,
+    references: base.references,
+    draft: true,
+    message: ''
+  };
+};
+
 export default function CVForm({ templateId, templateName, initialVersionId, onBack, onSaveComplete, userProfile }: CVFormProps) {
   const [step, setStep] = useState(1);
-  const [formData, setFormData] = useState<CVFormData>(DEFAULT_FORM_DATA(userProfile?.email, userProfile?.displayName, userProfile?.phone));
+  const [formData, setFormData] = useState<CVFormData>(() => buildPrefilledCVData(userProfile));
   const [aiAdvice, setAiAdvice] = useState<string | null>(null);
   const [loadingAdvice, setLoadingAdvice] = useState(false);
+  const [submittingRequest, setSubmittingRequest] = useState(false);
   const [versionName, setVersionName] = useState('Mon CV Professionnel');
 
-  // Load existing version if editing
+  const draftCacheKey = `cvlm_draft_cache_cv_${templateId}`;
+
+  // Load existing version or draft cache or user profile prefill
   useEffect(() => {
     if (initialVersionId) {
       const existing = getVersionById(initialVersionId);
@@ -63,18 +148,34 @@ export default function CVForm({ templateId, templateName, initialVersionId, onB
         setFormData(existing.data);
         setVersionName(existing.name);
       }
-    } else if (userProfile) {
-      setFormData(prev => ({
-        ...prev,
-        fullName: userProfile.displayName || prev.fullName,
-        email: userProfile.email || prev.email,
-        phonePrimary: userProfile.phone || prev.phonePrimary,
-        address: userProfile.locationCity ? `${userProfile.locationCity}, ${userProfile.locationCountry || 'CI'}` : prev.address,
-        jobTitle: userProfile.jobTitle || prev.jobTitle,
-        portfolioUrl: userProfile.portfolioUrl || prev.portfolioUrl
-      }));
+    } else {
+      const cachedStr = safeGetItem(draftCacheKey);
+      if (cachedStr) {
+        try {
+          const cachedData = JSON.parse(cachedStr);
+          setFormData(cachedData);
+          showToast('Brouillon sauvegardé en cache restauré !', 'info');
+        } catch (e) {
+          setFormData(buildPrefilledCVData(userProfile));
+        }
+      } else if (userProfile) {
+        setFormData(buildPrefilledCVData(userProfile));
+      }
     }
-  }, [initialVersionId, userProfile]);
+  }, [initialVersionId, userProfile, templateId]);
+
+  // Auto-save form cache to localStorage on edit
+  useEffect(() => {
+    if (!initialVersionId && formData.fullName) {
+      safeSetItem(draftCacheKey, JSON.stringify(formData));
+    }
+  }, [formData, templateId, initialVersionId]);
+
+  const handleClearDraftCache = () => {
+    safeRemoveItem(draftCacheKey);
+    setFormData(buildPrefilledCVData(userProfile));
+    showToast('Champs réinitialisés avec votre profil.', 'info');
+  };
 
   // Handle inputs
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -171,7 +272,7 @@ export default function CVForm({ templateId, templateName, initialVersionId, onB
     try {
       const advice = await generateCVAdvice(formData.jobTitle);
       setAiAdvice(advice);
-      showToast('Conseils IA générés !', 'success');
+      showToast('Conseils d\'experts chargés !', 'success');
     } catch (e) {
       showToast('Erreur lors de la génération', 'error');
     } finally {
@@ -261,194 +362,106 @@ export default function CVForm({ templateId, templateName, initialVersionId, onB
     showToast('Redirection vers WhatsApp...', 'success');
   };
 
-  // Generate beautiful customized PDF with jsPDF
-  const handleDownloadPDF = () => {
+  // Submit CV Request to database & RH Experts
+  const handleSubmitRequest = async () => {
+    setSubmittingRequest(true);
     try {
-      const doc = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: 'a4'
+      const versionId = initialVersionId || `cv-version-${Date.now()}`;
+      const newVersion: CVVersion = {
+        id: versionId,
+        profileType: 'candidate',
+        name: versionName,
+        data: { ...formData, draft: false },
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        templateId,
+        templateName
+      };
+
+      // 1. Save version locally & Firestore cv_versions
+      await saveVersion(newVersion);
+
+      // 2. Save request record locally
+      await saveCVRequest({
+        templateName,
+        status: 'completed'
       });
 
-      // Colors
-      const primaryColor = [226, 92, 29]; // Orange #e25c1d
-      const darkColor = [15, 23, 42]; // Slate 900
-      const lightColor = [71, 85, 105]; // Slate 600
+      // 3. Save request to Firestore database collection 'cv_requests' and local cache
+      const currentUser = auth.currentUser;
+      const requestDoc = {
+        id: `req-cv-${Date.now()}`,
+        userId: currentUser?.uid || 'guest',
+        userEmail: formData.email,
+        userName: formData.fullName,
+        userPhone: formData.phonePrimary,
+        templateId,
+        templateName,
+        type: 'cv',
+        formData: cleanUndefined(formData),
+        status: 'submitted',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
 
-      // Margins & Position trackers
-      const margin = 20;
-      let y = 25;
-
-      // Header background decoration (elegant header bar)
-      doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-      doc.rect(0, 0, 210, 15, 'F');
-
-      // Title & Header details
-      doc.setFont('Helvetica', 'bold');
-      doc.setFontSize(22);
-      doc.setTextColor(darkColor[0], darkColor[1], darkColor[2]);
-      doc.text(formData.fullName.toUpperCase(), margin, y);
-      y += 6;
-
-      doc.setFontSize(14);
-      doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-      doc.text(formData.jobTitle || 'CANDIDAT PROFESSIONNEL', margin, y);
-      y += 8;
-
-      // Info metadata columns
-      doc.setFont('Helvetica', 'normal');
-      doc.setFontSize(9);
-      doc.setTextColor(lightColor[0], lightColor[1], lightColor[2]);
-      
-      const metaText = `Email: ${formData.email}  |  Tél: ${formData.phonePrimary}  |  Adresse: ${formData.address || 'Abidjan, CI'}`;
-      doc.text(metaText, margin, y);
-      y += 4;
-
-      if (formData.portfolioUrl) {
-        doc.text(`Portfolio / LinkedIn: ${formData.portfolioUrl}`, margin, y);
-        y += 4;
-      }
-      
-      // Divider
-      doc.setDrawColor(220, 220, 220);
-      doc.setLineWidth(0.4);
-      doc.line(margin, y, 210 - margin, y);
-      y += 8;
-
-      // EXPERIENCES SECTION
-      if (formData.experiences.length > 0) {
-        doc.setFont('Helvetica', 'bold');
-        doc.setFontSize(12);
-        doc.setTextColor(darkColor[0], darkColor[1], darkColor[2]);
-        doc.text('EXPÉRIENCES PROFESSIONNELLES', margin, y);
-        y += 6;
-
-        formData.experiences.forEach((exp) => {
-          doc.setFont('Helvetica', 'bold');
-          doc.setFontSize(10);
-          doc.setTextColor(darkColor[0], darkColor[1], darkColor[2]);
-          doc.text(`${exp.position} - ${exp.company}`, margin, y);
-          
-          doc.setFont('Helvetica', 'italic');
-          doc.setFontSize(9);
-          doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-          doc.text(`(${exp.startDate} - ${exp.endDate || "Présent"})`, 210 - margin - 35, y, { align: 'right' });
-          y += 5;
-
-          doc.setFont('Helvetica', 'normal');
-          doc.setFontSize(9);
-          doc.setTextColor(lightColor[0], lightColor[1], lightColor[2]);
-          const splitDesc = doc.splitTextToSize(exp.description || '', 170);
-          doc.text(splitDesc, margin, y);
-          y += splitDesc.length * 4.5 + 4;
-        });
-        y += 2;
-      }
-
-      // EDUCATION SECTION
-      if (formData.educations.length > 0) {
-        doc.setFont('Helvetica', 'bold');
-        doc.setFontSize(12);
-        doc.setTextColor(darkColor[0], darkColor[1], darkColor[2]);
-        doc.text('FORMATIONS & ÉDUCATION', margin, y);
-        y += 6;
-
-        formData.educations.forEach((ed) => {
-          doc.setFont('Helvetica', 'bold');
-          doc.setFontSize(10);
-          doc.setTextColor(darkColor[0], darkColor[1], darkColor[2]);
-          doc.text(`${ed.degree} - ${ed.school}`, margin, y);
-          
-          doc.setFont('Helvetica', 'italic');
-          doc.setFontSize(9);
-          doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-          doc.text(`(${ed.startDate} - ${ed.endDate})`, 210 - margin - 35, y, { align: 'right' });
-          y += 5;
-
-          if (ed.description) {
-            doc.setFont('Helvetica', 'normal');
-            doc.setFontSize(9);
-            doc.setTextColor(lightColor[0], lightColor[1], lightColor[2]);
-            const splitDesc = doc.splitTextToSize(ed.description, 170);
-            doc.text(splitDesc, margin, y);
-            y += splitDesc.length * 4.5 + 4;
-          } else {
-            y += 2;
-          }
-        });
-        y += 2;
-      }
-
-      // SKILLS SECTION
-      doc.setFont('Helvetica', 'bold');
-      doc.setFontSize(12);
-      doc.setTextColor(darkColor[0], darkColor[1], darkColor[2]);
-      doc.text('COMPÉTENCES ET EXPERTISE', margin, y);
-      y += 6;
-
-      doc.setFont('Helvetica', 'normal');
-      doc.setFontSize(9);
-      doc.setTextColor(lightColor[0], lightColor[1], lightColor[2]);
-      
-      if (formData.skillsTechnical) {
-        doc.setFont('Helvetica', 'bold');
-        doc.text('Techniques : ', margin, y);
-        doc.setFont('Helvetica', 'normal');
-        doc.text(formData.skillsTechnical, margin + 25, y);
-        y += 5;
-      }
-      if (formData.skillsTools) {
-        doc.setFont('Helvetica', 'bold');
-        doc.text('Outils & Softwares : ', margin, y);
-        doc.setFont('Helvetica', 'normal');
-        doc.text(formData.skillsTools, margin + 35, y);
-        y += 5;
-      }
-      if (formData.skillsLanguages) {
-        doc.setFont('Helvetica', 'bold');
-        doc.text('Langues : ', margin, y);
-        doc.setFont('Helvetica', 'normal');
-        doc.text(formData.skillsLanguages, margin + 20, y);
-        y += 5;
-      }
-
-      y += 3;
-
-      // CERTIFICATIONS & INTERESTS
-      if (formData.certifications || formData.interestsHobbies) {
-        doc.setFont('Helvetica', 'bold');
-        doc.setFontSize(11);
-        doc.setTextColor(darkColor[0], darkColor[1], darkColor[2]);
-        doc.text('CERTIFICATIONS & CENTRES D\'INTÉRÊT', margin, y);
-        y += 5;
-
-        doc.setFont('Helvetica', 'normal');
-        doc.setFontSize(9);
-        doc.setTextColor(lightColor[0], lightColor[1], lightColor[2]);
-        
-        if (formData.certifications) {
-          doc.text(`Certifications: ${formData.certifications}`, margin, y);
-          y += 5;
+      // Save to local storage cache for instant offline / admin access
+      try {
+        const cachedStr = safeGetItem('cvlm_all_requests');
+        let cachedList = [];
+        if (cachedStr) {
+          try { cachedList = JSON.parse(cachedStr); } catch (e) {}
         }
-        if (formData.interestsHobbies) {
-          doc.text(`Intérêts: ${formData.interestsHobbies}`, margin, y);
-          y += 5;
-        }
+        cachedList = [requestDoc, ...cachedList.filter((r: any) => r.id !== requestDoc.id)];
+        safeSetItem('cvlm_all_requests', JSON.stringify(cachedList));
+      } catch (e) {
+        console.warn('Local request cache notice:', e);
       }
 
-      // Footer brand notice
-      doc.setFontSize(8);
-      doc.setTextColor(180, 180, 180);
-      doc.text(`Généré avec CVLM - Partenaire de Réussite 2NG Groupe`, 105, 287, { align: 'center' });
+      try {
+        await setDoc(doc(db, 'cv_requests', requestDoc.id), requestDoc);
+        if (currentUser?.uid) {
+          await setDoc(doc(db, 'users', currentUser.uid), {
+            displayName: formData.fullName,
+            phone: formData.phonePrimary,
+            jobTitle: formData.jobTitle,
+            address: formData.address,
+            cvUpdatedAt: new Date().toISOString()
+          }, { merge: true });
+        }
+      } catch (e) {
+        console.warn('Firestore request save notice:', e);
+      }
 
-      doc.save(`CV_${formData.fullName.replace(/\s+/g, '_')}_${templateName.replace(/\s+/g, '_')}.pdf`);
-      showToast('Fichier PDF téléchargé avec succès !', 'success');
-      
-      // Auto-save progress
-      handleSaveDraft(true);
-    } catch (e: any) {
-      console.error(e);
-      showToast(`Erreur lors de la génération du PDF: ${e.message}`, 'error');
+      // 4. Background notification email
+      try {
+        fetch('https://formspree.io/f/xvovgwza', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            recipient: '2ng.groupeentreprise@gmail.com',
+            subject: `Nouvelle demande de CV (${templateName}) - ${formData.fullName}`,
+            candidateName: formData.fullName,
+            candidateEmail: formData.email,
+            candidatePhone: formData.phonePrimary,
+            jobTitle: formData.jobTitle,
+            templateName,
+            formData
+          })
+        }).catch(() => {});
+      } catch (err) {
+        // ignore background dispatch
+      }
+
+      // 5. Clear draft cache from localStorage
+      safeRemoveItem(draftCacheKey);
+
+      showToast('Votre demande de création de CV a été transmise avec succès à nos experts RH !', 'success');
+      onSaveComplete();
+    } catch (err) {
+      console.error('Error submitting request:', err);
+      showToast('Erreur lors de la transmission de la demande', 'error');
+    } finally {
+      setSubmittingRequest(false);
     }
   };
 
@@ -518,10 +531,8 @@ export default function CVForm({ templateId, templateName, initialVersionId, onB
       </div>
 
       {/* Steps Editor Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Main Step Panel */}
-        <div className="lg:col-span-2">
-          <GlassCard className="space-y-6">
+      <div className="max-w-4xl mx-auto">
+        <GlassCard className="space-y-6">
             <h3 className="text-sm font-black uppercase tracking-wider text-slate-900 border-b border-slate-100 pb-3 flex items-center gap-2">
               Étape {step} / 7 : {stepsList[step - 1]}
             </h3>
@@ -932,47 +943,45 @@ export default function CVForm({ templateId, templateName, initialVersionId, onB
               </div>
             )}
 
-            {/* Step 7: Save & Export PDF */}
+            {/* Step 7: Finalize & Submit Request */}
             {step === 7 && (
               <div className="py-6 text-center space-y-6">
                 <div className="h-16 w-16 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center mx-auto shadow-sm">
-                  <FileCheck className="h-8 w-8" />
+                  <CheckCircle2 className="h-8 w-8" />
                 </div>
                 <div className="space-y-2">
-                  <h4 className="text-base font-black text-slate-800 uppercase">CV Prêt pour l'Action !</h4>
+                  <h4 className="text-base font-black text-slate-800 uppercase">DEMANDE PRÊTE À ÊTRE TRANSMISE !</h4>
                   <p className="text-xs font-semibold text-slate-500 max-w-md mx-auto leading-relaxed">
-                    Votre CV est complet. Vous pouvez à présent le sauvegarder sous forme de brouillon pour l'éditer plus tard, ou l'exporter immédiatement au format PDF standard pour postuler directement.
+                    Vos informations sont enregistrées. Cliquez sur <strong className="text-slate-800">Soumettre ma demande</strong> pour transmettre votre dossier à nos experts RH qui concevront votre CV sur-mesure.
                   </p>
                 </div>
 
                 <div className="flex flex-col gap-3 max-w-sm mx-auto w-full">
+                  <Button 
+                    variant="primary" 
+                    className="w-full py-3.5 text-xs font-black uppercase tracking-wider bg-orange-600 hover:bg-orange-700 text-white flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-orange-650/20"
+                    onClick={handleSubmitRequest}
+                    isLoading={submittingRequest}
+                  >
+                    <Send className="h-4 w-4" /> Soumettre ma demande de CV
+                  </Button>
+
                   <div className="flex flex-col sm:flex-row items-center justify-center gap-3 w-full">
-                    <Button 
-                      variant="primary" 
-                      className="w-full py-3 text-xs tracking-wider"
-                      onClick={handleDownloadPDF}
-                    >
-                      <Download className="mr-1.5 h-4.5 w-4.5 animate-bounce" /> Exporter en PDF
-                    </Button>
                     <Button 
                       variant="secondary" 
                       className="w-full py-3 text-xs tracking-wider"
                       onClick={() => handleSaveDraft(false)}
                     >
-                      Terminer & Sauver
+                      <Save className="mr-1.5 h-4 w-4" /> Sauvegarder brouillon
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="w-full py-3 text-xs tracking-wider border-slate-200"
+                      onClick={handleClearDraftCache}
+                    >
+                      <RotateCcw className="mr-1.5 h-4 w-4 text-slate-500" /> Réinitialiser
                     </Button>
                   </div>
-                  
-                  <Button
-                    type="button"
-                    onClick={handleSendWhatsApp}
-                    className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl text-xs uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer shadow-md border-0"
-                  >
-                    <svg className="h-4 w-4 fill-current shrink-0" viewBox="0 0 24 24">
-                      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L0 24l6.335-1.662c1.746.953 3.71 1.458 5.705 1.459h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
-                    </svg>
-                    Partager sur WhatsApp
-                  </Button>
                 </div>
               </div>
             )}
@@ -1005,47 +1014,6 @@ export default function CVForm({ templateId, templateName, initialVersionId, onB
               )}
             </div>
           </GlassCard>
-        </div>
-
-        {/* AI Copilot Advisor card column */}
-        <div className="lg:col-span-1 space-y-6">
-          <GlassCard className="border-orange-100/60 bg-gradient-to-br from-white to-orange-50/10 space-y-4">
-            <div className="flex items-center gap-2">
-              <div className="h-8 w-8 bg-orange-100 text-orange-600 rounded-xl flex items-center justify-center">
-                <Sparkles className="h-4.5 w-4.5 animate-pulse" />
-              </div>
-              <div>
-                <h4 className="text-xs font-black uppercase tracking-wider text-slate-800">Conseiller IA Gemini</h4>
-                <p className="text-[9px] font-bold text-slate-400">OPTIMISATION CV EN DIRECT</p>
-              </div>
-            </div>
-
-            <p className="text-[10px] font-semibold text-slate-500 leading-normal">
-              Demandez à l'IA Gemini d'analyser le poste visé (<span className="text-orange-600 font-extrabold">{formData.jobTitle || "Indéterminé"}</span>) et d'obtenir 3 recommandations adaptées pour multiplier vos chances d'entretien.
-            </p>
-
-            <Button
-              variant="outline"
-              className="w-full text-[10px] uppercase tracking-wider bg-white py-2"
-              onClick={handleGetAiAdvice}
-              isLoading={loadingAdvice}
-              disabled={!formData.jobTitle}
-            >
-              <Sparkles className="mr-1.5 h-4 w-4 text-orange-500" /> Générer conseils IA
-            </Button>
-
-            {aiAdvice && (
-              <div className="bg-slate-950 text-slate-100 rounded-2xl p-4.5 border border-slate-800/80 shadow-md text-left text-xs leading-relaxed max-h-72 overflow-y-auto space-y-2 prose prose-invert font-semibold">
-                <p className="text-[10px] font-black uppercase text-orange-400 tracking-wider flex items-center gap-1.5 pb-1 border-b border-slate-850">
-                  ⚡ Recommandations Gemini 2.5
-                </p>
-                <div className="text-[11px] font-medium leading-relaxed space-y-1.5 break-words whitespace-pre-wrap">
-                  {aiAdvice}
-                </div>
-              </div>
-            )}
-          </GlassCard>
-        </div>
       </div>
     </div>
   );

@@ -231,7 +231,7 @@ ${rawText}`;
         // Return structured backup advice if Gemini is not configured
         if (type === 'cv') {
           res.json({
-            advice: `### 💡 Conseils pour le poste de **${jobTitle || 'Candidat'}** (Mode hors-ligne)\n\n1. **Valorisez vos réalisations concrètes** : Utilisez des chiffres précis (ex: augmentation du chiffre d'affaires de 15% ou gestion de 5 projets simultanés).\n2. **Mots-clés pertinents** : Intégrez les termes recherchés par les recruteurs du secteur dans votre CV pour passer les filtres d'algorithmes (ATS).\n3. **Clarté & concision** : Optez pour un CV d'une seule page, aéré, structuré et facile à lire.`
+            advice: `### 💡 Conseils pour le poste de **${jobTitle || 'Candidat'}** (Mode hors-ligne)\n\n1. **Valorisez vos réalisations concrètes** : Utilisez des chiffres précis (ex: augmentation du chiffre d'affaires de 15% ou gestion de 5 projets simultanés).\n2. **Mots-clés pertinents** : Intégrez les termes et compétences clés recherchés par les recruteurs du secteur dans votre CV.\n3. **Clarté & concision** : Optez pour un CV d'une seule page, aéré, structuré et facile à lire.`
           });
         } else {
           res.json({

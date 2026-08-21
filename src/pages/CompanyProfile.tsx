@@ -15,6 +15,8 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { useAuth } from '@/contexts/AuthContext';
 import { compressImage } from '@/lib/utils';
+import { uploadImageToStorage } from '@/lib/imageUtils';
+
 import { 
   Building2, 
   MapPin, 
@@ -53,38 +55,26 @@ export default function CompanyProfile() {
 
     try {
       setUploadingBanner(true);
-      const reader = new FileReader();
-      reader.onloadend = async () => {
-        try {
-          const compressed = await compressImage(reader.result as string, 1200, 600, 0.6);
-          
-          // Update Firestore doc
-          const userDocRef = doc(db, 'users', id!);
-          
-          // branding might not exist yet, so we get current branding state or construct it
-          const currentBranding = profile?.branding || {};
-          const updatedBranding = { ...currentBranding, bannerUrl: compressed };
+      const storageUrl = await uploadImageToStorage(file, 'company_banners');
+      
+      // Update Firestore doc
+      const userDocRef = doc(db, 'users', id!);
+      const currentBranding = profile?.branding || {};
+      const updatedBranding = { ...currentBranding, bannerUrl: storageUrl };
 
-          await updateDoc(userDocRef, {
-            branding: updatedBranding
-          });
+      await updateDoc(userDocRef, {
+        branding: updatedBranding
+      });
 
-          // Update local profile state as well
-          setProfile(prev => prev ? {
-            ...prev,
-            branding: updatedBranding
-          } : null);
-
-        } catch (innerError) {
-          console.error("Error compressing and saving banner photo:", innerError);
-          alert("Une erreur s'est produite lors de la sauvegarde de la photo.");
-        } finally {
-          setUploadingBanner(false);
-        }
-      };
-      reader.readAsDataURL(file);
-    } catch (err) {
-      console.error("Error reading file:", err);
+      // Update local profile state
+      setProfile(prev => prev ? {
+        ...prev,
+        branding: updatedBranding
+      } : null);
+    } catch (innerError) {
+      console.error("Error uploading banner photo:", innerError);
+      alert("Une erreur s'est produite lors de la sauvegarde de la photo.");
+    } finally {
       setUploadingBanner(false);
     }
   };

@@ -124,14 +124,14 @@ export default function Jobs() {
                 detailsMap[docSnap.id] = data;
               });
             } catch (err) {
-              console.error("Error fetching recruiters batch:", err);
+              console.warn("Notice fetching recruiters batch:", err?.message || err);
             }
           }
           setCompanyNames(prev => ({ ...prev, ...namesMap }));
           setCompanyDetails(prev => ({ ...prev, ...detailsMap }));
         }
       } catch (error) {
-        console.error('Error fetching jobs:', error);
+        console.warn('Notice fetching jobs (using cached/default):', error?.message || error);
       } finally {
         setLoading(false);
       }
@@ -156,7 +156,7 @@ export default function Jobs() {
           });
           setAppliedJobIds(ids);
         } catch (err) {
-          console.error("Error loading user applications:", err);
+          console.warn("Notice loading user applications:", err?.message || err);
         }
       };
       fetchApplications();

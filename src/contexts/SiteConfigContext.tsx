@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { safeGetItem, safeSetItem } from '@/lib/safeStorage';
 
 interface SiteConfig {
   siteName: string;
@@ -82,6 +83,7 @@ const SiteConfigContext = createContext<{
   supportPhone: string;
   registrationsOpen: boolean;
   loading: boolean;
+  quotaExceeded: boolean;
 }>({
   config: defaultContent,
   maintenanceEnabled: false,
@@ -89,25 +91,43 @@ const SiteConfigContext = createContext<{
   supportEmail: "support@2ngentreprises.com",
   supportPhone: "+225 05 40 50 47 90",
   registrationsOpen: true,
-  loading: true
+  loading: true,
+  quotaExceeded: false
 });
 
 export function SiteConfigProvider({ children }: { children: React.ReactNode }) {
-  const [config, setConfig] = useState<SiteConfig>(defaultContent);
-  const [maintenanceEnabled, setMaintenanceEnabled] = useState(false);
-  const [maintenanceMessage, setMaintenanceMessage] = useState("");
-  const [supportEmail, setSupportEmail] = useState("support@2ngentreprises.com");
-  const [supportPhone, setSupportPhone] = useState("+225 05 40 50 47 90");
+  const [config, setConfig] = useState<SiteConfig>(() => {
+    const cached = safeGetItem('cached_site_config');
+    if (cached) {
+      try { return { ...defaultContent, ...JSON.parse(cached) }; } catch (e) {}
+    }
+    return defaultContent;
+  });
+  const [maintenanceEnabled, setMaintenanceEnabled] = useState(() => {
+    return safeGetItem('cached_maintenance_enabled') === 'true';
+  });
+  const [maintenanceMessage, setMaintenanceMessage] = useState(() => {
+    return safeGetItem('cached_maintenance_message') || "";
+  });
+  const [supportEmail, setSupportEmail] = useState(() => {
+    return safeGetItem('cached_support_email') || "support@2ngentreprises.com";
+  });
+  const [supportPhone, setSupportPhone] = useState(() => {
+    return safeGetItem('cached_support_phone') || "+225 05 40 50 47 90";
+  });
   const [registrationsOpen, setRegistrationsOpen] = useState(true);
   const [configLoading, setConfigLoading] = useState(true);
   const [maintenanceLoading, setMaintenanceLoading] = useState(true);
   const [settingsLoading, setSettingsLoading] = useState(true);
+  const [quotaExceeded, setQuotaExceeded] = useState(false);
 
   useEffect(() => {
     const unsubConfig = onSnapshot(doc(db, 'site_config', 'home'), (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.data() as SiteConfig;
-        setConfig({ ...defaultContent, ...data });
+        const merged = { ...defaultContent, ...data };
+        setConfig(merged);
+        safeSetItem('cached_site_config', JSON.stringify(merged));
         
         // Dynamic Favicon Update
         if (data.iconUrl) {
@@ -162,35 +182,57 @@ export function SiteConfigProvider({ children }: { children: React.ReactNode }) 
       }
       setConfigLoading(false);
     }, (error) => {
-      console.error("Error reading site config:", error);
+      const msg = error?.message || String(error);
+      if (msg.includes('Quota') || msg.includes('quota') || msg.includes('resource-exhausted')) {
+        setQuotaExceeded(true);
+      }
+      console.warn("Notice reading site config (using cached config):", msg);
       setConfigLoading(false);
     });
 
     const unsubMaintenance = onSnapshot(doc(db, 'maintenance', 'config'), (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.data();
-        setMaintenanceEnabled(!!data?.enabled);
-        setMaintenanceMessage(data?.message || "");
+        const enabled = !!data?.enabled;
+        const message = data?.message || "";
+        setMaintenanceEnabled(enabled);
+        setMaintenanceMessage(message);
+        safeSetItem('cached_maintenance_enabled', String(enabled));
+        safeSetItem('cached_maintenance_message', message);
       } else {
         setMaintenanceEnabled(false);
         setMaintenanceMessage("");
       }
       setMaintenanceLoading(false);
     }, (error) => {
-      console.error("Error reading maintenance state:", error);
+      const msg = error?.message || String(error);
+      if (msg.includes('Quota') || msg.includes('quota') || msg.includes('resource-exhausted')) {
+        setQuotaExceeded(true);
+      }
+      console.warn("Notice reading maintenance state (using cached state):", msg);
       setMaintenanceLoading(false);
     });
 
     const unsubSettings = onSnapshot(doc(db, 'settings', 'general'), (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.data();
-        if (data.supportEmail) setSupportEmail(data.supportEmail);
-        if (data.supportPhone) setSupportPhone(data.supportPhone);
+        if (data.supportEmail) {
+          setSupportEmail(data.supportEmail);
+          safeSetItem('cached_support_email', data.supportEmail);
+        }
+        if (data.supportPhone) {
+          setSupportPhone(data.supportPhone);
+          safeSetItem('cached_support_phone', data.supportPhone);
+        }
         if (data.registrationsOpen !== undefined) setRegistrationsOpen(data.registrationsOpen);
       }
       setSettingsLoading(false);
     }, (error) => {
-      console.error("Error reading general settings:", error);
+      const msg = error?.message || String(error);
+      if (msg.includes('Quota') || msg.includes('quota') || msg.includes('resource-exhausted')) {
+        setQuotaExceeded(true);
+      }
+      console.warn("Notice reading general settings (using cached settings):", msg);
       setSettingsLoading(false);
     });
 
@@ -211,7 +253,8 @@ export function SiteConfigProvider({ children }: { children: React.ReactNode }) 
       supportEmail, 
       supportPhone, 
       registrationsOpen, 
-      loading 
+      loading,
+      quotaExceeded
     }}>
       {children}
     </SiteConfigContext.Provider>

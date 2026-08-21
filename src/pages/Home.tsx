@@ -27,7 +27,8 @@ import {
   Send,
   Building,
   ArrowUpRight,
-  X
+  X,
+  FileText
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -197,7 +198,7 @@ export default function Home() {
         }
 
       } catch (e) {
-        console.error("Error loading offers:", e);
+        console.warn("Notice loading offers (using cached/default jobs):", e?.message || e);
       } finally {
         setLoadingJobs(false);
       }
@@ -221,7 +222,7 @@ export default function Home() {
           });
           setAppliedJobIds(ids);
         } catch (err) {
-          console.error("Error loading user applications:", err);
+          console.warn("Notice loading user applications:", err?.message || err);
         }
       };
       fetchUserApplications();
@@ -1178,7 +1179,7 @@ export default function Home() {
                 onClick={() => navigate('/cvlm')}
                 className="h-12 px-6 bg-slate-800 border border-slate-700 hover:bg-slate-700 text-white font-extrabold rounded-2xl text-xs transition-all duration-300 hover:scale-[1.02] flex items-center gap-2"
               >
-                <Sparkles className="h-4.5 w-4.5 text-orange-500 animate-pulse" /> Rédiger un CV/Lettre (IA)
+                <FileText className="h-4.5 w-4.5 text-orange-500" /> Rédiger un CV & Lettre
               </Button>
             </div>
           </div>

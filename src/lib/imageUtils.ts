@@ -1,6 +1,8 @@
+import { storage } from './firebase';
+import { ref, uploadString, uploadBytes, getDownloadURL } from 'firebase/storage';
+
 /**
- * Utility to compress uploaded images into clean, persistent base64 strings
- * so they can be safely stored in Firestore documents without expiring or disappearing.
+ * Utility to compress uploaded images into clean base64 strings
  */
 export function compressImage(
   file: File, 
@@ -91,4 +93,46 @@ export function compressDataUrl(
     img.src = dataUrl;
   });
 }
+
+/**
+ * Uploads a base64 Data URL or File/Blob directly to Firebase Storage and returns the public HTTP URL.
+ * Replaces heavy base64 strings with permanent Firebase Storage URLs to prevent 'Storage quota exceeded' errors.
+ */
+export async function uploadImageToStorage(
+  input: File | Blob | string,
+  folder: string = 'images'
+): Promise<string> {
+  if (!input) return '';
+
+  // If it's already an HTTP/HTTPS URL, return as is
+  if (typeof input === 'string' && (input.startsWith('http://') || input.startsWith('https://'))) {
+    return input;
+  }
+
+  const randomId = `${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+  const filePath = `${folder}/${randomId}.jpg`;
+  const storageRef = ref(storage, filePath);
+
+  try {
+    if (typeof input === 'string') {
+      if (input.startsWith('data:image/')) {
+        const compressed = await compressDataUrl(input, 800, 1000, 0.8);
+        const snapshot = await uploadString(storageRef, compressed, 'data_url');
+        return await getDownloadURL(snapshot.ref);
+      }
+      return input;
+    } else if (input instanceof File || input instanceof Blob) {
+      const snapshot = await uploadBytes(storageRef, input);
+      return await getDownloadURL(snapshot.ref);
+    }
+  } catch (error) {
+    console.warn('Firebase Storage upload warning (falling back to compressed data):', error);
+    if (typeof input === 'string' && input.startsWith('data:image/')) {
+      return await compressDataUrl(input, 500, 600, 0.7);
+    }
+    if (typeof input === 'string') return input;
+  }
+  return '';
+}
+
 

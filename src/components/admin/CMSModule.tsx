@@ -20,6 +20,8 @@ import {
 } from 'lucide-react';
 import { doc, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { uploadImageToStorage } from '@/lib/imageUtils';
+
 
 interface CMSProps {
   currentData: any;
@@ -128,15 +130,15 @@ export default function CMSModule({ currentData, onSave }: CMSProps) {
     }
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, field: string) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, field: string) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = async () => {
-        const compressed = await compressImage(reader.result as string, 800, 800, 0.72);
-        setLocalData((prev: any) => ({ ...prev, [field]: compressed }));
-      };
-      reader.readAsDataURL(file);
+      try {
+        const storageUrl = await uploadImageToStorage(file, 'cms');
+        setLocalData((prev: any) => ({ ...prev, [field]: storageUrl }));
+      } catch (err) {
+        console.error("Error uploading image to storage:", err);
+      }
     }
   };
 
@@ -700,17 +702,8 @@ export default function CMSModule({ currentData, onSave }: CMSProps) {
                       onChange={(e) => {
                         const files = e.target.files;
                         if (files && files.length > 0) {
-                          const readersArr: Promise<string>[] = Array.from(files).map((file: any) => {
-                            return new Promise((resolve) => {
-                              const reader = new FileReader();
-                              reader.onloadend = async () => {
-                                const compressed = await compressImage(reader.result as string, 900, 900, 0.68);
-                                resolve(compressed);
-                              };
-                              reader.readAsDataURL(file);
-                            });
-                          });
-                          Promise.all(readersArr).then(results => {
+                          const uploadsArr = Array.from(files).map((file: any) => uploadImageToStorage(file, 'cms/banners'));
+                          Promise.all(uploadsArr).then(results => {
                             const existing = localData.bannerImages || [];
                             setLocalData({
                               ...localData,
@@ -938,17 +931,8 @@ export default function CMSModule({ currentData, onSave }: CMSProps) {
                           onChange={(e) => {
                             const files = e.target.files;
                             if (files && files.length > 0) {
-                              const readersArr: Promise<string>[] = Array.from(files).map((file: any) => {
-                                return new Promise((resolve) => {
-                                  const reader = new FileReader();
-                                  reader.onloadend = async () => {
-                                    const compressed = await compressImage(reader.result as string, 900, 900, 0.68);
-                                    resolve(compressed);
-                                  };
-                                  reader.readAsDataURL(file);
-                                });
-                              });
-                              Promise.all(readersArr).then(results => {
+                              const uploadsArr = Array.from(files).map((file: any) => uploadImageToStorage(file, 'cms/jobs_banners'));
+                              Promise.all(uploadsArr).then(results => {
                                 const existing = localData.jobsBannerImages || [];
                                 setLocalData({
                                   ...localData,
@@ -1090,17 +1074,8 @@ export default function CMSModule({ currentData, onSave }: CMSProps) {
                           onChange={(e) => {
                             const files = e.target.files;
                             if (files && files.length > 0) {
-                              const readersArr: Promise<string>[] = Array.from(files).map((file: any) => {
-                                return new Promise((resolve) => {
-                                  const reader = new FileReader();
-                                  reader.onloadend = async () => {
-                                    const compressed = await compressImage(reader.result as string, 900, 900, 0.68);
-                                    resolve(compressed);
-                                  };
-                                  reader.readAsDataURL(file);
-                                });
-                              });
-                              Promise.all(readersArr).then(results => {
+                              const uploadsArr = Array.from(files).map((file: any) => uploadImageToStorage(file, 'cms/jobs_between_banners'));
+                              Promise.all(uploadsArr).then(results => {
                                 const existing = localData.jobsInBetweenBannersImages || [];
                                 setLocalData({
                                   ...localData,

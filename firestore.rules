@@ -207,5 +207,10 @@ service cloud.firestore {
       allow read: if true;
       allow write: if isSignedIn() || isAdmin();
     }
+
+    // 14. CVLM Requests Rules
+    match /cv_requests/{requestId} {
+      allow read, write: if true;
+    }
   }
 }

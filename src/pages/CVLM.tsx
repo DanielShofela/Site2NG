@@ -7,7 +7,7 @@ import {
   Camera, Upload
 } from 'lucide-react';
 import { CVLMScreen, CVLMTemplate, CVVersion, LMVersion, CVLMUserProfile } from '@/types/cvlm';
-import { getCVTemplates, getLMTemplates, getTemplates, toggleFavorite, subscribeToTemplates } from '@/services/templateService';
+import { getCVTemplates, getLMTemplates, getTemplates, toggleFavorite, subscribeToTemplates, getTemplateThumbnail } from '@/services/templateService';
 import { getAllVersions, duplicateVersion, deleteVersion, subscribeToVersions } from '@/services/cvVersionService';
 import { getAllLMVersions, duplicateLMVersion, deleteLMVersion, subscribeToLMVersions } from '@/services/lmVersionService';
 import { showToast, ToastMessage } from '@/components/dashboard/toast';
@@ -48,20 +48,26 @@ interface TemplateCardProps {
   key?: string | number;
   template: CVLMTemplate;
   onPreview: (template: CVLMTemplate) => void;
-  onToggleFav: (id: string, e: React.MouseEvent) => void;
   onShare: (template: CVLMTemplate, e: React.MouseEvent) => void;
   onUse: (template: CVLMTemplate) => void;
 }
 
-function TemplateCard({ template, onPreview, onToggleFav, onShare, onUse }: TemplateCardProps) {
+function TemplateCard({ template, onPreview, onShare, onUse }: TemplateCardProps) {
   const [imgErr, setImgErr] = useState(false);
+
+  useEffect(() => {
+    setImgErr(false);
+  }, [template.id, template.thumbnail]);
+
+  const thumbUrl = getTemplateThumbnail(template.thumbnail, template.type, template.id);
+
   return (
     <div className="bg-white rounded-3xl border border-slate-150/70 overflow-hidden shadow-sm hover:shadow-md transition-all duration-300 group flex flex-col justify-between">
       {/* Thumbnail frame */}
       <div className="aspect-[3/4] bg-slate-100 relative overflow-hidden flex items-center justify-center border-b border-slate-100">
-        {template.thumbnail && !imgErr ? (
+        {!imgErr ? (
           <img
-            src={template.thumbnail}
+            src={thumbUrl}
             alt={template.name}
             className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-300"
             onError={() => setImgErr(true)}
@@ -108,13 +114,6 @@ function TemplateCard({ template, onPreview, onToggleFav, onShare, onUse }: Temp
             <Eye className="h-4.5 w-4.5" />
           </button>
           <button
-            onClick={(e) => onToggleFav(template.id, e)}
-            className="p-3 bg-white/95 text-slate-800 hover:text-rose-600 rounded-2xl transition-all shadow-md cursor-pointer"
-            title="Ajouter aux favoris"
-          >
-            <Heart className={`h-4.5 w-4.5 ${template.isFavorite ? 'text-rose-600 fill-rose-600' : ''}`} />
-          </button>
-          <button
             onClick={(e) => onShare(template, e)}
             className="p-3 bg-white/95 text-slate-800 hover:text-blue-600 rounded-2xl transition-all shadow-md cursor-pointer"
             title="Partager"
@@ -153,7 +152,7 @@ export default function CVLM() {
   const { user, logout } = useAuth();
   const [screen, setScreen] = useState<CVLMScreen>(CVLMScreen.ONBOARDING);
   const [templates, setTemplates] = useState<CVLMTemplate[]>([]);
-  const [filter, setFilter] = useState<'all' | 'cv' | 'lm' | 'favorite'>('all');
+  const [filter, setFilter] = useState<'all' | 'cv' | 'lm'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [cvVersions, setCvVersions] = useState<CVVersion[]>([]);
   const [lmVersions, setLmVersions] = useState<LMVersion[]>([]);
@@ -255,13 +254,6 @@ export default function CVLM() {
   }, [user]);
 
   // Actions
-  const handleToggleFav = (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    const updated = toggleFavorite(id);
-    setTemplates(updated);
-    showToast('Favoris mis à jour !', 'success');
-  };
-
   const handleShare = (template: CVLMTemplate, e: React.MouseEvent) => {
     e.stopPropagation();
     const shareUrl = `${window.location.origin}/cvlm?template=${template.id}`;
@@ -361,7 +353,6 @@ export default function CVLM() {
     if (!t) return false;
     const matchesFilter = 
       filter === 'all' ? true :
-      filter === 'favorite' ? t.isFavorite :
       t.type === filter;
     const matchesSearch = (t.name || '').toLowerCase().includes(searchQuery.toLowerCase()) || 
                           (t.tags || []).some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()));
@@ -439,13 +430,13 @@ export default function CVLM() {
           >
             <div className="space-y-4 max-w-xl mx-auto">
               <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-orange-100 text-orange-600 rounded-full text-[10px] font-black uppercase tracking-wider">
-                ✨ Propulsé par l'IA Gemini 2.5
+                ✨ Modèles certifiés & Validés RH
               </span>
               <h2 className="text-2xl sm:text-4xl font-black text-slate-900 tracking-tight leading-tight">
-                Créez des candidatures d'impact en <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-650 to-amber-500">quelques minutes</span>.
+                Créez vos candidatures professionnelles en <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-650 to-amber-500">toute simplicité</span>.
               </h2>
               <p className="text-xs sm:text-sm text-slate-500 font-semibold leading-relaxed">
-                Accédez à 41 templates de CV professionnels, 43 modèles de lettres de motivation, et optimisez votre style instantanément avec l'IA.
+                Accédez à 41 modèles de CV professionnels, 43 modèles de lettres de motivation, et personnalisez vos documents avec l'accompagnement de nos experts RH.
               </p>
             </div>
 
@@ -456,14 +447,14 @@ export default function CVLM() {
                   <LayoutGrid className="h-5 w-5" />
                 </div>
                 <h4 className="text-xs font-black uppercase tracking-wider text-slate-900">Bibliothèque Riche</h4>
-                <p className="text-[11px] font-semibold text-slate-400">Plus de 80 gabarits haut de gamme conformes aux normes RH.</p>
+                <p className="text-[11px] font-semibold text-slate-400">Plus de 80 gabarits haut de gamme conformes aux normes de recrutement.</p>
               </GlassCard>
               <GlassCard className="p-6 text-center space-y-3">
                 <div className="h-11 w-11 bg-orange-100 text-orange-600 rounded-2xl flex items-center justify-center mx-auto shadow-sm">
-                  <Sparkles className="h-5 w-5 animate-pulse" />
+                  <Award className="h-5 w-5" />
                 </div>
-                <h4 className="text-xs font-black uppercase tracking-wider text-slate-900">Conseils IA en direct</h4>
-                <p className="text-[11px] font-semibold text-slate-400">Génération de phrases d'impact, corrections stylistiques et ATS.</p>
+                <h4 className="text-xs font-black uppercase tracking-wider text-slate-900">Accompagnement RH</h4>
+                <p className="text-[11px] font-semibold text-slate-400">Conseils de mise en page, relecture soignée et optimisation de vos candidatures par nos spécialistes.</p>
               </GlassCard>
               <GlassCard className="p-6 text-center space-y-3">
                 <div className="h-11 w-11 bg-orange-100 text-orange-600 rounded-2xl flex items-center justify-center mx-auto shadow-sm">
@@ -513,19 +504,14 @@ export default function CVLM() {
                   <p className="text-sm font-black text-slate-800">{lmVersions.length} créées</p>
                 </div>
               </GlassCard>
-              <GlassCard 
-                onClick={() => setFilter('favorite')}
-                className={`p-4 flex items-center gap-3 cursor-pointer hover:shadow-md transition-all select-none ${
-                  filter === 'favorite' ? 'ring-2 ring-rose-500 bg-rose-50/10' : ''
-                }`}
-              >
-                <div className="h-10 w-10 bg-rose-50 text-rose-600 rounded-xl flex items-center justify-center shrink-0">
-                  <Heart className="h-5 w-5 text-rose-500 fill-rose-500" />
+              <GlassCard className="p-4 flex items-center gap-3">
+                <div className="h-10 w-10 bg-orange-50 text-orange-600 rounded-xl flex items-center justify-center shrink-0">
+                  <LayoutGrid className="h-5 w-5" />
                 </div>
                 <div>
-                  <p className="text-[9px] font-black uppercase text-slate-400">Favoris</p>
+                  <p className="text-[9px] font-black uppercase text-slate-400">Modèles Disponibles</p>
                   <p className="text-sm font-black text-slate-800">
-                    {safeTemplates.filter(t => t?.isFavorite).length} modèles
+                    {safeTemplates.length} modèles
                   </p>
                 </div>
               </GlassCard>
@@ -567,14 +553,6 @@ export default function CVLM() {
                 >
                   Lettres ({safeTemplates.filter(t => t?.type === 'lm').length})
                 </button>
-                <button
-                  onClick={() => setFilter('favorite')}
-                  className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
-                    filter === 'favorite' ? 'bg-white text-orange-600 shadow-sm' : 'text-slate-500'
-                  }`}
-                >
-                  Favoris ({safeTemplates.filter(t => t?.isFavorite).length})
-                </button>
               </div>
 
               {/* Elegant Search Bar */}
@@ -602,7 +580,6 @@ export default function CVLM() {
                     key={template.id}
                     template={template}
                     onPreview={setPreviewTemplate}
-                    onToggleFav={handleToggleFav}
                     onShare={handleShare}
                     onUse={handleUseTemplate}
                   />
@@ -903,11 +880,11 @@ export default function CVLM() {
             <div className="p-5 space-y-4 text-center">
               <div className="aspect-[3/4] bg-slate-100 rounded-2xl overflow-hidden shadow-inner border max-w-xs mx-auto">
                 <img
-                  src={previewTemplate.thumbnail}
+                  src={getTemplateThumbnail(previewTemplate.thumbnail, previewTemplate.type, previewTemplate.id)}
                   alt={previewTemplate.name}
                   className="w-full h-full object-cover"
                   onError={(e) => {
-                    (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1586281380349-632531db7ed4?w=300&h=400&fit=crop';
+                    (e.target as HTMLImageElement).src = getTemplateThumbnail('', previewTemplate.type, previewTemplate.id);
                   }}
                 />
               </div>

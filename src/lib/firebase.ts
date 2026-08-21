@@ -1,6 +1,7 @@
-import { initializeApp } from 'firebase/app';
+import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { initializeFirestore } from 'firebase/firestore';
+import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
+import { getStorage } from 'firebase/storage';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 // Retrieve configuration, supporting optional Vite environment variables first
@@ -18,18 +19,32 @@ const getFirebaseConfig = () => {
     };
   }
   
-  // Note: We avoid overriding the authDomain with the live web domain on Hostinger.
-  // When hosting the frontend statically on custom servers like Hostinger, 
-  // they cannot perform routing proxying for Firebase Auth's standard endpoints (e.g., `__/auth/iframe`),
-  // leading to 404 errors. Instead, we use the original firebaseapp.com authDomain.
   return firebaseConfig;
 };
 
 const config = getFirebaseConfig();
-const app = initializeApp(config);
-export const db = initializeFirestore(app, {
-  experimentalAutoDetectLongPolling: true,
-}, config.firestoreDatabaseId || (config as any).firestoreDatabaseId);
+const app = !getApps().length ? initializeApp(config) : getApp();
+
+export const db = getFirestore(app, config.firestoreDatabaseId);
 export const auth = getAuth(app);
+export const storage = getStorage(app);
+
+// Connection test helper
+export async function testFirebaseConnection(): Promise<{ success: boolean; error?: string }> {
+  try {
+    await getDocFromServer(doc(db, 'test', 'connection'));
+    console.log('✅ Firebase Firestore database connected successfully.');
+    return { success: true };
+  } catch (error: any) {
+    console.warn('Firebase connection check result:', error?.message || error);
+    // If doc doesn't exist, it's still a successful connection to Firestore
+    if (error?.code === 'not-found' || error?.message?.includes('No document to update')) {
+      return { success: true };
+    }
+    return { success: false, error: error?.message || String(error) };
+  }
+}
+
+
 
 

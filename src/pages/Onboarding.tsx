@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { uploadImageToStorage } from '@/lib/imageUtils';
+
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -807,26 +809,19 @@ function SkillsStep({ data, onChange }: { data: Partial<UserProfile>, onChange: 
 function DocumentsStep({ data, onChange }: { data: Partial<UserProfile>, onChange: (d: any) => void }) {
   const social = data.social || {};
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, type: string) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: string) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Check file size (limit to 700KB to stay within Firestore 1MB doc limit after base64 overhead)
-    const MAX_SIZE = 700 * 1024;
-    if (file.size > MAX_SIZE) {
-      alert("Le fichier est trop volumineux (Max 700 Ko). Veuillez compresser votre PDF ou utiliser un lien vers votre CV en ligne.");
-      return;
-    }
-    
-    // Simulate upload
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const base64 = reader.result as string;
+    try {
+      const storageUrl = await uploadImageToStorage(file, 'user_cvs');
       if (type === 'cv') {
-        onChange({ cvUrl: base64, cvName: file.name, cvUpdatedAt: new Date() });
+        onChange({ cvUrl: storageUrl, cvName: file.name, cvUpdatedAt: new Date() });
       }
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      console.error("Error uploading file to storage:", err);
+      alert("Erreur lors de l'envoi du fichier.");
+    }
   };
 
   return (
